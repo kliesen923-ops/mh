@@ -130,13 +130,14 @@ resize();
 // 내 캐릭터 데이터
 const player = {
     x: 200, y: 300, hp: 100, maxHp: 100, angle: 0,
-    isGuarding: false, isAttacking: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
+    isGuarding: false, guardTimer: 0, // 가드 타이머 추가
+    isAttacking: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
     trail: { active: false, alpha: 0, sA: 0, eA: 0, dir: 1 },
     isDodging: false, dTimer: 0, dDX: 0, dDY: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0, wire: { active: false, tx: 0, ty: 0 }
 };
 
-const boss = { x: 500, y: 300, hp: 1000, maxHp: 1000, size: 75, angle: 0, isHit: 0, animTime: 0 };
+const boss = { x: 500, y: 300, hp: 1000, maxHp: 1000, size: 75, angle: 0, state: 'idle', isHit: 0, animTime: 0, timer: 0 };
 
 // --- 소켓 이벤트 처리 ---
 socket.on('connect', () => { myId = socket.id; });
@@ -178,6 +179,12 @@ socket.on('bossUpdate', (serverBoss) => {
 });
 
 socket.on('playerHit', (damage) => {
+    // 저스트 가드 판정 (가드 시작 후 0.5초 이내)
+    if (player.isGuarding && player.guardTimer < 0.5) {
+        socket.emit('bossParry'); // 서버에 패링 알림
+        return;
+    }
+    
     player.hp -= damage;
     document.getElementById('player-hp').style.width = Math.max(0, player.hp) + "%";
 });
@@ -185,6 +192,9 @@ socket.on('playerHit', (damage) => {
 // --- 기존 게임 로직 ---
 function update(dt) {
     if (gameState !== 'PLAYING' || isChatting) return;
+
+    if (player.isGuarding) player.guardTimer += dt;
+    else player.guardTimer = 0;
 
     let prevPos = { x: player.x, y: player.y, angle: player.angle };
 
@@ -273,8 +283,23 @@ window.addEventListener('keyup', e => {
     keys[e.code] = false;
     if(isChatting) return;
     
-    if(e.code === 'ShiftLeft') { player.isGuarding = false; socket.emit('playerAction', { isGuarding: false }); }
+    if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') { 
+        player.isGuarding = false; 
+        socket.emit('playerAction', { isGuarding: false }); 
+    }
 });
+
+// 마우스 공격/와이어 기능 추가
+window.addEventListener('mousedown', e => {
+    if(gameState !== 'PLAYING' || isChatting) return;
+    // 왼쪽 클릭: 공격 (단, 모바일 버튼 영역 제외를 위해 화면 너비 체크 추가 가능)
+    if(e.button === 0) startAttack();
+    // 오른쪽 클릭: 와이어
+    if(e.button === 2) { e.preventDefault(); startWire(); }
+});
+
+// 우클릭 메뉴 방지
+window.addEventListener('contextmenu', e => e.preventDefault());
 
 function startAttack() {
     if(player.isAttacking) return;
@@ -308,14 +333,33 @@ function startDodge() {
 function startWire() {
     if(player.isAttacking || player.isDodging) return;
     player.wire.active = true;
-    player.wire.tx = player.x + Math.cos(player.angle) * 400;
-    player.wire.ty = player.y + Math.sin(player.angle) * 400;
+    
+    // 와이어 목표 지점 계산
+    let tx = player.x + Math.cos(player.angle) * 400;
+    let ty = player.y + Math.sin(player.angle) * 400;
+    
+    // 맵 밖으로 나가지 않도록 제한 (중요!)
+    player.wire.tx = Math.max(30, Math.min(canvas.width - 30, tx));
+    player.wire.ty = Math.max(30, Math.min(canvas.height - 30, ty));
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 1;
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+    
+    // 와이어 선 그리기
+    if (player.wire.active) {
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.wire.tx, player.wire.ty);
+        ctx.strokeStyle = "#f1c40f";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
     drawBoss(boss);
     Object.keys(otherPlayers).forEach(id => drawCharacter(otherPlayers[id], "#3498db"));
     drawCharacter(player, "#e67e22");
@@ -375,9 +419,42 @@ function drawCharacter(p, color) {
 }
 
 function drawBoss(b) {
-    ctx.save(); ctx.translate(b.x, b.y); ctx.scale(1, VIEW_Y_SCALE);
-    ctx.fillStyle = "#2d5a27"; ctx.beginPath(); ctx.arc(0, 0, b.size, 0, Math.PI*2); ctx.fill();
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(1, VIEW_Y_SCALE);
+
+    // 돌진 전 경고 효과 (서버의 boss.timer 활용)
+    if (b.state === 'charge' && b.timer > 10) {
+        ctx.beginPath();
+        ctx.arc(0, 0, b.size + Math.sin(Date.now()*0.02)*10, 0, Math.PI*2);
+        ctx.strokeStyle = "rgba(231, 76, 60, 0.5)";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+    }
+
+    // 다리/팔
+    const legAtoms = [
+        {ax: -1, ay: -1}, {ax: 1, ay: -1}, {ax: -1, ay: 1}, {ax: 1, ay: 1}
+    ];
+    legAtoms.forEach(l => {
+        const move = Math.sin((b.animTime || 0) * 2 + l.ax) * 10;
+        ctx.fillStyle = "#1e3c1a";
+        ctx.fillRect(l.ax * 40 - 10, l.ay * 40 - 10 + move, 20, 20);
+    });
+
+    // 몸체 (패링 시 파란색으로 반짝임)
+    ctx.fillStyle = (b.isParried) ? "#3498db" : (b.isHit > 0 ? "#fff" : "#2d5a27");
+    ctx.beginPath(); ctx.arc(0, 0, b.size, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#1a3316"; ctx.lineWidth = 4; ctx.stroke();
+
+    // 눈
+    ctx.rotate(b.angle || 0);
+    ctx.fillStyle = b.state === 'charge' ? "#ff0000" : "#fff";
+    ctx.beginPath(); ctx.arc(30, -15, 8, 0, Math.PI*2); ctx.arc(30, 15, 8, 0, Math.PI*2); ctx.fill();
+    
     ctx.restore();
+    
+    // 보스 체력바
     document.getElementById('boss-hp-fill').style.width = (b.hp/b.maxHp*100) + "%";
 }
 
@@ -396,9 +473,9 @@ function startGame() {
     requestAnimationFrame(loop);
 }
 
-// 조이스틱 로직 생략 (기존과 동일)
+// 조이스틱 로직
 joyContainer.addEventListener('pointerdown', e => {
-    if(gameState !== 'PLAYING') return;
+    if(gameState !== 'PLAYING' || isChatting) return;
     joyData.active = true; joyData.pointerId = e.pointerId;
     const rect = joyContainer.getBoundingClientRect();
     joyData.startX = rect.left + rect.width / 2;
@@ -419,6 +496,35 @@ window.addEventListener('pointerup', e => {
     joyData.active = false; joyStick.style.transform = `translate(0px, 0px)`;
     player.moveDir = { x: 0, y: 0 };
 });
+
+// 버튼 바인딩 함수 추가
+const bindBtn = (id, start, end) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('pointerdown', e => { 
+        e.preventDefault(); 
+        if(gameState === 'PLAYING' && !isChatting) start(); 
+    });
+    if(end) {
+        const stop = e => { e.preventDefault(); end(); };
+        el.addEventListener('pointerup', stop);
+        el.addEventListener('pointerleave', stop);
+    }
+};
+
+// 버튼 이벤트 연결
+bindBtn('btn-attack', startAttack);
+bindBtn('btn-dodge', startDodge);
+bindBtn('btn-guard', () => { 
+    if(!player.isAttacking) { 
+        player.isGuarding = true; 
+        socket.emit('playerAction', { isGuarding: true }); 
+    } 
+}, () => { 
+    player.isGuarding = false; 
+    socket.emit('playerAction', { isGuarding: false }); 
+});
+bindBtn('btn-wire', startWire);
 </script>
 </body>
 </html>
