@@ -91,7 +91,7 @@
             .btn { width: 58px; height: 58px; font-size: 12px; border-width: 2px; }
             #btn-attack { width: 76px; height: 76px; font-size: 14px; }
             #upgrade-cards { gap: 10px; margin-top: 14px; }
-            .card { flex-basis: 100px; max-width: 150px; height: 170px; padding: 10px; border-radius: 8px; }
+            .card { flex-basis: 96px; max-width: 140px; height: 164px; padding: 9px; border-radius: 8px; }
             .card h4 { font-size: 13px; margin-bottom: 7px; }
             .card p { font-size: 11px; }
             .card .icon { font-size: 24px; margin-bottom: 7px; }
@@ -152,7 +152,7 @@
                 bottom: calc(18px + env(safe-area-inset-bottom));
             }
             #upgrade-cards { max-width: calc(100vw - 32px); }
-            .card { height: 150px; }
+            .card { height: 142px; }
         }
     </style>
 </head>
@@ -187,6 +187,7 @@
             <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">⚔️</div><h4>공격력 강화</h4><p>모든 공격의 데미지가 <br><b>20%</b> 상승합니다.</p></div>
             <div class="card" onclick="selectUpgrade('range')"><div class="icon">📏</div><h4>사거리 강화</h4><p>공격의 리치와 범위가 <br><b>15%</b> 상승합니다.</p></div>
             <div class="card" onclick="selectUpgrade('speed')"><div class="icon">⚡</div><h4>공격 속도 강화</h4><p>공격 속도가 <br><b>25%</b> 상승합니다.</p></div>
+            <div class="card" onclick="selectUpgrade('move')"><div class="icon">👟</div><h4>이동 속도 강화</h4><p>이동 속도가 <br><b>10%</b> 상승합니다.</p></div>
         </div>
     </div>
 
@@ -208,7 +209,7 @@ const player = {
     isDodging: false, dTimer: 0, dDX: 0, dDY: 0, dodgeCooldown: 0,
     wire: { active: false, tx: 0, ty: 0 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
-    stats: { dmg: 1.0, range: 1.0, speed: 1.0 }
+    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 }
 };
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -217,7 +218,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.stats = data[myId].stats; player.level = data[myId].level; updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -263,7 +264,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.stats = data[myId].stats; player.level = data[myId].level; updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -272,7 +273,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = 100; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.stats = Object.assign({}, p.stats); 
+        player.level = p.level; player.stats = normalizeStats(p.stats); 
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -315,6 +316,10 @@ function formatDamage(value) {
     return String(Math.floor(value));
 }
 
+function normalizeStats(stats) {
+    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 }, stats || {});
+}
+
 function updateHUD() {
     const hpText = document.getElementById('hp-text');
     const hpFill = document.getElementById('hp-fill');
@@ -327,7 +332,8 @@ function updateHUD() {
     hpText.textContent = `${hp}/100`;
     hpFill.style.width = `${Math.max(0, Math.min(100, hp))}%`;
 
-    const dmgScale = player.stats && Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
+    player.stats = normalizeStats(player.stats);
+    const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
     basicDamage.textContent = formatDamage(10 * dmgScale);
     secondDamage.textContent = formatDamage(20 * dmgScale);
     heavyDamage.textContent = formatDamage(35 * dmgScale);
@@ -354,7 +360,8 @@ function update(dt) {
         const dx = player.wire.tx - player.x, dy = player.wire.ty - player.y, d = Math.hypot(dx,dy);
         if(d > 20) { player.x += (dx/d)*1200*dt; player.y += (dy/d)*1200*dt; } else { player.wire.active = false; socket.emit('playerAction', { wire: { active: false } }); }
     } else if(mx !== 0 || my !== 0) {
-        const d = Math.hypot(mx, my), s = (player.isGuarding ? 150 : 350) * dt;
+        player.stats = normalizeStats(player.stats);
+        const d = Math.hypot(mx, my), s = (player.isGuarding ? 150 : 350) * player.stats.move * dt;
         player.x += (mx/d) * s; player.y += (my/d) * s; player.angle = Math.atan2(my, mx); player.animTime += dt * 10;
     } else player.animTime = 0;
 

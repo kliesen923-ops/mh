@@ -50,6 +50,14 @@ function hasHitTargetThisAttack(playerId, targetId) {
     return false;
 }
 
+function createDefaultStats() {
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
+}
+
+function normalizeStats(stats) {
+    return Object.assign(createDefaultStats(), stats || {});
+}
+
 function sanitizeAction(p, actionData) {
     const action = {};
     if (!actionData || typeof actionData !== 'object') return action;
@@ -115,7 +123,7 @@ io.on('connection', (socket) => {
         isUpgrading: false,
         pendingUpgrades: 0,
         wire: { active: false, tx: 0, ty: 0 },
-        stats: { dmg: 1.0, range: 1.0, speed: 1.0 },
+        stats: createDefaultStats(),
         lastMoveAt: Date.now(),
         lastWireAt: 0
     };
@@ -163,9 +171,11 @@ io.on('connection', (socket) => {
     socket.on('selectUpgrade', (type) => {
         const p = players[socket.id];
         if (!p) return;
+        p.stats = normalizeStats(p.stats);
         if (type === 'dmg') p.stats.dmg += 0.2;
         else if (type === 'range') p.stats.range += 0.15;
         else if (type === 'speed') p.stats.speed += 0.25;
+        else if (type === 'move') p.stats.move += 0.1;
         p.pendingUpgrades--;
         if (p.pendingUpgrades <= 0) {
             p.pendingUpgrades = 0;
@@ -260,7 +270,7 @@ io.on('connection', (socket) => {
                     attacker.pendingUpgrades += levelsGained;
                 }
                 target.level = 1;
-                target.stats = { dmg: 1.0, range: 1.0, speed: 1.0 };
+                target.stats = createDefaultStats();
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
                 io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
