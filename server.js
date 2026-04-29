@@ -23,6 +23,16 @@ setInterval(() => {
     const playerIds = Object.keys(players);
     if (playerIds.length === 0) {
         boss.state = 'idle';
+        boss.isParried = false;
+        return;
+    }
+
+    // 패링 경직 처리
+    if (boss.isParried) {
+        boss.parryTimer--;
+        if (boss.parryTimer <= 0) boss.isParried = false;
+        
+        io.emit('bossUpdate', boss);
         return;
     }
 
@@ -87,12 +97,25 @@ setInterval(() => {
         angle: boss.angle,
         state: boss.state,
         animTime: boss.animTime,
-        isHit: boss.isHit
+        isHit: boss.isHit,
+        timer: boss.timer,
+        isParried: boss.isParried
     });
 }, 33);
 
 io.on('connection', (socket) => {
     console.log('새로운 플레이어 접속:', socket.id);
+
+    // 패링 처리
+    socket.on('bossParry', () => {
+        boss.isParried = true;
+        boss.parryTimer = 45; // 약 1.5초 경직
+        boss.state = 'idle';
+        // 뒤로 밀려나기 (각도 반대 방향)
+        boss.x -= Math.cos(boss.angle) * 50;
+        boss.y -= Math.sin(boss.angle) * 50;
+        io.emit('bossUpdate', boss);
+    });
 
     // 새 플레이어 초기화
     players[socket.id] = {
@@ -137,6 +160,11 @@ io.on('connection', (socket) => {
     socket.on('bossHit', (damage) => {
         boss.hp -= damage;
         io.emit('bossUpdate', boss); // 모든 사람에게 보스 체력 업데이트
+    });
+
+    // 채팅 메시지 처리
+    socket.on('chatMessage', (msg) => {
+        io.emit('chatMessage', { id: socket.id, message: msg });
     });
 
     // 접속 종료 처리
