@@ -147,7 +147,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
-    console.log(`서버가 시작되었습니다! http://localhost:${PORT}`);
+    console.log(`서버가 시작되었습니다! 포트: ${PORT}`);
 });
