@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>2D 몬헌 멀티플레이어</title>
+    <!-- Socket.io 라이브러리 로드 -->
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; touch-action: none; -webkit-user-select: none; user-select: none; }
+        canvas { display: block; background: #111; }
+        
+        /* UI 레이아웃 */
+        .ui-container { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 100; }
+        .hp-label { color: white; font-size: 12px; margin-bottom: 4px; text-shadow: 1px 1px 2px black; }
+        .hp-bar { width: 180px; height: 12px; background: #222; border: 2px solid #555; border-radius: 6px; overflow: hidden; }
+        .hp-fill { height: 100%; transition: width 0.2s; background: linear-gradient(to bottom, #2ecc71, #27ae60); width: 100%; }
+        
+        #boss-hp-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 60%; text-align: center; z-index: 100; }
+        #boss-name { color: #e74c3c; font-weight: bold; margin-bottom: 5px; text-shadow: 2px 2px 4px black; }
+        #boss-hp-bar { width: 100%; height: 18px; background: #222; border: 2px solid #c0392b; border-radius: 9px; overflow: hidden; }
+        #boss-hp-fill { background: linear-gradient(to bottom, #e74c3c, #c0392b); width: 100%; height: 100%; transition: width 0.3s; }
+
+        .action-buttons { position: absolute; bottom: 50px; right: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; z-index: 100; }
+        .btn { width: 70px; height: 70px; background: rgba(40,40,40,0.7); border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
+        #btn-attack { background: rgba(192, 57, 43, 0.7); border-color: #e74c3c; width: 90px; height: 90px; grid-column: 2; grid-row: 2; font-size: 18px; }
+
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; color: white; text-align: center; }
+        .hidden { display: none; }
+        #joy-container { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        #joy-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; position: absolute; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div class="ui-container">
+        <div class="hp-label">HUNTER HP</div>
+        <div class="hp-bar"><div id="player-hp" class="hp-fill"></div></div>
+    </div>
+
+    <div id="boss-hp-container">
+        <div id="boss-name">ANCIENT GUARDIAN (MULTI)</div>
+        <div id="boss-hp-bar"><div id="boss-hp-fill"></div></div>
+    </div>
+
+    <div id="joy-container"><div id="joy-stick"></div></div>
+
+    <div class="action-buttons">
+        <div class="btn" id="btn-wire">와이어</div>
+        <div class="btn" id="btn-dodge">회피</div>
+        <div class="btn" id="btn-guard">가드</div>
+        <div class="btn" id="btn-attack">공격</div>
+    </div>
+
+    <div id="overlay-start" class="overlay">
+        <h1>MONSTER HUNTER 2D (멀티)</h1>
+        <button onclick="startGame()" style="padding: 15px 40px; background: #e74c3c; color: white; border: none; border-radius: 30px; cursor: pointer;">접속하기</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+const socket = io(); // 서버 연결
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const VIEW_Y_SCALE = 0.7;
+
+let gameState = 'TITLE';
+let myId = null;
+let otherPlayers = {};
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+// 내 캐릭터 데이터
+const player = {
+    x: 200, y: 300, hp: 100, maxHp: 100, angle: 0,
+    isGuarding: false, isAttacking: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
+    trail: { active: false, alpha: 0, sA: 0, eA: 0, dir: 1 },
+    isDodging: false, dTimer: 0, dDX: 0, dDY: 0,
+    moveDir: { x: 0, y: 0 }, animTime: 0, wire: { active: false, tx: 0, ty: 0 }
+};
+
+const boss = { x: 500, y: 300, hp: 1000, maxHp: 1000, size: 75, angle: 0, isHit: 0, animTime: 0 };
+
+// --- 소켓 이벤트 처리 ---
+socket.on('connect', () => { myId = socket.id; });
+
+socket.on('currentPlayers', (players) => {
+    Object.keys(players).forEach(id => {
+        if (id !== socket.id) otherPlayers[id] = players[id];
+    });
+});
+
+socket.on('newPlayer', (data) => { otherPlayers[data.id] = data.player; });
+
+socket.on('playerMoved', (data) => {
+    if (otherPlayers[data.id]) {
+        otherPlayers[data.id].x = data.player.x;
+        otherPlayers[data.id].y = data.player.y;
+        otherPlayers[data.id].angle = data.player.angle;
+        otherPlayers[data.id].animTime = data.player.animTime;
+    }
+});
+
+socket.on('playerActionUpdate', (data) => {
+    if (otherPlayers[data.id]) Object.assign(otherPlayers[data.id], data.action);
+});
+
+socket.on('playerDisconnected', (id) => { delete otherPlayers[id]; });
+
+socket.on('bossUpdate', (serverBoss) => {
+    Object.assign(boss, serverBoss);
+});
+
+socket.on('playerHit', (damage) => {
+    player.hp -= damage;
+    document.getElementById('player-hp').style.width = Math.max(0, player.hp) + "%";
+});
+
+// --- 기존 게임 로직 (멀티 동기화 추가) ---
+function update(dt) {
+    if (gameState !== 'PLAYING') return;
+
+    let prevPos = { x: player.x, y: player.y, angle: player.angle };
+
+    handleMovement(dt);
+    if(player.isAttacking) updateAttackLogic(dt);
+
+    if (prevPos.x !== player.x || prevPos.y !== player.y || prevPos.angle !== player.angle) {
+        socket.emit('playerMovement', { x: player.x, y: player.y, angle: player.angle, animTime: player.animTime });
+    }
+}
+
+function handleMovement(dt) {
+    let mx = player.moveDir.x, my = player.moveDir.y;
+    
+    // 키보드 입력 반영
+    if(keys['KeyW']) my -= 1; if(keys['KeyS']) my += 1;
+    if(keys['KeyA']) mx -= 1; if(keys['KeyD']) mx += 1;
+
+    if(player.isDodging) {
+        player.x += player.dDX * 1000 * dt; player.y += player.dDY * 1000 * dt;
+        player.dTimer -= dt;
+        if(player.dTimer <= 0) player.isDodging = false;
+    } else if(player.isAttacking) {
+        // 공격 관성 (앞으로 살짝 나감)
+        const step = (player.comboStep === 3 ? 600 : 400) * dt;
+        player.x += Math.cos(player.aAngle) * step; player.y += Math.sin(player.aAngle) * step;
+    } else if(player.wire.active) {
+        const dx = player.wire.tx - player.x, dy = player.wire.ty - player.y, d = Math.hypot(dx,dy);
+        if(d > 20) { player.x += (dx/d)*1500*dt; player.y += (dy/d)*1500*dt; } else player.wire.active = false;
+    } else {
+        if(mx||my) {
+            const d = Math.hypot(mx,my), s = (player.isGuarding ? 180 : 380) * dt;
+            player.x += (mx/d)*s; player.y += (my/d)*s;
+            if(!joyData.active) player.angle = Math.atan2(my, mx);
+            player.animTime += dt * 10;
+        } else {
+            player.animTime = 0;
+        }
+    }
+    
+    // 화면 제한
+    player.x = Math.max(30, Math.min(canvas.width - 30, player.x));
+    player.y = Math.max(30, Math.min(canvas.height - 30, player.y));
+}
+
+// --- 입력 시스템 등록 ---
+const keys = {};
+const joyData = { active: false, startX: 0, startY: 0, pointerId: null };
+const joyContainer = document.getElementById('joy-container');
+const joyStick = document.getElementById('joy-stick');
+
+joyContainer.addEventListener('pointerdown', e => {
+    if(gameState !== 'PLAYING') return;
+    joyData.active = true; joyData.pointerId = e.pointerId;
+    const rect = joyContainer.getBoundingClientRect();
+    joyData.startX = rect.left + rect.width / 2;
+    joyData.startY = rect.top + rect.height / 2;
+    joyContainer.setPointerCapture(e.pointerId);
+});
+
+window.addEventListener('pointermove', e => {
+    if (!joyData.active || e.pointerId !== joyData.pointerId) return;
+    let dx = e.clientX - joyData.startX;
+    let dy = e.clientY - joyData.startY;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    let maxDist = 45;
+    if (dist > maxDist) { dx = (dx/dist) * maxDist; dy = (dy/dist) * maxDist; dist = maxDist; }
+    joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
+    player.moveDir = { x: dx/maxDist, y: (dy/maxDist) / VIEW_Y_SCALE };
+    if(!player.isAttacking) player.angle = Math.atan2(dy/VIEW_Y_SCALE, dx);
+});
+
+const endJoy = e => {
+    if(!joyData.active || e.pointerId !== joyData.pointerId) return;
+    joyData.active = false; joyData.pointerId = null;
+    joyStick.style.transform = `translate(0px, 0px)`;
+    player.moveDir = { x: 0, y: 0 };
+};
+window.addEventListener('pointerup', endJoy);
+
+const bindBtn = (id, start, end) => {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING') start(); });
+    if(end) {
+        const stop = e => { e.preventDefault(); end(); };
+        el.addEventListener('pointerup', stop);
+        el.addEventListener('pointerleave', stop);
+    }
+};
+
+bindBtn('btn-attack', startAttack);
+bindBtn('btn-dodge', startDodge);
+bindBtn('btn-guard', () => { if(!player.isAttacking) { player.isGuarding = true; socket.emit('playerAction', { isGuarding: true }); } }, () => { player.isGuarding = false; socket.emit('playerAction', { isGuarding: false }); });
+bindBtn('btn-wire', startWire);
+
+function startDodge() {
+    if (player.isDodging || player.isAttacking) return;
+    player.isDodging = true; player.dTimer = 0.18;
+    player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle);
+    socket.emit('playerAction', { isDodging: true });
+}
+
+function startWire() {
+    if(player.isAttacking || player.isDodging) return;
+    player.wire.active = true;
+    player.wire.tx = player.x + Math.cos(player.angle) * 400;
+    player.wire.ty = player.y + Math.sin(player.angle) * 400;
+}
+
+window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if(gameState !== 'PLAYING') return;
+    if(e.code === 'Space') startDodge();
+    if(e.code === 'ShiftLeft') { player.isGuarding = true; socket.emit('playerAction', { isGuarding: true }); }
+    if(e.code === 'KeyR' || e.code === 'KeyF') startAttack();
+});
+window.addEventListener('keyup', e => {
+    keys[e.code] = false;
+    if(e.code === 'ShiftLeft') { player.isGuarding = false; socket.emit('playerAction', { isGuarding: false }); }
+});
+
+// 마우스 공격/와이어
+window.addEventListener('mousedown', e => {
+    if(gameState === 'PLAYING' && e.button === 0 && canvas.width > 800) startAttack();
+    if(gameState === 'PLAYING' && e.button === 2) { e.preventDefault(); startWire(); }
+});
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+function startAttack() {
+    if(player.isAttacking) return;
+    player.isAttacking = true;
+    player.comboStep = (player.comboStep % 3) + 1;
+    player.attackPhase = 1; player.attackTimer = 0.12;
+    player.aAngle = player.angle;
+    
+    // 서버에 내 공격 액션 알림
+    socket.emit('playerAction', { 
+        isAttacking: true, 
+        comboStep: player.comboStep, 
+        aAngle: player.aAngle,
+        attackPhase: 1 
+    });
+}
+
+function updateAttackLogic(dt) {
+    player.attackTimer -= dt;
+    if (player.attackPhase === 1 && player.attackTimer <= 0) {
+        player.attackPhase = 2; player.attackTimer = 0.08;
+        // 보스 타격 시 서버에 알림
+        if(Math.hypot(boss.x-player.x, boss.y-player.y) < boss.size + 80) {
+            socket.emit('bossHit', player.comboStep === 3 ? 120 : 45);
+        }
+    } else if (player.attackPhase === 2 && player.attackTimer <= 0) {
+        player.attackPhase = 3; player.attackTimer = 0.2;
+    } else if (player.attackPhase === 3 && player.attackTimer <= 0) {
+        player.isAttacking = false;
+        socket.emit('playerAction', { isAttacking: false });
+    }
+}
+
+// --- 렌더링 (모든 플레이어 그리기) ---
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 격자 배경
+    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 1;
+    for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+
+    // 보스 그리기
+    drawBoss(boss);
+
+    // 다른 플레이어들 그리기
+    Object.keys(otherPlayers).forEach(id => {
+        drawCharacter(otherPlayers[id], "#3498db"); // 다른 사람은 파란색
+    });
+
+    // 내 캐릭터 그리기
+    drawCharacter(player, "#e67e22"); // 나는 오렌지색
+    
+    requestAnimationFrame(loop);
+}
+
+function drawCharacter(p, color) {
+    const { x, y, angle, animTime, isDodging, isGuarding, isAttacking, comboStep, attackPhase } = p;
+    
+    // 그림자
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, VIEW_Y_SCALE);
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, VIEW_Y_SCALE);
+
+    // 1. 다리
+    const legCycle = Math.sin(animTime || 0);
+    ctx.fillStyle = "#34495e";
+    ctx.fillRect(-15, 0 + (legCycle > 0 ? -8 : 8), 10, 25);
+    ctx.fillRect(5, 0 + (legCycle < 0 ? -8 : 8), 10, 25);
+
+    ctx.rotate(angle || 0);
+
+    // 2. 몸체
+    ctx.fillStyle = isDodging ? "rgba(230,126,34,0.6)" : (color || "#e67e22");
+    ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 2; ctx.stroke();
+
+    // 3. 머리
+    ctx.fillStyle = "#ffdbac";
+    ctx.beginPath(); ctx.arc(0, -12, 14, 0, Math.PI*2); ctx.fill();
+
+    // 4. 팔 & 장비
+    const armSkin = "#ffdbac";
+
+    // 왼팔 & 방패
+    ctx.save();
+    ctx.rotate(-0.6 + (isGuarding ? -0.4 : 0));
+    ctx.fillStyle = armSkin;
+    ctx.fillRect(15, -28, 20, 10);
+    ctx.fillStyle = "#2980b9";
+    ctx.fillRect(30, -45, 12, 55);
+    ctx.restore();
+
+    // 오른팔 & 검
+    ctx.save();
+    let swordRot = 0.8;
+    if(isAttacking) {
+        if(attackPhase === 1) swordRot = (comboStep === 2) ? 1.5 : -1.5;
+        else if(attackPhase === 2) swordRot = (comboStep === 2) ? -1.2 : 1.2;
+    } else if(isGuarding) swordRot = 0.2;
+    
+    ctx.rotate(swordRot);
+    ctx.fillStyle = armSkin; ctx.fillRect(15, 18, 20, 10);
+    ctx.fillStyle = comboStep === 3 ? "#f1c40f" : "#bdc3c7";
+    ctx.fillRect(35, 18, 60, 10);
+    ctx.restore();
+
+    ctx.restore();
+
+    // 검기 궤적 (내 캐릭터만 직접 계산, 다른 캐릭터는 데이터 기반)
+    if(isAttacking && attackPhase === 2) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(1, VIEW_Y_SCALE);
+        ctx.beginPath();
+        let sA = p.aAngle - 2.0, eA = p.aAngle + 0.5;
+        let counter = false;
+        if(comboStep === 2) { sA = p.aAngle + 2.0; eA = p.aAngle - 0.5; counter = true; }
+        else if(comboStep === 3) { sA = p.aAngle - 2.8; eA = p.aAngle + 2.8; }
+        
+        ctx.arc(0, 0, 75, sA, eA, counter);
+        ctx.strokeStyle = comboStep === 3 ? "rgba(255, 100, 0, 0.8)" : "rgba(255, 255, 255, 0.8)";
+        ctx.lineWidth = 24; ctx.lineCap = "round";
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+function drawBoss(b) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(1, VIEW_Y_SCALE);
+    ctx.fillStyle = "#2d5a27";
+    ctx.beginPath(); ctx.arc(0, 0, b.size, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    
+    // 보스 체력바
+    document.getElementById('boss-hp-fill').style.width = (b.hp/b.maxHp*100) + "%";
+}
+
+let lastTime = 0;
+function loop(t) {
+    let dt = (t - lastTime) / 1000;
+    if(dt > 0.1) dt = 0.1;
+    lastTime = t;
+    update(dt);
+    draw();
+}
+
+function startGame() {
+    document.getElementById('overlay-start').classList.add('hidden');
+    gameState = 'PLAYING';
+    requestAnimationFrame(loop);
+}
+
+// 가상 조이스틱 (기존 코드 유지)
+// ...
+</script>
+</body>
+</html>
