@@ -483,6 +483,7 @@ window.addEventListener('keydown', e => {
         if (e.code === 'Enter') startGame();
         return;
     }
+    if (gameState !== 'PLAYING') return;
     if (isChatting && e.code !== 'Enter') return;
     if (isUpgrading) return;
     if (e.code === 'Enter') { if (!isChatting) { isChatting = true; document.getElementById('chat-container').classList.add('active'); document.getElementById('chat-input-container').style.display = 'block'; Object.keys(keys).forEach(k => keys[k] = false); setTimeout(() => document.getElementById('chat-input').focus(), 10); e.preventDefault(); } return; }
