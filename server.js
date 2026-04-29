@@ -18,6 +18,7 @@ const MOVE_TOLERANCE = 80;
 const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
 const MAX_CHAT_LENGTH = 50;
+const MAX_NAME_LENGTH = 10;
 
 function getAngleDiff(a1, a2) {
     let diff = a1 - a2;
@@ -56,6 +57,15 @@ function createDefaultStats() {
 
 function normalizeStats(stats) {
     return Object.assign(createDefaultStats(), stats || {});
+}
+
+function sanitizeName(name, fallback) {
+    const cleaned = String(name || '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^\p{L}\p{N}_]/gu, '')
+        .slice(0, MAX_NAME_LENGTH);
+    return cleaned.length >= 2 ? cleaned : fallback;
 }
 
 function sanitizeAction(p, actionData) {
@@ -130,6 +140,13 @@ io.on('connection', (socket) => {
 
     socket.emit('currentPlayers', players);
     socket.broadcast.emit('newPlayer', players[socket.id]);
+
+    socket.on('setName', (name) => {
+        const p = players[socket.id];
+        if (!p) return;
+        p.name = sanitizeName(name, p.name);
+        io.emit('statsUpdate', players);
+    });
 
     socket.on('playerMovement', (movementData) => {
         if (players[socket.id] && !players[socket.id].isStunned) {

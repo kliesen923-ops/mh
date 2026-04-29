@@ -40,6 +40,10 @@
         #upgrade-timer { font-size: 24px; color: #e74c3c; font-weight: bold; margin-top: 20px; text-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
         #joy-container { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; border: 2px solid rgba(255,255,255,0.2); }
         #joy-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; position: absolute; pointer-events: none; }
+        #nickname-input { width: min(260px, calc(100vw - 40px)); margin: 14px 0; padding: 12px 14px; border: 1px solid #555; border-radius: 8px; background: rgba(255,255,255,0.12); color: white; outline: none; font-size: 16px; text-align: center; box-sizing: border-box; }
+        #nickname-input:focus { border-color: #f1c40f; box-shadow: 0 0 0 2px rgba(241,196,15,0.2); }
+        #nickname-input::placeholder { color: rgba(255,255,255,0.55); }
+        #nickname-error { min-height: 18px; color: #e74c3c; font-size: 12px; margin-bottom: 10px; }
 
         @media (max-width: 700px), (max-height: 500px) {
             #hud {
@@ -179,6 +183,8 @@
     
     <div id="overlay-start" class="overlay">
         <h1>HUNTER ARENA: LEVEL UP</h1>
+        <input id="nickname-input" type="text" maxlength="10" placeholder="닉네임 2~10자" autocomplete="off">
+        <div id="nickname-error"></div>
         <button onclick="startGame()" style="padding: 15px 40px; background: #e74c3c; color: white; border: none; border-radius: 30px; cursor: pointer; font-weight: bold; font-size: 18px;">참전하기</button>
     </div>
 
@@ -450,6 +456,10 @@ function startWire() {
 function distToSegment(p1, p2, p) { const l2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2); if (l2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y); let t = Math.max(0, Math.min(1, ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2)); return Math.hypot(p.x - (p1.x + t * (p2.x - p1.x)), p.y - (p1.y + t * (p2.y - p1.y))); }
 
 window.addEventListener('keydown', e => {
+    if (gameState === 'TITLE' && e.target && e.target.id === 'nickname-input') {
+        if (e.code === 'Enter') startGame();
+        return;
+    }
     if (isChatting && e.code !== 'Enter') return;
     if (isUpgrading) return;
     if (e.code === 'Enter') { if (!isChatting) { isChatting = true; document.getElementById('chat-container').classList.add('active'); document.getElementById('chat-input-container').style.display = 'block'; Object.keys(keys).forEach(k => keys[k] = false); setTimeout(() => document.getElementById('chat-input').focus(), 10); e.preventDefault(); } return; }
@@ -490,7 +500,23 @@ const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) 
 bind('btn-attack', () => { if(player.isAttacking || player.hp <= 0 || player.isStunned) return; player.isAttacking = true; player.comboStep = (player.comboStep % 3) + 1; player.attackPhase = 1; player.attackTimer = 0.12 / player.stats.speed; player.aAngle = player.angle; socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle }); });
 bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire);
 let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateCooldownUI(); draw(); }
-function startGame() { document.getElementById('overlay-start').classList.add('hidden'); gameState = 'PLAYING'; requestAnimationFrame(loop); }
+function normalizeNameInput(value) {
+    return String(value || '').trim().replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 10);
+}
+function startGame() {
+    const nicknameInput = document.getElementById('nickname-input');
+    const errorEl = document.getElementById('nickname-error');
+    const nickname = normalizeNameInput(nicknameInput ? nicknameInput.value : '');
+    if (nickname && nickname.length < 2) {
+        if (errorEl) errorEl.textContent = '닉네임은 2자 이상이어야 합니다.';
+        return;
+    }
+    if (errorEl) errorEl.textContent = '';
+    if (nickname) socket.emit('setName', nickname);
+    document.getElementById('overlay-start').classList.add('hidden');
+    gameState = 'PLAYING';
+    requestAnimationFrame(loop);
+}
 </script>
 </body>
 </html>
