@@ -10,145 +10,40 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'mh.html'));
 });
 
-// 게임 데이터 관리
 let players = {};
-let boss = { 
-    x: 500, y: 300, hp: 1000, maxHp: 1000, 
-    state: 'idle', angle: 0, timer: 100, targetId: null,
-    size: 75
-};
-
-// 보스 AI 루프 (초당 30회 업데이트)
-setInterval(() => {
-    const playerIds = Object.keys(players);
-    if (playerIds.length === 0) {
-        boss.state = 'idle';
-        boss.isParried = false;
-        return;
-    }
-
-    // 패링 경직 처리
-    if (boss.isParried) {
-        boss.parryTimer--;
-        if (boss.parryTimer <= 0) boss.isParried = false;
-        
-        io.emit('bossUpdate', boss);
-        return;
-    }
-
-    // 타겟 선정 (가장 가까운 플레이어)
-    if (!boss.targetId || !players[boss.targetId]) {
-        let minDist = Infinity;
-        playerIds.forEach(id => {
-            let d = Math.hypot(players[id].x - boss.x, players[id].y - boss.y);
-            if (d < minDist) { minDist = d; boss.targetId = id; }
-        });
-    }
-
-    const target = players[boss.targetId];
-    if (!target) return;
-
-    boss.timer--;
-
-    if (boss.state === 'idle') {
-        boss.angle = Math.atan2(target.y - boss.y, target.x - boss.x);
-        if (boss.timer <= 0) {
-            boss.state = 'charge';
-            boss.timer = 40; // 돌진 준비 및 수행 시간
-        }
-    } else if (boss.state === 'charge') {
-        if (boss.timer > 10) {
-            // 돌진 전 흔들림 효과 유도 (각도만 살짝씩 변경)
-        } else {
-            // 실제 돌진
-            boss.x += Math.cos(boss.angle) * 15;
-            boss.y += Math.sin(boss.angle) * 15;
-
-            // 플레이어 충돌 판정
-            playerIds.forEach(id => {
-                const p = players[id];
-                if (Math.hypot(p.x - boss.x, p.y - boss.y) < boss.size + 25) {
-                    // 데미지 전송 (클라이언트에서 처리하도록 이벤트 발송)
-                    io.to(id).emit('playerHit', 15);
-                    boss.state = 'idle';
-                    boss.timer = 90;
-                    boss.targetId = null; // 타격 후 타겟 초기화
-                }
-            });
-        }
-
-        if (boss.timer <= -20) {
-            boss.state = 'idle';
-            boss.timer = 90;
-            boss.targetId = null;
-        }
-    }
-
-    // 화면 경계 제한 (서버 기준)
-    boss.x = Math.max(100, Math.min(1200, boss.x));
-    boss.y = Math.max(100, Math.min(800, boss.y));
-    boss.animTime = (boss.animTime || 0) + 0.1;
-
-    io.emit('bossUpdate', {
-        x: boss.x,
-        y: boss.y,
-        hp: boss.hp,
-        maxHp: boss.maxHp,
-        angle: boss.angle,
-        state: boss.state,
-        animTime: boss.animTime,
-        isHit: boss.isHit,
-        timer: boss.timer,
-        isParried: boss.isParried
-    });
-}, 33);
 
 io.on('connection', (socket) => {
-    console.log('새로운 플레이어 접속:', socket.id);
+    console.log('플레이어 접속:', socket.id);
 
-    // 패링 처리
-    socket.on('bossParry', () => {
-        boss.isParried = true;
-        boss.parryTimer = 45; // 약 1.5초 경직
-        boss.state = 'idle';
-        // 뒤로 밀려나기 (각도 반대 방향)
-        boss.x -= Math.cos(boss.angle) * 50;
-        boss.y -= Math.sin(boss.angle) * 50;
-        io.emit('bossUpdate', boss);
-    });
-
-    // 새 플레이어 초기화
     players[socket.id] = {
-        x: 100 + Math.random() * 200,
-        y: 100 + Math.random() * 200,
+        id: socket.id,
+        name: "Hunter_" + socket.id.substring(0, 4),
+        x: 200 + Math.random() * 600,
+        y: 200 + Math.random() * 400,
         hp: 100,
         angle: 0,
-        comboStep: 0,
+        kills: 0,
+        deaths: 0,
         isAttacking: false,
+        attackPhase: 0,
+        comboStep: 0,
+        aAngle: 0,
         isGuarding: false,
-        isDodging: false
+        wire: { active: false, tx: 0, ty: 0 }
     };
 
-    // 현재 플레이어 목록과 보스 상태 전송
     socket.emit('currentPlayers', players);
-    socket.emit('bossUpdate', boss);
+    socket.broadcast.emit('newPlayer', players[socket.id]);
 
-    // 다른 사람들에게 새 플레이어 알림
-    socket.broadcast.emit('newPlayer', { id: socket.id, player: players[socket.id] });
-
-    // 플레이어 움직임 업데이트
     socket.on('playerMovement', (movementData) => {
         if (players[socket.id]) {
             players[socket.id].x = movementData.x;
             players[socket.id].y = movementData.y;
             players[socket.id].angle = movementData.angle;
-            players[socket.id].animTime = movementData.animTime;
-            // 다른 사람들에게 이 플레이어의 위치 전송
-            socket.broadcast.emit('playerMoved', { id: socket.id, player: players[socket.id] });
+            socket.broadcast.emit('playerMoved', players[socket.id]);
         }
     });
 
-    // 공격 등 액션 동기화
     socket.on('playerAction', (actionData) => {
         if (players[socket.id]) {
             Object.assign(players[socket.id], actionData);
@@ -156,20 +51,40 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 보스 타격 판정 (간단한 버전)
-    socket.on('bossHit', (damage) => {
-        boss.hp -= damage;
-        io.emit('bossUpdate', boss); // 모든 사람에게 보스 체력 업데이트
+    socket.on('playerHitTarget', (targetId) => {
+        const attacker = players[socket.id];
+        const target = players[targetId];
+
+        if (attacker && target && target.hp > 0) {
+            let damage = attacker.comboStep === 3 ? 30 : 15;
+            if (target.isGuarding) damage = Math.floor(damage * 0.2);
+            
+            target.hp -= damage;
+
+            if (target.hp <= 0) {
+                target.hp = 0;
+                target.deaths++;
+                attacker.kills++;
+                io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
+                
+                setTimeout(() => {
+                    if (players[targetId]) {
+                        players[targetId].hp = 100;
+                        players[targetId].x = 100 + Math.random() * 800;
+                        players[targetId].y = 100 + Math.random() * 500;
+                        io.emit('playerRespawn', players[targetId]);
+                    }
+                }, 3000);
+            }
+            io.emit('statsUpdate', players);
+        }
     });
 
-    // 채팅 메시지 처리
     socket.on('chatMessage', (msg) => {
         io.emit('chatMessage', { id: socket.id, message: msg });
     });
 
-    // 접속 종료 처리
     socket.on('disconnect', () => {
-        console.log('플레이어 접속 종료:', socket.id);
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
@@ -177,5 +92,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
-    console.log(`서버가 시작되었습니다! 포트: ${PORT}`);
+    console.log(`서버 실행 중: 포트 ${PORT}`);
 });
