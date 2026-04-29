@@ -12,7 +12,6 @@ app.get('/', (req, res) => {
 
 let players = {};
 
-// 각도 차이 계산 함수
 function getAngleDiff(a1, a2) {
     let diff = a1 - a2;
     while (diff < -Math.PI) diff += Math.PI * 2;
@@ -32,13 +31,20 @@ io.on('connection', (socket) => {
         angle: 0,
         kills: 0,
         deaths: 0,
+        level: 1,
         isAttacking: false,
         attackPhase: 0,
         comboStep: 0,
         isGuarding: false,
         guardStartTime: 0,
         isStunned: false,
-        wire: { active: false, tx: 0, ty: 0 }
+        wire: { active: false, tx: 0, ty: 0 },
+        // 능력치 배수
+        stats: {
+            dmg: 1.0,
+            range: 1.0,
+            speed: 1.0
+        }
     };
 
     socket.emit('currentPlayers', players);
@@ -60,40 +66,42 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 업그레이드 선택 처리
+    socket.on('selectUpgrade', (type) => {
+        const p = players[socket.id];
+        if (!p) return;
+        
+        if (type === 'dmg') p.stats.dmg += 0.25;
+        else if (type === 'range') p.stats.range += 0.2;
+        else if (type === 'speed') p.stats.speed += 0.15;
+        
+        io.emit('statsUpdate', players);
+        socket.emit('upgradeApplied');
+    });
+
     socket.on('wireGrabHit', (targetId) => {
         let attackerId = socket.id;
         let finalAttacker = players[attackerId];
         let finalTarget = players[targetId];
-        
         if (!finalAttacker || !finalTarget) return;
 
         const now = Date.now();
-        // 타겟에서 공격자를 바라보는 각도
         const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
-        // 전방 120도(Math.PI / 3) 내에서 오는지 확인
         const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
 
-        // 카운터 판정: 전방에서 오고 가드 시작 후 0.5초 이내인 경우
         if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500) {
-            const tempId = attackerId;
-            attackerId = targetId;
-            targetId = tempId;
-            finalAttacker = players[attackerId];
-            finalTarget = players[targetId];
+            const tempId = attackerId; attackerId = targetId; targetId = tempId;
+            finalAttacker = players[attackerId]; finalTarget = players[targetId];
             io.emit('chatMessage', { id: 'SYSTEM', message: `⚔️ ${finalAttacker.name}의 완벽한 반격!` });
         }
 
         if (finalAttacker && finalTarget && !finalTarget.isStunned) {
             finalTarget.isStunned = true;
             io.emit('playerStunned', { id: targetId, stunned: true });
-
             let steps = 10;
             let currentStep = 0;
             let pullInterval = setInterval(() => {
-                if (!players[attackerId] || !players[targetId]) {
-                    clearInterval(pullInterval);
-                    return;
-                }
+                if (!players[attackerId] || !players[targetId]) { clearInterval(pullInterval); return; }
                 const destX = finalAttacker.x + Math.cos(finalAttacker.angle) * 50;
                 const destY = finalAttacker.y + Math.sin(finalAttacker.angle) * 50;
                 finalTarget.x += (destX - finalTarget.x) * 0.5;
@@ -117,18 +125,32 @@ io.on('connection', (socket) => {
         const attacker = players[socket.id];
         const target = players[targetId];
         if (attacker && target && target.hp > 0) {
-            let damage = attacker.comboStep === 3 ? 30 : 15;
+            let damage = (attacker.comboStep === 3 ? 30 : 15) * attacker.stats.dmg;
             
             const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
             const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
 
-            // 전방에서 오는 공격만 가드로 경감
             if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.2);
             
             target.hp -= damage;
             if (target.hp <= 0) {
                 target.hp = 0; target.deaths++; attacker.kills++;
+                
+                // 보너스 레벨업 로직: 차이나는 레벨만큼 추가 상승
+                let levelsGained = 1;
+                if (target.level > attacker.level) {
+                    levelsGained = target.level - attacker.level;
+                }
+                attacker.level += levelsGained;
+                
+                // 죽은 사람 레벨 및 능력치 초기화
+                target.level = 1;
+                target.stats = { dmg: 1.0, range: 1.0, speed: 1.0 };
+                
                 io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
+                // 획득한 레벨 수만큼 카드를 뽑을 수 있도록 알림
+                socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
+                
                 setTimeout(() => {
                     if (players[targetId]) {
                         players[targetId].hp = 100;
