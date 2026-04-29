@@ -38,13 +38,10 @@ io.on('connection', (socket) => {
         isGuarding: false,
         guardStartTime: 0,
         isStunned: false,
+        isUpgrading: false,
+        pendingUpgrades: 0,
         wire: { active: false, tx: 0, ty: 0 },
-        // 능력치 배수
-        stats: {
-            dmg: 1.0,
-            range: 1.0,
-            speed: 1.0
-        }
+        stats: { dmg: 1.0, range: 1.0, speed: 1.0 }
     };
 
     socket.emit('currentPlayers', players);
@@ -66,15 +63,17 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 업그레이드 선택 처리
     socket.on('selectUpgrade', (type) => {
         const p = players[socket.id];
         if (!p) return;
-        
         if (type === 'dmg') p.stats.dmg += 0.25;
         else if (type === 'range') p.stats.range += 0.2;
         else if (type === 'speed') p.stats.speed += 0.15;
-        
+        p.pendingUpgrades--;
+        if (p.pendingUpgrades <= 0) {
+            p.pendingUpgrades = 0;
+            p.isUpgrading = false;
+        }
         io.emit('statsUpdate', players);
         socket.emit('upgradeApplied');
     });
@@ -83,7 +82,7 @@ io.on('connection', (socket) => {
         let attackerId = socket.id;
         let finalAttacker = players[attackerId];
         let finalTarget = players[targetId];
-        if (!finalAttacker || !finalTarget) return;
+        if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
 
         const now = Date.now();
         const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
@@ -115,7 +114,7 @@ io.on('connection', (socket) => {
                             players[targetId].isStunned = false;
                             io.emit('playerStunned', { id: targetId, stunned: false });
                         }
-                    }, 500);
+                    }, 1500);
                 }
             }, 30);
         }
@@ -124,33 +123,29 @@ io.on('connection', (socket) => {
     socket.on('playerHitTarget', (targetId) => {
         const attacker = players[socket.id];
         const target = players[targetId];
-        if (attacker && target && target.hp > 0) {
+        if (attacker && target && target.hp > 0 && !target.isUpgrading) {
             let damage = (attacker.comboStep === 3 ? 30 : 15) * attacker.stats.dmg;
-            
             const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
             const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
-
             if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.2);
-            
             target.hp -= damage;
             if (target.hp <= 0) {
                 target.hp = 0; target.deaths++; attacker.kills++;
-                
-                // 보너스 레벨업 로직: 차이나는 레벨만큼 추가 상승
-                let levelsGained = 1;
-                if (target.level > attacker.level) {
-                    levelsGained = target.level - attacker.level;
+                let levelsGained = 0;
+                if (attacker.level < 10) {
+                    levelsGained = Math.max(1, target.level - attacker.level);
+                    levelsGained = Math.min(levelsGained, 10 - attacker.level);
+                    attacker.level += levelsGained;
+                    attacker.hp = Math.min(100, attacker.hp + 50);
+                    attacker.isUpgrading = true;
+                    attacker.pendingUpgrades += levelsGained;
                 }
-                attacker.level += levelsGained;
-                
-                // 죽은 사람 레벨 및 능력치 초기화
                 target.level = 1;
                 target.stats = { dmg: 1.0, range: 1.0, speed: 1.0 };
-                
+                target.pendingUpgrades = 0;
+                target.isUpgrading = false;
                 io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
-                // 획득한 레벨 수만큼 카드를 뽑을 수 있도록 알림
-                socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
-                
+                if (levelsGained > 0) socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
                 setTimeout(() => {
                     if (players[targetId]) {
                         players[targetId].hp = 100;
