@@ -14,7 +14,7 @@
         #hp-fill { height: 100%; width: 100%; background: linear-gradient(to right, #2ecc71, #f1c40f); transition: width 0.2s; }
         #damage-readout { color: #ddd; line-height: 1.5; }
         #damage-readout b { color: #f1c40f; }
-        #leaderboard { position: absolute; top: 20px; right: 20px; background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 8px; color: white; font-size: 14px; min-width: 180px; z-index: 500; pointer-events: none; }
+        #leaderboard { position: absolute; top: 20px; right: 20px; width: 210px; max-width: calc(100vw - 40px); box-sizing: border-box; background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 8px; color: white; font-size: 14px; z-index: 500; pointer-events: none; }
         #leaderboard h3 { margin: 0 0 10px 0; font-size: 16px; color: #f1c40f; border-bottom: 1px solid #444; padding-bottom: 5px; }
         .score-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .score-table th:nth-child(2), .score-table th:nth-child(3), .score-table td:nth-child(2), .score-table td:nth-child(3) { width: 36px; }
@@ -66,8 +66,7 @@
             #leaderboard {
                 top: calc(10px + env(safe-area-inset-top));
                 right: 10px;
-                min-width: 0;
-                width: min(180px, calc(50vw - 18px));
+                width: min(168px, calc(50vw - 18px));
                 padding: 9px;
                 font-size: 11px;
             }
@@ -111,7 +110,7 @@
 
         @media (max-width: 700px) and (orientation: portrait) {
             #hud { width: min(133px, calc(50vw - 18px)); }
-            #leaderboard { width: calc(50vw - 18px); }
+            #leaderboard { width: min(158px, calc(50vw - 18px)); }
             #chat-container {
                 bottom: calc(158px + env(safe-area-inset-bottom));
                 height: 82px;
