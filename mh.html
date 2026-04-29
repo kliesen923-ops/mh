@@ -16,7 +16,14 @@
         #damage-readout b { color: #f1c40f; }
         #leaderboard { position: absolute; top: 20px; right: 20px; background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 8px; color: white; font-size: 14px; min-width: 180px; z-index: 500; pointer-events: none; }
         #leaderboard h3 { margin: 0 0 10px 0; font-size: 16px; color: #f1c40f; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .score-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .score-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .score-table th:nth-child(2), .score-table th:nth-child(3), .score-table td:nth-child(2), .score-table td:nth-child(3) { width: 36px; }
+        .score-table th { color: #f1c40f; font-size: 11px; font-weight: bold; text-align: right; padding: 0 0 6px 6px; border-bottom: 1px solid rgba(255,255,255,0.18); }
+        .score-table th:first-child { text-align: left; padding-left: 0; }
+        .score-table td { padding: 5px 0 0 6px; text-align: right; }
+        .score-table td:first-child { padding-left: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .score-table .name-cell { display: flex; align-items: center; min-width: 0; }
+        .score-table .name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .level-badge { background: #f1c40f; color: black; padding: 0 5px; border-radius: 4px; font-weight: bold; margin-right: 5px; font-size: 11px; }
         #chat-container { position: absolute; bottom: 20px; left: 20px; width: 300px; height: 180px; background: rgba(0, 0, 0, 0.4); border-radius: 8px; display: flex; flex-direction: column; z-index: 200; pointer-events: none; }
         #chat-container.active { background: rgba(0, 0, 0, 0.7); pointer-events: auto; }
@@ -66,13 +73,8 @@
             }
             #leaderboard h3 { font-size: 12px; margin-bottom: 6px; padding-bottom: 4px; }
             .level-badge { font-size: 9px; padding: 0 4px; margin-right: 3px; }
-            .score-row { gap: 6px; }
-            .score-row span:first-child {
-                min-width: 0;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
+            .score-table th { font-size: 10px; padding-bottom: 4px; }
+            .score-table td { padding-top: 4px; }
             #chat-container {
                 left: 10px;
                 bottom: calc(176px + env(safe-area-inset-bottom));
@@ -303,22 +305,44 @@ socket.on('chatMessage', (data) => {
 
 function updateLeaderboard() {
     const list = document.getElementById('score-list'); if(!list) return; list.innerHTML = '';
+    const table = document.createElement('table');
+    table.className = 'score-table';
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['닉네임', '킬', '데스'].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
     Object.values(allPlayers).sort((a,b) => b.kills - a.kills).forEach(p => {
         const lvlTxt = p.level >= 10 ? "MAX" : "Lv." + (p.level || 1);
-        const row = document.createElement('div');
-        row.className = 'score-row';
-        const left = document.createElement('span');
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        const nameWrap = document.createElement('span');
+        nameWrap.className = 'name-cell';
         const badge = document.createElement('span');
         badge.className = 'level-badge';
         badge.textContent = lvlTxt;
-        left.appendChild(badge);
-        left.appendChild(document.createTextNode(p.name || 'Hunter'));
-        const score = document.createElement('span');
-        score.textContent = `${p.kills || 0}K / ${p.deaths || 0}D`;
-        row.appendChild(left);
-        row.appendChild(score);
-        list.appendChild(row);
+        const nameText = document.createElement('span');
+        nameText.className = 'name-text';
+        nameText.textContent = p.name || 'Hunter';
+        nameWrap.appendChild(badge);
+        nameWrap.appendChild(nameText);
+        nameCell.appendChild(nameWrap);
+        const killsCell = document.createElement('td');
+        killsCell.textContent = p.kills || 0;
+        const deathsCell = document.createElement('td');
+        deathsCell.textContent = p.deaths || 0;
+        row.appendChild(nameCell);
+        row.appendChild(killsCell);
+        row.appendChild(deathsCell);
+        tbody.appendChild(row);
     });
+    table.appendChild(tbody);
+    list.appendChild(table);
 }
 
 function formatDamage(value) {
