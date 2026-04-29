@@ -51,7 +51,7 @@ const player = {
     x: 400, y: 300, hp: 100, angle: 0,
     isGuarding: false, guardCooldown: 0, guardActiveTimer: 0,
     isAttacking: false, isStunned: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
-    isDodging: false, dTimer: 0, dDX: 0, dDY: 0,
+    isDodging: false, dTimer: 0, dDX: 0, dDY: 0, dodgeCooldown: 0,
     wire: { active: false, tx: 0, ty: 0 },
     moveDir: { x: 0, y: 0 }, animTime: 0
 };
@@ -116,11 +116,13 @@ function update(dt) {
         if (player.guardActiveTimer >= 1.0) releaseGuard();
     }
     if(player.guardCooldown > 0) player.guardCooldown -= dt;
+    if(player.dodgeCooldown > 0) player.dodgeCooldown -= dt;
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
             x: player.x, y: player.y, angle: player.angle, animTime: player.animTime, 
-            isGuarding: player.isGuarding, isAttacking: player.isAttacking, 
+            isGuarding: player.isGuarding, guardActiveTimer: player.guardActiveTimer,
+            isAttacking: player.isAttacking, isDodging: player.isDodging,
             comboStep: player.comboStep, attackPhase: player.attackPhase, aAngle: player.aAngle,
             wire: { active: player.wire.active, tx: player.wire.tx, ty: player.wire.ty }
         });
@@ -150,26 +152,25 @@ function updateAttack(dt) {
 
 function startGuard() {
     if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) {
-        player.isGuarding = true;
-        player.guardActiveTimer = 0;
-        const startTime = Date.now();
-        socket.emit('playerAction', { isGuarding: true, guardStartTime: startTime });
+        player.isGuarding = true; player.guardActiveTimer = 0;
+        socket.emit('playerAction', { isGuarding: true, guardActiveTimer: 0, guardStartTime: Date.now() });
     }
 }
-
 function releaseGuard() {
     if (player.isGuarding) {
-        player.isGuarding = false;
-        player.guardCooldown = 1.0;
+        player.isGuarding = false; player.guardCooldown = 1.0;
         socket.emit('playerAction', { isGuarding: false });
     }
 }
-
+function startDodge() {
+    if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) return;
+    player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle);
+    player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true });
+}
 function startWire() {
     if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned) return;
     const wireRange = 500;
-    const tx = player.x + Math.cos(player.angle) * wireRange;
-    const ty = player.y + Math.sin(player.angle) * wireRange;
+    const tx = player.x + Math.cos(player.angle) * wireRange, ty = player.y + Math.sin(player.angle) * wireRange;
     let hitId = null;
     Object.keys(allPlayers).forEach(id => {
         if(id === myId) return;
@@ -180,80 +181,48 @@ function startWire() {
     });
     if(hitId) {
         socket.emit('wireGrabHit', hitId);
-        player.wire.active = true;
-        player.wire.tx = allPlayers[hitId].x;
-        player.wire.ty = allPlayers[hitId].y;
+        player.wire.active = true; player.wire.tx = allPlayers[hitId].x; player.wire.ty = allPlayers[hitId].y;
         socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty } });
         setTimeout(() => { player.wire.active = false; socket.emit('playerAction', { wire: { active: false } }); }, 300);
     } else {
         player.wire.active = true;
-        player.wire.tx = Math.max(25, Math.min(canvas.width-25, tx));
-        player.wire.ty = Math.max(25, Math.min(canvas.height-25, ty));
+        player.wire.tx = Math.max(25, Math.min(canvas.width-25, tx)); player.wire.ty = Math.max(25, Math.min(canvas.height-25, ty));
         socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty } });
     }
 }
-
 function distToSegment(p1, p2, p) {
     const l2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
     if (l2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y);
-    let t = ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2;
-    t = Math.max(0, Math.min(1, t));
+    let t = Math.max(0, Math.min(1, ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2));
     return Math.hypot(p.x - (p1.x + t * (p2.x - p1.x)), p.y - (p1.y + t * (p2.y - p1.y)));
 }
 
-// --- 입력 이벤트 (Window) ---
 window.addEventListener('keydown', e => {
-    // 채팅 중일 때 Enter 외의 다른 키 무시
     if (isChatting && e.code !== 'Enter') return;
-
     if (e.code === 'Enter') {
         if (!isChatting) {
-            // 채팅 시작
             isChatting = true;
-            const c = document.getElementById('chat-container');
-            const iw = document.getElementById('chat-input-container');
-            const i = document.getElementById('chat-input');
-            
-            c.classList.add('active');
-            iw.style.display = 'block';
-            // 모든 이동 키 초기화
+            document.getElementById('chat-container').classList.add('active');
+            document.getElementById('chat-input-container').style.display = 'block';
             Object.keys(keys).forEach(k => keys[k] = false);
-            
-            setTimeout(() => {
-                i.focus();
-            }, 10);
+            setTimeout(() => document.getElementById('chat-input').focus(), 10);
             e.preventDefault();
         }
         return;
     }
-
     if (player.hp <= 0 || player.isStunned) return;
     keys[e.code] = true;
-    if(e.code === 'Space') { player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); socket.emit('playerAction', { isDodging: true }); }
+    if(e.code === 'Space') startDodge();
     if(e.code === 'ShiftLeft') startGuard();
     if(e.code === 'KeyR' || e.code === 'KeyF') { if(player.isAttacking) return; player.isAttacking = true; player.comboStep = (player.comboStep % 3) + 1; player.attackPhase = 1; player.attackTimer = 0.12; player.aAngle = player.angle; socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle }); }
 });
-
-// 채팅 입력창 전용 이벤트 (Enter 처리)
 document.getElementById('chat-input').addEventListener('keydown', e => {
     if (e.code === 'Enter') {
-        const i = e.target;
-        const c = document.getElementById('chat-container');
-        const iw = document.getElementById('chat-input-container');
-
-        if (i.value.trim()) {
-            socket.emit('chatMessage', i.value);
-        }
-        
-        // 채팅 종료 로직
-        i.value = '';
-        i.blur();
-        isChatting = false;
-        c.classList.remove('active');
-        iw.style.display = 'none';
-        
-        e.preventDefault();
-        e.stopPropagation(); // Window의 keydown 이벤트가 다시 발생하는 것을 방지
+        if (e.target.value.trim()) socket.emit('chatMessage', e.target.value);
+        e.target.value = ''; e.target.blur(); isChatting = false;
+        document.getElementById('chat-container').classList.remove('active');
+        document.getElementById('chat-input-container').style.display = 'none';
+        e.preventDefault(); e.stopPropagation();
     }
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; if(e.code === 'ShiftLeft') releaseGuard(); });
@@ -261,35 +230,38 @@ window.addEventListener('mousedown', e => { if(gameState === 'PLAYING' && !isCha
 window.addEventListener('contextmenu', e => e.preventDefault());
 
 function drawCharacter(p, color) {
-    const { x, y, angle, animTime, isDodging, isGuarding, isAttacking, isStunned, comboStep, attackPhase, hp, name, aAngle, wire } = p;
+    const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, comboStep, attackPhase, hp, name, aAngle, wire } = p;
     if(wire && wire.active) { ctx.save(); ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.moveTo(x, y); ctx.lineTo(wire.tx, wire.ty); ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); }
     
-    // 가드 범위 시각화 (전방 120도)
     if(isGuarding) {
+        const isPerfect = (guardActiveTimer < 0.5);
         ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3);
-        ctx.strokeStyle = "rgba(52, 152, 219, 0.4)";
-        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3);
+        ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)";
+        ctx.lineWidth = isPerfect ? 8 : 3;
         ctx.stroke();
-        // 채우기 효과 추가 (선택사항)
-        ctx.fillStyle = "rgba(52, 152, 219, 0.1)";
-        ctx.lineTo(0,0);
-        ctx.fill();
-        ctx.restore();
+        ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)";
+        ctx.lineTo(0,0); ctx.fill(); ctx.restore();
     }
+
+    ctx.save();
+    if (isDodging) ctx.globalAlpha = 0.2; // 회피 시 확실하게 반투명 처리
 
     ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
     ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-60, 50, 6);
     ctx.fillStyle = isStunned ? "#9b59b6" : (hp > 30 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, (hp/100)*50, 6);
+
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE);
     ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill();
     ctx.restore();
+
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE);
     const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25);
     ctx.rotate(angle);
-    ctx.fillStyle = isStunned ? "#9b59b6" : (isDodging ? "rgba(255,255,255,0.6)" : color); ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = isStunned ? "#9b59b6" : color; 
+    ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
+    
     ctx.save();
     let sRot = 0.8;
     if(isAttacking) {
@@ -297,10 +269,12 @@ function drawCharacter(p, color) {
         else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2);
         else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5);
     } else if(isGuarding) sRot = 0.2;
-    ctx.rotate(sRot);
-    ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10);
+    ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10);
     ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7"; ctx.fillRect(35,18,60,10);
-    ctx.restore(); ctx.restore();
+    ctx.restore();
+    ctx.restore();
+    ctx.restore();
+
     if(isAttacking && attackPhase === 2) {
         ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.beginPath();
         const ba = aAngle || angle; let sA = ba-2.0, eA = ba+0.5; let counter = false;
@@ -309,30 +283,23 @@ function drawCharacter(p, color) {
         ctx.arc(0,0,75,sA,eA,counter); ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.stroke(); ctx.restore();
     }
 }
-
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("패배했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
-    requestAnimationFrame(loop);
 }
-
 const joyContainer = document.getElementById('joy-container'), joyStick = document.getElementById('joy-stick');
 let joyId = null;
 joyContainer.addEventListener('pointerdown', e => { if(gameState === 'PLAYING' && !isChatting && player.hp > 0 && !player.isStunned) { joyId = e.pointerId; joyContainer.setPointerCapture(e.pointerId); } });
 window.addEventListener('pointermove', e => { if(joyId === e.pointerId) { const r = joyContainer.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2; let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy); if(d > 50) { dx *= 50/d; dy *= 50/d; } joyStick.style.transform = `translate(${dx}px, ${dy}px)`; player.moveDir = { x: dx/50, y: (dy/50)/VIEW_Y_SCALE }; } });
 window.addEventListener('pointerup', e => { if(joyId === e.pointerId) { joyId = null; joyStick.style.transform = 'translate(0,0)'; player.moveDir = { x: 0, y: 0 }; } });
-
 const bind = (id, fn, end) => { const el = document.getElementById(id); el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting) fn(); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); } };
 bind('btn-attack', () => { if(player.isAttacking || player.hp <= 0 || player.isStunned) return; player.isAttacking = true; player.comboStep = (player.comboStep % 3) + 1; player.attackPhase = 1; player.attackTimer = 0.12; player.aAngle = player.angle; socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle }); });
-bind('btn-dodge', () => { if(player.hp>0 && !player.isStunned) { player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); } });
-bind('btn-guard', startGuard, releaseGuard);
-bind('btn-wire', startWire);
-
+bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire);
 let lastTime = 0;
-function loop(t) { let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); draw(); }
+function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 function startGame() { document.getElementById('overlay-start').classList.add('hidden'); gameState = 'PLAYING'; requestAnimationFrame(loop); }
 </script>
 </body>
