@@ -79,7 +79,7 @@ function findAccountById(id) {
 
 function createBaseStatsForWeapon(weapon) {
     if (sanitizeWeapon(weapon) === 'hammer') {
-        return { dmg: 1.3, range: 0.9, speed: 0.8, move: 1.0 };
+        return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 };
     }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
 }
