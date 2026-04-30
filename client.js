@@ -393,7 +393,15 @@ function update(dt) {
         if (normalizeWeapon(player.weapon) !== 'bow') {
             player.x += Math.cos(player.aAngle) * 150 * dt; player.y += Math.sin(player.aAngle) * 150 * dt;
         }
-    } else if(player.wire.active) {
+    } else if(mx !== 0 || my !== 0) {
+        player.stats = normalizeStats(player.stats);
+        const d = Math.hypot(mx, my), s = (player.isGuarding ? 175 : 350) * player.stats.move * dt;
+        player.x += (mx/d) * s; player.y += (my/d) * s;
+        if (aimMode !== 'mouse') player.angle = Math.atan2(my, mx);
+        player.animTime += dt * 10;
+    } else player.animTime = 0;
+
+    if(player.wire.active) {
         const wire = player.wire;
         const prevProgress = wire.progress || 0;
         const nextProgress = Math.min(1, (wire.progress || 0) + dt * (wire.kind === 'ash' ? 3.6 : 3.2));
@@ -412,13 +420,7 @@ function update(dt) {
         } else {
             socket.emit('playerAction', { wire: { active: true, kind: wire.kind || 'wire', tx: wire.tx, ty: wire.ty, progress: wire.progress, maxDistance: wire.maxDistance || 500 } });
         }
-    } else if(mx !== 0 || my !== 0) {
-        player.stats = normalizeStats(player.stats);
-        const d = Math.hypot(mx, my), s = (player.isGuarding ? 175 : 350) * player.stats.move * dt;
-        player.x += (mx/d) * s; player.y += (my/d) * s;
-        if (aimMode !== 'mouse') player.angle = Math.atan2(my, mx);
-        player.animTime += dt * 10;
-    } else player.animTime = 0;
+    }
 
     player.x = Math.max(25, Math.min(canvas.width - 25, player.x));
     player.y = Math.max(25, Math.min(canvas.height - 25, player.y));
