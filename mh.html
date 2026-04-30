@@ -880,6 +880,7 @@ function setWeaponSelection(weapon) {
 }
 function showWeaponPanel(auth) {
     pendingAuth = auth;
+    document.getElementById('overlay-start')?.classList.remove('hidden');
     setAuthMode('weapon');
     const weaponPanel = document.getElementById('weapon-panel');
     if (weaponPanel) weaponPanel.classList.remove('hidden');
@@ -908,6 +909,7 @@ async function postAuth(path, payload) {
 function enterGame(nickname, accountId, weapon) {
     currentSession = { id: accountId || '', nickname: nickname || 'Hunter' };
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
+    if (accountId) socket.emit('setAccount', accountId);
     if (nickname) socket.emit('setName', nickname);
     if (weapon) {
         player.weapon = normalizeWeapon(weapon);

@@ -56,13 +56,25 @@ function loadAccounts() {
     const raw = fs.readFileSync(ACCOUNT_FILE, 'utf8').trim();
     if (!raw) return [];
     return raw.split(/\r?\n/).map((line) => {
-        const [id, nickname, password] = line.split(',');
-        return { id: id || '', nickname: nickname || '', password: password || '' };
+        const [id, nickname, password, kills, deaths] = line.split(',');
+        return {
+            id: id || '',
+            nickname: nickname || '',
+            password: password || '',
+            kills: Number.parseInt(kills, 10) || 0,
+            deaths: Number.parseInt(deaths, 10) || 0,
+        };
     }).filter((account) => account.id && account.nickname && account.password);
 }
 
 function saveAccounts(accounts) {
-    const body = accounts.map((account) => [account.id, account.nickname, account.password].join(',')).join('\n');
+    const body = accounts.map((account) => [
+        account.id,
+        account.nickname,
+        account.password,
+        Number.isFinite(account.kills) ? account.kills : 0,
+        Number.isFinite(account.deaths) ? account.deaths : 0,
+    ].join(',')).join('\n');
     fs.writeFileSync(ACCOUNT_FILE, body ? `${body}\n` : '', 'utf8');
 }
 
@@ -75,6 +87,21 @@ function createBaseStatsForWeapon(weapon) {
         return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 };
     }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
+}
+
+function getAccountById(id) {
+    return loadAccounts().find((account) => account.id === id);
+}
+
+function updateAccountScore(accountId, field, delta) {
+    const id = sanitizeAccountId(accountId);
+    if (!id || !Number.isFinite(delta)) return null;
+    const accounts = loadAccounts();
+    const account = accounts.find((entry) => entry.id === id);
+    if (!account) return null;
+    account[field] = Math.max(0, (Number.isFinite(account[field]) ? account[field] : 0) + delta);
+    saveAccounts(accounts);
+    return account;
 }
 
 app.post('/api/auth/register', (req, res) => {
@@ -96,7 +123,7 @@ app.post('/api/auth/register', (req, res) => {
         return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
     }
 
-    accounts.push({ id, nickname, password, weapon: '' });
+    accounts.push({ id, nickname, password, kills: 0, deaths: 0 });
     saveAccounts(accounts);
     return res.json({ ok: true, id, nickname });
 });
@@ -210,6 +237,7 @@ io.on('connection', (socket) => {
 
     players[socket.id] = {
         id: socket.id,
+        accountId: '',
         name: "Hunter_" + socket.id.substring(0, 4),
         weapon: 'sword',
         x: 200 + Math.random() * 600,
@@ -240,6 +268,17 @@ io.on('connection', (socket) => {
         const p = players[socket.id];
         if (!p) return;
         p.name = sanitizeName(name, p.name);
+        io.emit('statsUpdate', players);
+    });
+
+    socket.on('setAccount', (accountId) => {
+        const p = players[socket.id];
+        if (!p) return;
+        const account = getAccountById(accountId);
+        if (!account) return;
+        p.accountId = account.id;
+        p.kills = Number.isFinite(account.kills) ? account.kills : 0;
+        p.deaths = Number.isFinite(account.deaths) ? account.deaths : 0;
         io.emit('statsUpdate', players);
     });
 
@@ -381,6 +420,8 @@ io.on('connection', (socket) => {
             target.hp -= damage;
             if (target.hp <= 0) {
                 target.hp = 0; target.deaths++; attacker.kills++;
+                updateAccountScore(attacker.accountId, 'kills', 1);
+                updateAccountScore(target.accountId, 'deaths', 1);
                 let levelsGained = 0;
                 if (attacker.level < 10) {
                     levelsGained = Math.max(1, target.level - attacker.level);
