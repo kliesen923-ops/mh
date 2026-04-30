@@ -443,6 +443,7 @@ let currentSession = null;
 let selectedWeapon = 'sword';
 let selectedSkill = 'wire';
 let combatEffects = [];
+let ashProjectiles = [];
 const keys = {};
 
 const player = {
@@ -547,6 +548,19 @@ socket.on('combatEffect', (effect) => {
         weapon: normalizeWeapon(effect.weapon),
         life: 0.22,
         maxLife: 0.22,
+    });
+});
+socket.on('ashProjectile', (effect) => {
+    if (!effect) return;
+    ashProjectiles.push({
+        startX: Number(effect.startX) || 0,
+        startY: Number(effect.startY) || 0,
+        endX: Number(effect.endX) || 0,
+        endY: Number(effect.endY) || 0,
+        angle: Math.atan2((Number(effect.endY) || 0) - (Number(effect.startY) || 0), (Number(effect.endX) || 0) - (Number(effect.startX) || 0)),
+        duration: Math.max(0.14, Math.min(0.7, (Number(effect.duration) || 400) / 1000)),
+        progress: 0,
+        reflected: Boolean(effect.reflected),
     });
 });
 socket.on('chatMessage', (data) => {
@@ -685,6 +699,13 @@ function updateCombatEffects(dt) {
     });
 }
 
+function updateAshProjectiles(dt) {
+    ashProjectiles = ashProjectiles.filter((effect) => {
+        effect.progress = Math.min(1, (effect.progress || 0) + dt / Math.max(0.001, effect.duration || 0.35));
+        return effect.progress < 1;
+    });
+}
+
 function selectUpgrade(type) {
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
     socket.emit('selectUpgrade', type);
@@ -739,6 +760,7 @@ function update(dt) {
     updateCooldownUI();
     updateCombatReadouts();
     updateCombatEffects(dt);
+    updateAshProjectiles(dt);
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
@@ -1051,6 +1073,15 @@ function drawCombatEffects() {
     });
 }
 
+function drawAshProjectiles() {
+    ashProjectiles.forEach((effect) => {
+        const p = Math.max(0, Math.min(1, effect.progress || 0));
+        const tipX = effect.startX + (effect.endX - effect.startX) * p;
+        const tipY = effect.startY + (effect.endY - effect.startY) * p;
+        drawAshArrow(effect.startX, effect.startY, tipX, tipY, effect.angle, p);
+    });
+}
+
 function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
     const crystalScale = 0.92;
     ctx.save();
@@ -1136,6 +1167,7 @@ function draw() {
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
     drawCombatEffects();
+    drawAshProjectiles();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }

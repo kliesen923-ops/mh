@@ -161,6 +161,95 @@ function distToSegment(p1, p2, p) {
     return Math.hypot(p.x - (p1.x + t * (p2.x - p1.x)), p.y - (p1.y + t * (p2.y - p1.y)));
 }
 
+function emitAshProjectile(originId, impactId, startX, startY, endX, endY, reflected) {
+    io.emit('ashProjectile', {
+        originId,
+        impactId,
+        startX,
+        startY,
+        endX,
+        endY,
+        reflected: Boolean(reflected),
+        duration: Math.max(140, Math.min(700, Math.round(Math.hypot(endX - startX, endY - startY) * 1.15))),
+    });
+}
+
+function applyAshImpact(attackerId, targetId, payload, reflected) {
+    const finalAttacker = players[attackerId];
+    const finalTarget = players[targetId];
+    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isStunned) return;
+
+    const now = Date.now();
+    const wireProgress = Number.isFinite(payload.progress)
+        ? Math.max(0, Math.min(1, payload.progress))
+        : Math.max(0, Math.min(1, finalAttacker.wire && Number.isFinite(finalAttacker.wire.progress) ? finalAttacker.wire.progress : 1));
+    const wireTx = Number.isFinite(payload.tx)
+        ? payload.tx
+        : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.tx) ? finalAttacker.wire.tx : finalAttacker.x);
+    const wireTy = Number.isFinite(payload.ty)
+        ? payload.ty
+        : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.ty) ? finalAttacker.wire.ty : finalAttacker.y);
+    const maxDistance = Number.isFinite(payload.maxDistance)
+        ? Math.max(1, payload.maxDistance)
+        : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.maxDistance) ? finalAttacker.wire.maxDistance : 500);
+    const wireTip = {
+        x: finalAttacker.x + (wireTx - finalAttacker.x) * wireProgress,
+        y: finalAttacker.y + (wireTy - finalAttacker.y) * wireProgress
+    };
+    if (Math.hypot(finalTarget.x - wireTip.x, finalTarget.y - wireTip.y) > 28) return;
+    finalAttacker.lastWireAt = now;
+
+    const distanceTravelled = Math.max(0, Math.min(maxDistance, maxDistance * wireProgress));
+    const ratio = maxDistance > 0 ? distanceTravelled / maxDistance : 0;
+    let stunMs = Math.round((0.35 + (ratio * 2.25)) * 1000);
+    stunMs = Math.max(350, Math.min(2600, stunMs));
+    const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
+    const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
+
+    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500) {
+        const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
+        const reflectedPayload = {
+            targetId: attackerId,
+            progress: 0,
+            tx: finalAttacker.x,
+            ty: finalAttacker.y,
+            maxDistance: reflectDistance,
+            kind: 'ash',
+            reflectedFrom: targetId,
+        };
+        io.emit('combatEffect', {
+            x: finalTarget.x,
+            y: finalTarget.y,
+            angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
+            weapon: 'ash',
+        });
+        emitAshProjectile(targetId, attackerId, finalTarget.x, finalTarget.y, finalAttacker.x, finalAttacker.y, true);
+        setTimeout(() => {
+            applyAshImpact(targetId, attackerId, reflectedPayload, true);
+        }, Math.max(140, Math.min(700, Math.round(reflectDistance * 1.15))));
+        return;
+    }
+
+    if (finalTarget.isGuarding && isFacingAttacker) {
+        stunMs = Math.round(stunMs * 0.5);
+    }
+
+    io.emit('combatEffect', {
+        x: finalTarget.x,
+        y: finalTarget.y,
+        angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
+        weapon: 'ash',
+    });
+    finalTarget.isStunned = true;
+    io.emit('playerStunned', { id: targetId, stunned: true });
+    setTimeout(() => {
+        if (players[targetId]) {
+            players[targetId].isStunned = false;
+            io.emit('playerStunned', { id: targetId, stunned: false });
+        }
+    }, stunMs);
+}
+
 function resetAttackHits(playerId) {
     attackSequences[playerId] = (attackSequences[playerId] || 0) + 1;
     attackHitTargets.set(`${playerId}:${attackSequences[playerId]}`, new Set());
@@ -432,53 +521,7 @@ io.on('connection', (socket) => {
         const finalTarget = players[targetId];
         if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
         if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'ash') return;
-
-        const now = Date.now();
-        if ((now - (finalAttacker.lastWireAt || 0)) < WIRE_COOLDOWN_MS) return;
-        const wireProgress = Number.isFinite(payload.progress)
-            ? Math.max(0, Math.min(1, payload.progress))
-            : Math.max(0, Math.min(1, finalAttacker.wire && Number.isFinite(finalAttacker.wire.progress) ? finalAttacker.wire.progress : 1));
-        const wireTx = Number.isFinite(payload.tx)
-            ? payload.tx
-            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.tx) ? finalAttacker.wire.tx : finalAttacker.x);
-        const wireTy = Number.isFinite(payload.ty)
-            ? payload.ty
-            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.ty) ? finalAttacker.wire.ty : finalAttacker.y);
-        const maxDistance = Number.isFinite(payload.maxDistance)
-            ? Math.max(1, payload.maxDistance)
-            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.maxDistance) ? finalAttacker.wire.maxDistance : 500);
-        const wireTip = {
-            x: finalAttacker.x + (wireTx - finalAttacker.x) * wireProgress,
-            y: finalAttacker.y + (wireTy - finalAttacker.y) * wireProgress
-        };
-        if (Math.hypot(finalTarget.x - wireTip.x, finalTarget.y - wireTip.y) > 28) return;
-        finalAttacker.lastWireAt = now;
-
-        const distanceTravelled = Math.max(0, Math.min(maxDistance, maxDistance * wireProgress));
-        const ratio = maxDistance > 0 ? distanceTravelled / maxDistance : 0;
-        let stunMs = Math.round((0.35 + (ratio * 2.25)) * 1000);
-        stunMs = Math.max(350, Math.min(2600, stunMs));
-        const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
-        const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
-        if (finalTarget.isGuarding && isFacingAttacker) {
-            stunMs = Math.round(stunMs * 0.5);
-        }
-
-        if (finalTarget.isStunned) return;
-        io.emit('combatEffect', {
-            x: finalTarget.x,
-            y: finalTarget.y,
-            angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
-            weapon: 'ash',
-        });
-        finalTarget.isStunned = true;
-        io.emit('playerStunned', { id: targetId, stunned: true });
-        setTimeout(() => {
-            if (players[targetId]) {
-                players[targetId].isStunned = false;
-                io.emit('playerStunned', { id: targetId, stunned: false });
-            }
-        }, stunMs);
+        applyAshImpact(attackerId, targetId, payload, false);
     });
 
     socket.on('playerHitTarget', (targetId) => {
