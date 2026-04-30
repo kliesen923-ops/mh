@@ -21,6 +21,7 @@ const ATTACK_PROFILES = {
 const SKILL_PRESETS = {
     wire: { label: '땡겨', cooldown: 2.0 },
     ash: { label: '애쉬궁', cooldown: 2.0 },
+    gear: { label: '입체기동', cooldown: 3.0 },
 };
 const GUARD_DURATION_SEC = 0.5;
 const JUST_GUARD_WINDOW_SEC = 0.1;
@@ -59,6 +60,7 @@ const player = {
     giantActive: false,
     giantEndsAt: 0,
     giantRecoveryEndsAt: 0,
+    gearRush: { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 },
     skill: 'wire'
 };
 
@@ -73,7 +75,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign({ active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 }, data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -141,7 +143,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign({ active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 }, data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -150,7 +152,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign({ active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 }, p.gearRush || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -413,7 +415,7 @@ function updateCooldownButton(id, remaining, duration) {
 function updateCooldownUI() {
     updateCooldownButton('btn-dodge', player.dodgeCooldown, 1.0);
     updateCooldownButton('btn-guard', player.guardCooldown, 1.0);
-    updateCooldownButton('btn-wire', player.wireCooldown, 1.0);
+    updateCooldownButton('btn-wire', player.wireCooldown, SKILL_PRESETS[normalizeSkill(player.skill || selectedSkill)]?.cooldown || 1.0);
 }
 
 function updateCombatEffects(dt) {
@@ -467,6 +469,28 @@ function updateBowProjectiles(dt) {
     });
 }
 
+function updateGearRush(dt) {
+    if (!player.gearRush || !player.gearRush.active) return;
+    const rush = player.gearRush;
+    const duration = Math.max(0.08, Number(rush.duration) || 0.24);
+    const elapsed = Math.max(0, (Date.now() - Number(rush.startTime || Date.now())) / 1000);
+    const progress = Math.max(0, Math.min(1, elapsed / duration));
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const startX = Number.isFinite(rush.startX) ? rush.startX : player.x;
+    const startY = Number.isFinite(rush.startY) ? rush.startY : player.y;
+    const tx = Number.isFinite(rush.tx) ? rush.tx : player.x;
+    const ty = Number.isFinite(rush.ty) ? rush.ty : player.y;
+    player.x = startX + (tx - startX) * eased;
+    player.y = startY + (ty - startY) * eased;
+    player.angle = Math.atan2(ty - startY, tx - startX);
+    player.animTime += dt * 12;
+    player.moveDir = { x: 0, y: 0 };
+    if (progress >= 1) {
+        player.gearRush.active = false;
+        socket.emit('playerAction', { gearRush: { active: false } });
+    }
+}
+
 function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
     const candidates = [];
     for (const id of Object.keys(allPlayers)) {
@@ -494,7 +518,9 @@ function update(dt) {
     if(keys['KeyW']) my -= 1; if(keys['KeyS']) my += 1; if(keys['KeyA']) mx -= 1; if(keys['KeyD']) mx += 1;
     if(player.moveDir.x !== 0 || player.moveDir.y !== 0) { mx = player.moveDir.x; my = player.moveDir.y; }
 
-    if(player.isDodging) {
+    if(player.gearRush && player.gearRush.active) {
+        updateGearRush(dt);
+    } else if(player.isDodging) {
         player.stats = normalizeStats(player.stats);
         const dodgeMultiplier = Number.isFinite(player.stats.dodge) ? player.stats.dodge : 1;
         player.x += player.dDX * 800 * dodgeMultiplier * dt; player.y += player.dDY * 800 * dodgeMultiplier * dt;
@@ -551,6 +577,7 @@ function update(dt) {
             isGuarding: player.isGuarding, guardActiveTimer: player.guardActiveTimer,
             isAttacking: player.isAttacking, isDodging: player.isDodging,
             comboStep: player.comboStep, attackPhase: player.attackPhase, aAngle: player.aAngle,
+            gearRush: { active: player.gearRush.active, startX: player.gearRush.startX, startY: player.gearRush.startY, tx: player.gearRush.tx, ty: player.gearRush.ty, startTime: player.gearRush.startTime, duration: player.gearRush.duration },
             wire: { active: player.wire.active, kind: player.wire.kind, tx: player.wire.tx, ty: player.wire.ty, progress: player.wire.progress, maxDistance: player.wire.maxDistance },
             level: player.level, weapon: player.weapon, skill: player.skill, stats: player.stats, isUpgrading: isUpgrading
         });
@@ -610,11 +637,11 @@ function getAngleDiff(a1, a2) {
 function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
 function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
 function releaseGuardForAction() { if (player.isGuarding) releaseGuard(); }
-function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
+function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0 || (player.gearRush && player.gearRush.active)) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
 function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
 function beginAttack() {
     releaseGuardForAction();
-    if (!canStartAttack() || player.isAttacking) return;
+    if (!canStartAttack() || player.isAttacking || (player.gearRush && player.gearRush.active)) return;
     player.isAttacking = true;
     player.comboStep = (player.comboStep % 3) + 1;
     player.attackPhase = 1;
@@ -668,14 +695,29 @@ function startBowShot() {
         });
     }
 }
-function startWire() {
-    if (selectedSkill !== 'wire') {
-        startAshArrow();
-        return;
-    }
+function startGearRush() {
     releaseGuardForAction();
-    if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
-    player.wireCooldown = SKILL_PRESETS.wire.cooldown;
+    if (player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0 || (player.gearRush && player.gearRush.active)) return;
+    player.wireCooldown = getSkillCooldown('gear');
+    const angle = player.angle;
+    const dashDistance = 320;
+    const tx = Math.max(25, Math.min(canvas.width - 25, player.x + Math.cos(angle) * dashDistance));
+    const ty = Math.max(25, Math.min(canvas.height - 25, player.y + Math.sin(angle) * dashDistance));
+    player.gearRush = {
+        active: true,
+        startX: player.x,
+        startY: player.y,
+        tx,
+        ty,
+        startTime: Date.now(),
+        duration: 0.24,
+    };
+    socket.emit('playerAction', { gearRush: player.gearRush });
+}
+function startWireGrab() {
+    releaseGuardForAction();
+    if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0 || (player.gearRush && player.gearRush.active)) return;
+    player.wireCooldown = getSkillCooldown('wire');
     const rawTx = player.x + Math.cos(player.angle) * 500;
     const rawTy = player.y + Math.sin(player.angle) * 500;
     const tx = Math.max(25, Math.min(canvas.width - 25, rawTx));
@@ -688,11 +730,22 @@ function startWire() {
     player.wire.maxDistance = Math.max(1, Math.hypot(tx - player.x, ty - player.y));
     socket.emit('playerAction', { wire: { active: true, kind: 'wire', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
 }
+function startWire() {
+    if (selectedSkill === 'ash') {
+        startAshArrow();
+        return;
+    }
+    if (selectedSkill === 'gear') {
+        startGearRush();
+        return;
+    }
+    startWireGrab();
+}
 
 function startAshArrow() {
     releaseGuardForAction();
-    if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
-    player.wireCooldown = SKILL_PRESETS.ash.cooldown;
+    if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0 || (player.gearRush && player.gearRush.active)) return;
+    player.wireCooldown = getSkillCooldown('ash');
     const edge = getRayCanvasEdge(player.x, player.y, player.angle);
     const tx = edge.x;
     const ty = edge.y;
@@ -782,6 +835,47 @@ function resolveAshHit(forcedHitId) {
     wire.active = false;
     socket.emit('playerAction', { wire: { active: false } });
 }
+function drawGearRush(p) {
+    const rush = p.gearRush;
+    if (!rush || !rush.active) return;
+    const startX = Number.isFinite(rush.startX) ? rush.startX : p.x;
+    const startY = Number.isFinite(rush.startY) ? rush.startY : p.y;
+    const tx = Number.isFinite(rush.tx) ? rush.tx : p.x;
+    const ty = Number.isFinite(rush.ty) ? rush.ty : p.y;
+    const duration = Math.max(0.08, Number(rush.duration) || 0.24);
+    const elapsed = Math.max(0, (Date.now() - Number(rush.startTime || Date.now())) / 1000);
+    const progress = Math.max(0, Math.min(1, elapsed / duration));
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const tipX = startX + (tx - startX) * eased;
+    const tipY = startY + (ty - startY) * eased;
+    const angle = Math.atan2(ty - startY, tx - startX);
+    const scale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
+    const handSpread = 14 * scale;
+    const handLift = 6 * scale;
+    const leftStartX = startX + Math.cos(angle + Math.PI / 2) * handSpread;
+    const leftStartY = startY + Math.sin(angle + Math.PI / 2) * handSpread - handLift;
+    const rightStartX = startX + Math.cos(angle - Math.PI / 2) * handSpread;
+    const rightStartY = startY + Math.sin(angle - Math.PI / 2) * handSpread - handLift;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 240, 140, 0.95)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(255, 220, 120, 0.45)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(leftStartX, leftStartY);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(rightStartX, rightStartY);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 245, 190, 0.95)';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
 function distToSegment(p1, p2, p) { const l2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2); if (l2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y); let t = Math.max(0, Math.min(1, ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2)); return Math.hypot(p.x - (p1.x + t * (p2.x - p1.x)), p.y - (p1.y + t * (p2.y - p1.y))); }
 
 window.addEventListener('keydown', e => {
@@ -814,7 +908,9 @@ function drawCharacter(p, color) {
     const nameOffset = 65 * bodyScale;
     const hpOffset = 60 * bodyScale;
     const stunOffset = 82 * bodyScale;
-    if(wire && wire.active) {
+    if (p.gearRush && p.gearRush.active) {
+        drawGearRush(p);
+    } else if(wire && wire.active) {
         const wireProgress = wire.progress ?? 1;
         const tipX = x + (wire.tx - x) * wireProgress;
         const tipY = y + (wire.ty - y) * wireProgress;
@@ -1498,10 +1594,16 @@ function normalizeAccountPassword(value) {
     return String(value || '').trim().replace(/[\r\n,]/g, '').slice(0, 32);
 }
 function normalizeSkill(value) {
-    return String(value || '').trim().toLowerCase() === 'ash' ? 'ash' : 'wire';
+    const skill = String(value || '').trim().toLowerCase();
+    if (skill === 'ash') return 'ash';
+    if (skill === 'gear') return 'gear';
+    return 'wire';
 }
 function getSkillLabel(skill) {
     return SKILL_PRESETS[normalizeSkill(skill)]?.label || SKILL_PRESETS.wire.label;
+}
+function getSkillCooldown(skill) {
+    return SKILL_PRESETS[normalizeSkill(skill)]?.cooldown || SKILL_PRESETS.wire.cooldown;
 }
 function updateSkillButtonLabel() {
     const btn = document.getElementById('btn-wire');
@@ -1527,7 +1629,7 @@ function setWeaponError(message) {
 }
 function setSkillError(message) {
     const errorEl = document.getElementById('skill-note');
-    if (errorEl) errorEl.textContent = message || '땡겨 또는 애쉬궁 중 하나를 선택하세요.';
+    if (errorEl) errorEl.textContent = message || '땡겨, 입체기동 또는 애쉬궁 중 하나를 선택하세요.';
 }
 function setWeaponSelection(weapon) {
     selectedWeapon = normalizeWeapon(weapon);
@@ -1598,6 +1700,7 @@ function enterGame(nickname, accountId, weapon, skill) {
         player.maxHp = getMaxHpFromStats(player.stats);
         player.hp = player.maxHp;
         player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
+        player.gearRush = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 };
         socket.emit('setWeapon', player.weapon);
     }
     player.skill = normalizeSkill(skill);

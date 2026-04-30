@@ -88,6 +88,7 @@ function sanitizeWeapon(value) {
 function sanitizeSkill(value) {
     const skill = String(value || '').trim().toLowerCase();
     if (skill === 'ash') return 'ash';
+    if (skill === 'gear') return 'gear';
     return 'wire';
 }
 
@@ -684,6 +685,28 @@ function sanitizeAction(p, actionData) {
         action.wire = wire;
     }
 
+    if (actionData.gearRush && typeof actionData.gearRush === 'object') {
+        const gearRush = { active: Boolean(actionData.gearRush.active) };
+        if (Number.isFinite(actionData.gearRush.startX)) gearRush.startX = actionData.gearRush.startX;
+        if (Number.isFinite(actionData.gearRush.startY)) gearRush.startY = actionData.gearRush.startY;
+        if (Number.isFinite(actionData.gearRush.tx)) {
+            const dx = actionData.gearRush.tx - p.x;
+            const dy = actionData.gearRush.ty - p.y;
+            const distance = Math.hypot(dx, dy);
+            const maxDistance = 340;
+            if (distance > maxDistance) {
+                gearRush.tx = p.x + (dx / distance) * maxDistance;
+                gearRush.ty = p.y + (dy / distance) * maxDistance;
+            } else {
+                gearRush.tx = actionData.gearRush.tx;
+                gearRush.ty = actionData.gearRush.ty;
+            }
+        }
+        if (Number.isFinite(actionData.gearRush.startTime)) gearRush.startTime = actionData.gearRush.startTime;
+        if (Number.isFinite(actionData.gearRush.duration)) gearRush.duration = Math.max(0.08, Math.min(1.0, actionData.gearRush.duration));
+        action.gearRush = gearRush;
+    }
+
     return action;
 }
 
@@ -718,6 +741,7 @@ io.on('connection', (socket) => {
         giantEndsAt: 0,
         giantRecoveryEndsAt: 0,
         giantRecoveryArmed: false,
+        gearRush: { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 },
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
         skill: 'wire',
@@ -974,6 +998,7 @@ io.on('connection', (socket) => {
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
                 target.isSelectingLoadout = true;
+                target.gearRush = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 };
                 target.giantActive = false;
                 target.giantScale = 1;
                 target.giantAttackMult = 1;
@@ -990,6 +1015,7 @@ io.on('connection', (socket) => {
                         players[targetId].isStunned = false;
                         players[targetId].isGuarding = false;
                         players[targetId].isSelectingLoadout = true;
+                        players[targetId].gearRush = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 };
                         players[targetId].giantActive = false;
                         players[targetId].giantScale = 1;
                         players[targetId].giantAttackMult = 1;
