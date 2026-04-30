@@ -45,23 +45,43 @@ function sanitizeAccountPassword(value) {
         .slice(0, 32);
 }
 
+function sanitizeWeapon(value) {
+    const weapon = String(value || '').trim().toLowerCase();
+    if (weapon === 'hammer') return 'hammer';
+    return 'sword';
+}
+
 function loadAccounts() {
     ensureAccountFile();
     const raw = fs.readFileSync(ACCOUNT_FILE, 'utf8').trim();
     if (!raw) return [];
     return raw.split(/\r?\n/).map((line) => {
-        const [id, nickname, password] = line.split(',');
-        return { id: id || '', nickname: nickname || '', password: password || '' };
+        const [id, nickname, password, weapon] = line.split(',');
+        const hasWeapon = typeof weapon === 'string' && weapon.trim() !== '';
+        return {
+            id: id || '',
+            nickname: nickname || '',
+            password: password || '',
+            weapon: hasWeapon ? sanitizeWeapon(weapon) : '',
+            hasWeapon,
+        };
     }).filter((account) => account.id && account.nickname && account.password);
 }
 
 function saveAccounts(accounts) {
-    const body = accounts.map((account) => [account.id, account.nickname, account.password].join(',')).join('\n');
+    const body = accounts.map((account) => [account.id, account.nickname, account.password, account.weapon ? sanitizeWeapon(account.weapon) : ''].join(',')).join('\n');
     fs.writeFileSync(ACCOUNT_FILE, body ? `${body}\n` : '', 'utf8');
 }
 
 function findAccountById(id) {
     return loadAccounts().find((account) => account.id === id);
+}
+
+function createBaseStatsForWeapon(weapon) {
+    if (sanitizeWeapon(weapon) === 'hammer') {
+        return { dmg: 1.3, range: 0.9, speed: 0.8, move: 1.0 };
+    }
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
 }
 
 app.post('/api/auth/register', (req, res) => {
@@ -83,9 +103,9 @@ app.post('/api/auth/register', (req, res) => {
         return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
     }
 
-    accounts.push({ id, nickname, password });
+    accounts.push({ id, nickname, password, weapon: '' });
     saveAccounts(accounts);
-    return res.json({ ok: true, id, nickname });
+    return res.json({ ok: true, id, nickname, weapon: '' });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -98,7 +118,23 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(401).json({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
 
-    return res.json({ ok: true, id: account.id, nickname: account.nickname });
+    return res.json({ ok: true, id: account.id, nickname: account.nickname, weapon: account.hasWeapon ? account.weapon : '' });
+});
+
+app.post('/api/auth/set-weapon', (req, res) => {
+    const id = sanitizeAccountId(req.body && req.body.id);
+    const weapon = sanitizeWeapon(req.body && req.body.weapon);
+    if (!id) return res.status(400).json({ ok: false, error: '아이디가 필요합니다.' });
+    if (!weapon) return res.status(400).json({ ok: false, error: '무기군을 선택해 주세요.' });
+
+    const accounts = loadAccounts();
+    const account = accounts.find((entry) => entry.id === id);
+    if (!account) return res.status(404).json({ ok: false, error: '계정을 찾을 수 없습니다.' });
+
+    account.weapon = weapon;
+    account.hasWeapon = true;
+    saveAccounts(accounts);
+    return res.json({ ok: true, weapon });
 });
 
 function getAngleDiff(a1, a2) {
@@ -198,6 +234,7 @@ io.on('connection', (socket) => {
     players[socket.id] = {
         id: socket.id,
         name: "Hunter_" + socket.id.substring(0, 4),
+        weapon: 'sword',
         x: 200 + Math.random() * 600,
         y: 200 + Math.random() * 400,
         hp: 100,
@@ -214,7 +251,7 @@ io.on('connection', (socket) => {
         isUpgrading: false,
         pendingUpgrades: 0,
         wire: { active: false, tx: 0, ty: 0 },
-        stats: createDefaultStats(),
+        stats: createBaseStatsForWeapon('sword'),
         lastMoveAt: Date.now(),
         lastWireAt: 0
     };
@@ -226,6 +263,15 @@ io.on('connection', (socket) => {
         const p = players[socket.id];
         if (!p) return;
         p.name = sanitizeName(name, p.name);
+        io.emit('statsUpdate', players);
+    });
+
+    socket.on('setWeapon', (weapon) => {
+        const p = players[socket.id];
+        if (!p) return;
+        const nextWeapon = sanitizeWeapon(weapon);
+        p.weapon = nextWeapon;
+        p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
         io.emit('statsUpdate', players);
     });
 
@@ -368,7 +414,7 @@ io.on('connection', (socket) => {
                     attacker.pendingUpgrades += levelsGained;
                 }
                 target.level = 1;
-                target.stats = createDefaultStats();
+                target.stats = createBaseStatsForWeapon(target.weapon);
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
                 io.emit('playerDied', { victimId: targetId, attackerId: socket.id });

@@ -85,6 +85,53 @@
         #btn-signin { background: #e67e22; }
         #btn-register { background: #e74c3c; }
         #btn-back-login { background: #2c3e50; }
+        .weapon-panel { display: flex; flex-direction: column; align-items: center; width: min(560px, calc(100vw - 24px)); }
+        .weapon-panel.hidden { display: none; }
+        .weapon-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 18px 0 16px; }
+        .weapon-card {
+            min-height: 190px;
+            border: 2px solid rgba(255,255,255,0.18);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.06);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 12px;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s, background 0.18s;
+            text-align: center;
+        }
+        .weapon-card:hover { transform: translateY(-3px); border-color: rgba(241,196,15,0.7); box-shadow: 0 0 14px rgba(241,196,15,0.14); }
+        .weapon-card.selected { border-color: #f1c40f; background: rgba(241,196,15,0.08); box-shadow: 0 0 18px rgba(241,196,15,0.2); }
+        .weapon-card h4 { margin: 0; font-size: 18px; color: #f1c40f; }
+        .weapon-card p { margin: 0; font-size: 12px; line-height: 1.45; color: #ddd; }
+        .weapon-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 30% 30%, rgba(241,196,15,0.28), rgba(241,196,15,0.08) 55%, rgba(0,0,0,0.15) 100%);
+            border: 1px solid rgba(241,196,15,0.55);
+            box-shadow: inset 0 0 12px rgba(241,196,15,0.15), 0 0 12px rgba(241,196,15,0.12);
+        }
+        .weapon-icon svg {
+            width: 38px;
+            height: 38px;
+            stroke: #f1c40f;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        #weapon-note { min-height: 18px; color: #ddd; font-size: 12px; margin-bottom: 2px; text-align: center; }
+        #btn-weapon-confirm { background: #2ecc71; }
+        #btn-weapon-back { background: #2c3e50; }
 
         @media (max-width: 700px), (max-height: 500px) {
             #hud {
@@ -141,6 +188,10 @@
             #upgrade-timer { font-size: 18px; margin-top: 12px; }
             .overlay h1 { font-size: 26px; text-align: center; }
             .overlay p { max-width: calc(100vw - 32px); text-align: center; }
+            .weapon-grid { gap: 10px; }
+            .weapon-card { min-height: 150px; padding: 12px 10px; }
+            .weapon-icon { width: 60px; height: 60px; }
+            .weapon-icon svg { width: 30px; height: 30px; }
         }
 
         @media (max-width: 700px) and (orientation: portrait) {
@@ -177,6 +228,11 @@
             .card .icon { grid-row: 1 / span 2; margin: 0; width: 36px; height: 36px; }
             .card .icon svg { width: 20px; height: 20px; }
             .card h4 { margin: 0 0 4px 0; }
+            .weapon-panel { width: min(360px, calc(100vw - 24px)); }
+            .weapon-grid { grid-template-columns: 1fr; }
+            .weapon-card { min-height: 138px; align-items: flex-start; text-align: left; }
+            .weapon-card .weapon-icon { width: 54px; height: 54px; }
+            .weapon-card .weapon-icon svg { width: 26px; height: 26px; }
         }
 
         @media (max-height: 500px) and (orientation: landscape) {
@@ -243,6 +299,41 @@
                 <button id="btn-back-login" class="start-btn" type="button">LOGIN</button>
             </div>
         </div>
+        <div id="weapon-panel" class="weapon-panel hidden">
+            <h2 style="margin: 0; color: #f1c40f;">무기군 선택</h2>
+            <div id="weapon-note">한손검 또는 망치를 선택하세요.</div>
+            <div class="weapon-grid">
+                <div class="weapon-card selected" data-weapon="sword" role="button" tabindex="0">
+                    <div class="weapon-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M5 19L19 5" />
+                            <path d="M14 5h5v5" />
+                            <path d="M6 18l4-4" />
+                        </svg>
+                    </div>
+                    <h4>한손검</h4>
+                    <p>공격이 빠르고 균형이 좋습니다.<br>기본형 무기군입니다.</p>
+                </div>
+                <div class="weapon-card" data-weapon="hammer" role="button" tabindex="0">
+                    <div class="weapon-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M7 4h6l2 3H9z" />
+                            <path d="M9 7l-5 5" />
+                            <path d="M14 7l4 4" />
+                            <path d="M5 12l4 4" />
+                            <path d="M15 11l4 4" />
+                            <path d="M9 7v8" />
+                        </svg>
+                    </div>
+                    <h4>망치</h4>
+                    <p>공격이 느리지만 강력합니다.<br>사거리는 조금 짧습니다.</p>
+                </div>
+            </div>
+            <div class="start-actions">
+                <button id="btn-weapon-confirm" class="start-btn" type="button">시작하기</button>
+                <button id="btn-weapon-back" class="start-btn" type="button">뒤로</button>
+            </div>
+        </div>
     </div>
 
     <div id="overlay-upgrade" class="overlay hidden">
@@ -305,13 +396,20 @@
 const socket = window.io ? io() : { on() {}, emit() {}, id: null };
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 const VIEW_Y_SCALE = 0.7;
+const WEAPON_PRESETS = {
+    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 } },
+    hammer: { label: '망치', stats: { dmg: 1.3, range: 0.9, speed: 0.8, move: 1.0 } },
+};
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
+let pendingAuth = null;
+let selectedWeapon = 'sword';
 const keys = {};
 
 const player = {
     x: 400, y: 300, hp: 100, angle: 0, level: 1,
+    weapon: 'sword',
     isGuarding: false, guardCooldown: 0, guardActiveTimer: 0,
     isAttacking: false, isStunned: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
     isDodging: false, dTimer: 0, dDX: 0, dDY: 0, dodgeCooldown: 0,
@@ -326,7 +424,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -372,7 +470,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -381,7 +479,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = 100; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.stats = normalizeStats(p.stats); 
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); 
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -452,6 +550,18 @@ function formatPercentStat(multiplier) {
 
 function normalizeStats(stats) {
     return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 }, stats || {});
+}
+
+function normalizeWeapon(weapon) {
+    return weapon === 'hammer' ? 'hammer' : 'sword';
+}
+
+function createBaseStatsForWeapon(weapon) {
+    return Object.assign({}, WEAPON_PRESETS[normalizeWeapon(weapon)].stats);
+}
+
+function getWeaponLabel(weapon) {
+    return WEAPON_PRESETS[normalizeWeapon(weapon)].label;
 }
 
 function getEffectiveMoveMultiplier() {
@@ -550,7 +660,7 @@ function update(dt) {
             isAttacking: player.isAttacking, isDodging: player.isDodging,
             comboStep: player.comboStep, attackPhase: player.attackPhase, aAngle: player.aAngle,
             wire: { active: player.wire.active, tx: player.wire.tx, ty: player.wire.ty },
-            level: player.level, stats: player.stats, isUpgrading: isUpgrading
+            level: player.level, weapon: player.weapon, stats: player.stats, isUpgrading: isUpgrading
         });
     }
     if(prev.x !== player.x || prev.y !== player.y || prev.angle !== player.angle) socket.emit('playerMovement', { x: player.x, y: player.y, angle: player.angle });
@@ -644,6 +754,7 @@ window.addEventListener('contextmenu', e => e.preventDefault());
 
 function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats } = p;
+    const weapon = normalizeWeapon(p.weapon);
     const attackRange = 85 * (stats ? stats.range : 1.0);
     const weaponLength = Math.max(28, attackRange - 35);
     if(wire && wire.active) { ctx.save(); ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.moveTo(x, y); ctx.lineTo(wire.tx, wire.ty); ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); }
@@ -653,7 +764,20 @@ function drawCharacter(p, color) {
     ctx.fillStyle = isStunned ? "#9b59b6" : (hp > 30 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, (hp/100)*50, 6);
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
-    ctx.save(); let sRot = 0.8; if(isAttacking) { if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5); } else if(isGuarding) sRot = 0.2; ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10); ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7"; ctx.fillRect(35,18,weaponLength,10); ctx.restore(); ctx.restore(); ctx.restore();
+    ctx.save(); let sRot = 0.8; if(isAttacking) { if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5); } else if(isGuarding) sRot = 0.2; ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10);
+    if (weapon === 'hammer') {
+        const handleLength = Math.max(18, weaponLength * 0.7);
+        const headSize = Math.max(12, Math.min(28, 12 + Math.max(0, weaponLength - 28) * 0.18));
+        ctx.fillStyle = "#6e4b2f";
+        ctx.fillRect(35, 20, handleLength, 8);
+        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.fillRect(35 + handleLength - 2, 14, headSize, 20);
+        ctx.fillRect(35 + handleLength + headSize - 4, 13, 4, 22);
+    } else {
+        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.fillRect(35,18,weaponLength,10);
+    }
+    ctx.restore(); ctx.restore(); ctx.restore();
     if(isAttacking && attackPhase === 2) { ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.beginPath(); const ba = aAngle || angle; let sA = ba-2.0, eA = ba+0.5; let counter = false; if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; } ctx.arc(0,0,attackRange,sA,eA,counter); ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.stroke(); ctx.restore(); }
 }
 function draw() {
@@ -711,12 +835,40 @@ function normalizeAccountPassword(value) {
 function setAuthMode(mode) {
     const loginPanel = document.getElementById('login-panel');
     const registerPanel = document.getElementById('register-panel');
+    const weaponPanel = document.getElementById('weapon-panel');
     if (loginPanel) loginPanel.classList.toggle('hidden', mode !== 'login');
     if (registerPanel) registerPanel.classList.toggle('hidden', mode !== 'register');
+    if (weaponPanel) weaponPanel.classList.toggle('hidden', mode !== 'weapon');
 }
 function setAuthError(target, message) {
     const errorEl = document.getElementById(target + '-error');
     if (errorEl) errorEl.textContent = message || '';
+}
+function setWeaponError(message) {
+    const errorEl = document.getElementById('weapon-note');
+    if (errorEl) errorEl.textContent = message || '한손검 또는 망치를 선택하세요.';
+}
+function setWeaponSelection(weapon) {
+    selectedWeapon = normalizeWeapon(weapon);
+    document.querySelectorAll('.weapon-card').forEach((card) => {
+        card.classList.toggle('selected', card.dataset.weapon === selectedWeapon);
+    });
+    setWeaponError(`${getWeaponLabel(selectedWeapon)}가 선택되었습니다.`);
+}
+function showWeaponPanel(auth) {
+    pendingAuth = auth;
+    setAuthMode('weapon');
+    const weaponPanel = document.getElementById('weapon-panel');
+    if (weaponPanel) weaponPanel.classList.remove('hidden');
+    const loginPanel = document.getElementById('login-panel');
+    const registerPanel = document.getElementById('register-panel');
+    if (loginPanel) loginPanel.classList.add('hidden');
+    if (registerPanel) registerPanel.classList.add('hidden');
+    setWeaponSelection(auth.weapon || localStorage.getItem(`mh_last_weapon_${auth.id}`) || 'sword');
+}
+function hideWeaponPanel() {
+    const weaponPanel = document.getElementById('weapon-panel');
+    if (weaponPanel) weaponPanel.classList.add('hidden');
 }
 async function postAuth(path, payload) {
     const response = await fetch(path, {
@@ -730,9 +882,29 @@ async function postAuth(path, payload) {
     }
     return data;
 }
-function enterGame(nickname, accountId) {
+async function saveWeaponChoice(accountId, weapon) {
+    const response = await fetch('/api/auth/set-weapon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: accountId, weapon }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+        throw new Error(data.error || '무기 저장에 실패했습니다.');
+    }
+    return data.weapon;
+}
+function enterGame(nickname, accountId, weapon) {
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
+    if (accountId && weapon) localStorage.setItem(`mh_last_weapon_${accountId}`, weapon);
     if (nickname) socket.emit('setName', nickname);
+    if (weapon) {
+        player.weapon = normalizeWeapon(weapon);
+        player.stats = normalizeStats(createBaseStatsForWeapon(player.weapon));
+        socket.emit('setWeapon', player.weapon);
+        updateHUD();
+    }
+    hideWeaponPanel();
     document.getElementById('overlay-start').classList.add('hidden');
     gameState = 'PLAYING';
     requestAnimationFrame(loop);
@@ -743,7 +915,11 @@ async function handleLogin() {
     try {
         setAuthError('login', '');
         const result = await postAuth('/api/auth/login', { id, password });
-        enterGame(result.nickname, result.id);
+        if (result.weapon) {
+            enterGame(result.nickname, result.id, result.weapon);
+        } else {
+            showWeaponPanel(result);
+        }
     } catch (error) {
         setAuthError('login', error.message);
     }
@@ -761,7 +937,7 @@ async function handleRegister() {
         const loginPassword = document.getElementById('login-password');
         if (loginId) loginId.value = result.id;
         if (loginPassword) loginPassword.value = '';
-        enterGame(result.nickname, result.id);
+        showWeaponPanel(result);
     } catch (error) {
         setAuthError('register', error.message);
     }
@@ -784,6 +960,33 @@ document.getElementById('btn-register')?.addEventListener('click', handleRegiste
 document.getElementById('btn-back-login')?.addEventListener('click', () => {
     setAuthMode('login');
     setAuthError('login', '');
+});
+document.querySelectorAll('.weapon-card').forEach((card) => {
+    card.addEventListener('click', () => setWeaponSelection(card.dataset.weapon));
+    card.addEventListener('keydown', (e) => {
+        if (e.code === 'Enter' || e.code === 'Space') {
+            e.preventDefault();
+            setWeaponSelection(card.dataset.weapon);
+        }
+    });
+});
+document.getElementById('btn-weapon-back')?.addEventListener('click', () => {
+    pendingAuth = null;
+    hideWeaponPanel();
+    setAuthMode('login');
+    setAuthError('login', '');
+});
+document.getElementById('btn-weapon-confirm')?.addEventListener('click', async () => {
+    if (!pendingAuth) return;
+    try {
+        setWeaponError('');
+        const weapon = normalizeWeapon(selectedWeapon);
+        await saveWeaponChoice(pendingAuth.id, weapon);
+        enterGame(pendingAuth.nickname, pendingAuth.id, weapon);
+        pendingAuth = null;
+    } catch (error) {
+        setWeaponError(error.message);
+    }
 });
 document.getElementById('login-id')?.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
