@@ -565,9 +565,17 @@ function draw() {
 }
 const joyContainer = document.getElementById('joy-container'), joyStick = document.getElementById('joy-stick');
 let joyId = null;
+function setMouseAimFromPoint(clientX, clientY) {
+    if (!canStartAttack() || joyId !== null) return;
+    const dx = clientX - player.x;
+    const dy = clientY - player.y;
+    if (dx === 0 && dy === 0) return;
+    player.angle = Math.atan2(dy, dx);
+}
 joyContainer.addEventListener('pointerdown', e => { if(gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned) { joyId = e.pointerId; joyContainer.setPointerCapture(e.pointerId); } });
 window.addEventListener('pointermove', e => { if(joyId === e.pointerId) { const r = joyContainer.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2; let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy); if(d > 50) { dx *= 50/d; dy *= 50/d; } joyStick.style.transform = `translate(${dx}px, ${dy}px)`; player.moveDir = { x: dx/50, y: (dy/50)/VIEW_Y_SCALE }; } });
 window.addEventListener('pointerup', e => { if(joyId === e.pointerId) { joyId = null; joyStick.style.transform = 'translate(0,0)'; player.moveDir = { x: 0, y: 0 }; } });
+window.addEventListener('mousemove', e => { setMouseAimFromPoint(e.clientX, e.clientY); });
 const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) return; el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting && !isUpgrading) fn(e); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); el.addEventListener('pointercancel', end); } };
 bind('btn-attack', () => { attackHoldSources.add('button'); beginAttack(); }, () => { attackHoldSources.delete('button'); });
 bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire);
