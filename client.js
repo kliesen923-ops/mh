@@ -614,6 +614,13 @@ function selectUpgrade(type) {
 }
 
 function update(dt) {
+    const canTickCooldowns = gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0;
+    if (canTickCooldowns) {
+        if(player.guardCooldown > 0) player.guardCooldown -= dt;
+        if(player.dodgeCooldown > 0) player.dodgeCooldown -= dt;
+        if(player.wireCooldown > 0) player.wireCooldown -= dt;
+        updateCooldownUI();
+    }
     if (gameState !== 'PLAYING' || isChatting || isUpgrading || player.hp <= 0 || player.isStunned) return;
     const prev = { x: player.x, y: player.y, angle: player.angle };
     let mx = 0, my = 0;
@@ -664,10 +671,6 @@ function update(dt) {
     player.y = Math.max(25, Math.min(canvas.height - 25, player.y));
     if (player.isGuarding) { player.guardActiveTimer += dt; if (player.guardActiveTimer >= GUARD_DURATION_SEC) releaseGuard(); }
     
-    if(player.guardCooldown > 0) player.guardCooldown -= dt;
-    if(player.dodgeCooldown > 0) player.dodgeCooldown -= dt;
-    if(player.wireCooldown > 0) player.wireCooldown -= dt;
-    updateCooldownUI();
     updateCombatReadouts();
     updateCombatEffects(dt);
     updateAshProjectiles(dt);
