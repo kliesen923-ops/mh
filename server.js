@@ -312,7 +312,7 @@ function pickupGiantPotion(playerId) {
     const distance = Math.hypot(p.x - giantPotion.x, p.y - giantPotion.y);
     if (distance > GIANT_POTION_PICKUP_RADIUS) return;
     p.giantActive = true;
-    p.giantScale = 4;
+    p.giantScale = 3;
     p.giantAttackMult = 2;
     p.giantEndsAt = Date.now() + GIANT_POTION_DURATION_MS;
     p.giantRecoveryEndsAt = 0;
