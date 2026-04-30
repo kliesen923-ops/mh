@@ -43,7 +43,27 @@
         .card:hover { transform: translateY(-5px); box-shadow: 0 0 15px #f1c40f; }
         .card h4 { color: #f1c40f; margin: 0 0 10px 0; font-size: 16px; }
         .card p { font-size: 12px; line-height: 1.4; color: #ddd; margin: 0; }
-        .card .icon { font-size: 30px; margin-bottom: 10px; }
+        .card .icon {
+            width: 54px;
+            height: 54px;
+            margin-bottom: 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 30% 30%, rgba(241,196,15,0.35), rgba(241,196,15,0.08) 55%, rgba(0,0,0,0.15) 100%);
+            border: 1px solid rgba(241,196,15,0.55);
+            box-shadow: inset 0 0 12px rgba(241,196,15,0.18), 0 0 12px rgba(241,196,15,0.15);
+        }
+        .card .icon svg {
+            width: 30px;
+            height: 30px;
+            stroke: #f1c40f;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
         #upgrade-timer { font-size: 24px; color: #e74c3c; font-weight: bold; margin-top: 20px; text-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
         #joy-container { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; border: 2px solid rgba(255,255,255,0.2); }
         #joy-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; position: absolute; pointer-events: none; }
@@ -116,7 +136,8 @@
             .card { flex-basis: 96px; max-width: 140px; height: 164px; padding: 9px; border-radius: 8px; }
             .card h4 { font-size: 13px; margin-bottom: 7px; }
             .card p { font-size: 11px; }
-            .card .icon { font-size: 24px; margin-bottom: 7px; }
+            .card .icon { width: 44px; height: 44px; margin-bottom: 7px; }
+            .card .icon svg { width: 24px; height: 24px; }
             #upgrade-timer { font-size: 18px; margin-top: 12px; }
             .overlay h1 { font-size: 26px; text-align: center; }
             .overlay p { max-width: calc(100vw - 32px); text-align: center; }
@@ -153,7 +174,8 @@
                 gap: 4px 10px;
                 text-align: left;
             }
-            .card .icon { grid-row: 1 / span 2; margin: 0; width: 30px; text-align: center; }
+            .card .icon { grid-row: 1 / span 2; margin: 0; width: 36px; height: 36px; }
+            .card .icon svg { width: 20px; height: 20px; }
             .card h4 { margin: 0 0 4px 0; }
         }
 
@@ -228,10 +250,52 @@
         <p>업그레이드를 하나 선택해서 캐릭터를 강화하세요.</p>
         <div id="upgrade-timer">업그레이드 시간: 9초</div>
         <div id="upgrade-cards">
-            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">DMG</div><h4>공격력 강화</h4><p>모든 공격의 피해가 <br><b>20%</b> 증가합니다.</p></div>
-            <div class="card" onclick="selectUpgrade('range')"><div class="icon">RNG</div><h4>사거리 강화</h4><p>공격의 도달 범위가 <br><b>15%</b> 증가합니다.</p></div>
-            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">SPD</div><h4>공격 속도 강화</h4><p>공격 속도가 <br><b>25%</b> 증가합니다.</p></div>
-            <div class="card" onclick="selectUpgrade('move')"><div class="icon">MOV</div><h4>이동 속도 강화</h4><p>이동 속도가 <br><b>10%</b> 증가합니다.</p></div>
+            <div class="card" onclick="selectUpgrade('dmg')">
+                <div class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5 19L19 5" />
+                        <path d="M14 5h5v5" />
+                        <path d="M6 18l4-4" />
+                    </svg>
+                </div>
+                <h4>공격력 강화</h4>
+                <p>모든 공격의 피해가 <br><b>20%</b> 증가합니다.</p>
+            </div>
+            <div class="card" onclick="selectUpgrade('range')">
+                <div class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="7" />
+                        <path d="M12 3v3" />
+                        <path d="M21 12h-3" />
+                        <path d="M12 21v-3" />
+                        <path d="M3 12h3" />
+                        <circle cx="12" cy="12" r="1.5" />
+                    </svg>
+                </div>
+                <h4>사거리 강화</h4>
+                <p>공격의 도달 범위가 <br><b>15%</b> 증가합니다.</p>
+            </div>
+            <div class="card" onclick="selectUpgrade('speed')">
+                <div class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M13 2L4 14h6l-1 8 11-13h-6l-1-7z" />
+                    </svg>
+                </div>
+                <h4>공격 속도 강화</h4>
+                <p>공격 속도가 <br><b>25%</b> 증가합니다.</p>
+            </div>
+            <div class="card" onclick="selectUpgrade('move')">
+                <div class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 14l6-6" />
+                        <path d="M4 8v6h6" />
+                        <path d="M20 10l-6 6" />
+                        <path d="M20 16v-6h-6" />
+                    </svg>
+                </div>
+                <h4>이동 속도 강화</h4>
+                <p>이동 속도가 <br><b>10%</b> 증가합니다.</p>
+            </div>
         </div>
     </div>
 
