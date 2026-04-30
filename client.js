@@ -258,6 +258,11 @@ function formatPercentStat(multiplier) {
     return String(Math.round((Number.isFinite(multiplier) ? multiplier : 1) * 100));
 }
 
+function getBowProjectileCount(stats) {
+    const projectileMultiplier = Number.isFinite(stats && stats.projectile) ? stats.projectile : 1;
+    return Math.max(1, Math.min(5, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2))));
+}
+
 function normalizeStats(stats) {
     return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 }, stats || {});
 }
@@ -287,10 +292,30 @@ function updateCombatReadouts() {
     const rangeValue = document.getElementById('range-value');
     const attackSpeedValue = document.getElementById('attack-speed-value');
     const moveSpeedValue = document.getElementById('move-speed-value');
-    if (!rangeValue || !attackSpeedValue || !moveSpeedValue) return;
+    const basicLabel = document.getElementById('damage-basic-label');
+    const secondLabel = document.getElementById('damage-second-label');
+    const heavyLabel = document.getElementById('damage-heavy-label');
+    const basicRow = document.getElementById('damage-basic-row');
+    const secondRow = document.getElementById('damage-second-row');
+    const heavyRow = document.getElementById('damage-heavy-row');
+    const rangeLabel = document.getElementById('range-label');
+    if (!rangeValue || !attackSpeedValue || !moveSpeedValue || !basicLabel || !secondLabel || !heavyLabel || !basicRow || !secondRow || !heavyRow || !rangeLabel) return;
 
     player.stats = normalizeStats(player.stats);
-    rangeValue.textContent = formatPercentStat(player.stats.range);
+    const isBow = normalizeWeapon(player.weapon) === 'bow';
+    basicRow.style.display = '';
+    secondRow.style.display = isBow ? 'none' : '';
+    heavyRow.style.display = isBow ? 'none' : '';
+    basicLabel.textContent = isBow ? '공격력' : '1타';
+    secondLabel.textContent = '2타';
+    heavyLabel.textContent = '3타';
+    if (isBow) {
+        rangeLabel.textContent = '투사체수';
+        rangeValue.textContent = String(getBowProjectileCount(player.stats));
+    } else {
+        rangeLabel.textContent = '사거리';
+        rangeValue.textContent = formatPercentStat(player.stats.range);
+    }
     attackSpeedValue.textContent = formatPercentStat(player.stats.speed);
     moveSpeedValue.textContent = String(Math.round(getEffectiveMoveMultiplier() * 100));
 }
@@ -310,7 +335,8 @@ function updateHUD() {
 
     player.stats = normalizeStats(player.stats);
     const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
-    basicDamage.textContent = formatDamage(10 * dmgScale);
+    const isBow = normalizeWeapon(player.weapon) === 'bow';
+    basicDamage.textContent = formatDamage((isBow ? 9 : 10) * dmgScale);
     secondDamage.textContent = formatDamage(20 * dmgScale);
     heavyDamage.textContent = formatDamage(35 * dmgScale);
     updateCombatReadouts();
