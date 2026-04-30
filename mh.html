@@ -405,6 +405,7 @@ let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
 let pendingAuth = null;
 let currentSession = null;
 let selectedWeapon = 'sword';
+let combatEffects = [];
 const keys = {};
 
 const player = {
@@ -492,6 +493,17 @@ socket.on('playerDied', (data) => {
         showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
         setWeaponError('사망했습니다. 무기를 다시 선택하세요.');
     }
+});
+socket.on('combatEffect', (effect) => {
+    if (!effect) return;
+    combatEffects.push({
+        x: Number(effect.x) || 0,
+        y: Number(effect.y) || 0,
+        angle: Number(effect.angle) || 0,
+        weapon: normalizeWeapon(effect.weapon),
+        life: 0.22,
+        maxLife: 0.22,
+    });
 });
 socket.on('chatMessage', (data) => {
     const msgEl = document.createElement('div');
@@ -622,6 +634,13 @@ function updateCooldownUI() {
     updateCooldownButton('btn-wire', player.wireCooldown, 1.0);
 }
 
+function updateCombatEffects(dt) {
+    combatEffects = combatEffects.filter((effect) => {
+        effect.life -= dt;
+        return effect.life > 0;
+    });
+}
+
 function selectUpgrade(type) {
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
     socket.emit('selectUpgrade', type);
@@ -658,6 +677,7 @@ function update(dt) {
     if(player.wireCooldown > 0) player.wireCooldown -= dt;
     updateCooldownUI();
     updateCombatReadouts();
+    updateCombatEffects(dt);
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
@@ -803,10 +823,56 @@ function drawCharacter(p, color) {
     ctx.restore(); ctx.restore(); ctx.restore();
     if(isAttacking && attackPhase === 2) { ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.beginPath(); const ba = aAngle || angle; let sA = ba-2.0, eA = ba+0.5; let counter = false; if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; } ctx.arc(0,0,attackRange,sA,eA,counter); ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.stroke(); ctx.restore(); }
 }
+
+function drawCombatEffects() {
+    combatEffects.forEach((effect) => {
+        const t = Math.max(0, Math.min(1, effect.life / effect.maxLife));
+        const alpha = t;
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.scale(1, VIEW_Y_SCALE);
+        ctx.globalAlpha = alpha;
+        if (effect.weapon === 'hammer') {
+            const burst = 20 + (1 - t) * 34;
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.95)';
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.55)';
+            ctx.lineWidth = 4;
+            for (let i = 0; i < 6; i++) {
+                const a = (Math.PI * 2 / 6) * i + effect.angle;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 4);
+                ctx.lineTo(Math.cos(a) * burst, Math.sin(a) * burst);
+                ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.arc(0, 0, 10 + (1 - t) * 8, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            const slashLen = 44 + (1 - t) * 18;
+            const slashWidth = 4 + (1 - t) * 2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.lineWidth = slashWidth;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.rotate(effect.angle + Math.PI / 10);
+            ctx.moveTo(-slashLen * 0.6, -slashLen * 0.22);
+            ctx.lineTo(slashLen * 0.6, slashLen * 0.22);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.75)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-slashLen * 0.25, slashLen * 0.16);
+            ctx.lineTo(slashLen * 0.72, -slashLen * 0.12);
+            ctx.stroke();
+        }
+        ctx.restore();
+    });
+}
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
+    drawCombatEffects();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?⑤같?덉뒿?덈떎! 3珥???遺?쒗빀?덈떎.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }

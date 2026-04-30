@@ -417,6 +417,12 @@ io.on('connection', (socket) => {
             const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
             const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
             if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.5);
+            io.emit('combatEffect', {
+                x: target.x,
+                y: target.y,
+                angle: attackAngle,
+                weapon: attacker.weapon || 'sword',
+            });
             target.hp -= damage;
             if (target.hp <= 0) {
                 target.hp = 0; target.deaths++; attacker.kills++;
