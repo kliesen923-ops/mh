@@ -610,7 +610,7 @@ socket.on('ashProjectile', (effect) => {
 });
 socket.on('bowProjectile', (effect) => {
     if (!effect) return;
-    bowProjectiles.push({
+    const projectile = {
         id: String(effect.projectileId || `${effect.originId || 'bow'}:${Date.now()}`),
         originId: String(effect.originId || ''),
         startX: Number(effect.startX) || 0,
@@ -621,7 +621,10 @@ socket.on('bowProjectile', (effect) => {
         duration: Math.max(0.18, Math.min(0.8, (Number(effect.duration) || 400) / 1000)),
         progress: 0,
         reflected: Boolean(effect.reflected),
-    });
+    };
+    const existingIndex = bowProjectiles.findIndex((p) => p.id === projectile.id);
+    if (existingIndex >= 0) bowProjectiles[existingIndex] = projectile;
+    else bowProjectiles.push(projectile);
 });
 socket.on('bowProjectileResolved', (effect) => {
     if (!effect) return;
@@ -971,6 +974,18 @@ function startBowShot() {
     const angle = player.aAngle || player.angle;
     const edge = getRayCanvasEdge(player.x, player.y, angle);
     const projectileId = `${myId || 'bow'}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
+    bowProjectiles.push({
+        id: projectileId,
+        originId: myId || '',
+        startX: player.x,
+        startY: player.y,
+        endX: edge.x,
+        endY: edge.y,
+        angle,
+        duration: Math.max(0.18, Math.min(0.8, Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)) * 0.9 / 1000)),
+        progress: 0,
+        reflected: false,
+    });
     socket.emit('playerBowShot', {
         projectileId,
         startX: player.x,
@@ -1456,8 +1471,17 @@ function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
 
 function drawBowArrow(originX, originY, tipX, tipY, angle, progress, reflected) {
     ctx.save();
-    ctx.strokeStyle = reflected ? 'rgba(255, 170, 150, 0.55)' : 'rgba(255, 235, 170, 0.45)';
+    ctx.shadowColor = reflected ? 'rgba(255, 120, 120, 0.55)' : 'rgba(80, 220, 255, 0.65)';
+    ctx.shadowBlur = 18;
+    const trailColor = reflected ? 'rgba(255, 140, 110, 0.78)' : 'rgba(60, 220, 255, 0.82)';
+    ctx.strokeStyle = trailColor;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(originX, originY);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
     ctx.lineWidth = 2;
+    ctx.strokeStyle = reflected ? 'rgba(255, 245, 235, 0.95)' : 'rgba(235, 250, 255, 0.95)';
     ctx.beginPath();
     ctx.moveTo(originX, originY);
     ctx.lineTo(tipX, tipY);
@@ -1465,30 +1489,33 @@ function drawBowArrow(originX, originY, tipX, tipY, angle, progress, reflected) 
     ctx.translate(tipX, tipY);
     ctx.rotate(angle);
     ctx.scale(1, VIEW_Y_SCALE);
-    ctx.shadowColor = reflected ? 'rgba(255, 120, 120, 0.45)' : 'rgba(255, 220, 120, 0.35)';
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = reflected ? 'rgba(255, 180, 160, 0.98)' : 'rgba(180, 120, 60, 0.98)';
-    ctx.fillStyle = reflected ? 'rgba(255, 200, 180, 0.98)' : 'rgba(135, 95, 50, 0.98)';
-    ctx.lineWidth = 2;
+    ctx.shadowColor = reflected ? 'rgba(255, 120, 120, 0.9)' : 'rgba(80, 220, 255, 0.9)';
+    ctx.shadowBlur = 14;
+    ctx.strokeStyle = reflected ? 'rgba(255, 180, 160, 1)' : 'rgba(190, 250, 255, 1)';
+    ctx.fillStyle = reflected ? 'rgba(255, 210, 190, 1)' : 'rgba(90, 190, 255, 1)';
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-10, -3);
-    ctx.lineTo(-18, 0);
-    ctx.lineTo(-10, 3);
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-10, -5);
+    ctx.lineTo(-26, 0);
+    ctx.lineTo(-10, 5);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = reflected ? 'rgba(255, 145, 120, 0.95)' : 'rgba(160, 110, 60, 0.95)';
+    ctx.fillStyle = reflected ? 'rgba(255, 140, 120, 0.96)' : 'rgba(70, 175, 245, 0.96)';
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-30, 0);
-    ctx.strokeStyle = reflected ? 'rgba(255, 140, 110, 0.98)' : 'rgba(130, 90, 50, 0.98)';
-    ctx.lineWidth = 2.2;
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-34, 0);
+    ctx.strokeStyle = reflected ? 'rgba(255, 170, 140, 0.98)' : 'rgba(120, 230, 255, 0.98)';
+    ctx.lineWidth = 3.2;
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(-30, 0);
-    ctx.lineTo(-40, -2.5);
-    ctx.lineTo(-40, 2.5);
+    ctx.arc(6, 0, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-34, 0);
+    ctx.lineTo(-44, -3.5);
+    ctx.lineTo(-44, 3.5);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
