@@ -1175,6 +1175,7 @@ function drawCharacter(p, color) {
     const weaponLength = Math.max(28, visualAttackRange - 28);
     const bodyScale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
     const ultimate = getUltimateState(p);
+    const dualUltimateActive = weapon === 'dual' && ultimate.active && ultimate.type === 'dual';
     const nameOffset = 65 * bodyScale;
     const hpOffset = 60 * bodyScale;
     const stunOffset = 82 * bodyScale;
@@ -1306,24 +1307,27 @@ function drawCharacter(p, color) {
         ctx.fillStyle = "#6e4b2f";
         ctx.fillRect(rightGripX - 5, rightGripY - 5, 9, 9);
         ctx.fillRect(leftGripX - 5, leftGripY - 5, 9, 9);
+        const dualBladeColor = dualUltimateActive ? '#ff3b3b' : (comboStep===3?"#f1c40f":"#bdc3c7");
+        const dualAccentColor = dualUltimateActive ? 'rgba(255,90,90,0.6)' : 'rgba(255,255,255,0.45)';
+        const dualHiltColor = dualUltimateActive ? '#7a0b0b' : '#6e4b2f';
         ctx.save();
         ctx.translate(rightGripX, rightGripY);
         ctx.rotate(rightTilt);
-        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.fillStyle = dualBladeColor;
         ctx.fillRect(0, -2, bladeLength, 4);
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillStyle = dualAccentColor;
         ctx.fillRect(-3, -1, 4, 2);
-        ctx.fillStyle = "#6e4b2f";
+        ctx.fillStyle = dualHiltColor;
         ctx.fillRect(-6, -2, 6, 4);
         ctx.restore();
         ctx.save();
         ctx.translate(leftGripX, leftGripY);
         ctx.rotate(leftTilt);
-        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.fillStyle = dualBladeColor;
         ctx.fillRect(0, -2, bladeLength, 4);
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillStyle = dualAccentColor;
         ctx.fillRect(-3, -1, 4, 2);
-        ctx.fillStyle = "#6e4b2f";
+        ctx.fillStyle = dualHiltColor;
         ctx.fillRect(-6, -2, 6, 4);
         ctx.restore();
     } else if (weapon === 'bow') {
@@ -1507,53 +1511,93 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(0, 0, 5 + (1 - t) * 4, 0, Math.PI * 2);
             ctx.fill();
+        } else if (effect.weapon === 'ult-dual') {
+            const slashLen = 52 + (1 - t) * 28;
+            const burstScale = 1.15 + (1 - t) * 0.45;
+            ctx.lineWidth = 4.8;
+            ctx.lineCap = 'round';
+            const strokes = [
+                { color: 'rgba(255, 80, 80, 0.98)', ang: effect.angle + 0.68, len: 1.0, offX: -5, offY: -2 },
+                { color: 'rgba(190, 0, 0, 0.96)', ang: effect.angle - 0.95, len: 0.88, offX: 4, offY: 1 },
+                { color: 'rgba(255, 120, 120, 0.92)', ang: effect.angle + 1.56, len: 0.72, offX: -2, offY: 5 },
+                { color: 'rgba(120, 0, 0, 0.9)', ang: effect.angle - 1.62, len: 0.66, offX: 6, offY: -4 },
+            ];
+            strokes.forEach((stroke) => {
+                ctx.save();
+                ctx.translate(stroke.offX * burstScale, stroke.offY * burstScale);
+                ctx.rotate(stroke.ang);
+                ctx.strokeStyle = stroke.color;
+                ctx.beginPath();
+                ctx.moveTo(-slashLen * stroke.len, -slashLen * 0.18);
+                ctx.lineTo(slashLen * stroke.len, slashLen * 0.18);
+                ctx.stroke();
+                ctx.restore();
+            });
+            ctx.fillStyle = 'rgba(255, 120, 120, 0.7)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8 + (1 - t) * 5, 0, Math.PI * 2);
+            ctx.fill();
         } else if (effect.weapon === 'dragon') {
-            const beamLen = 78 + (1 - t) * 28;
-            ctx.strokeStyle = 'rgba(70, 220, 255, 0.95)';
-            ctx.fillStyle = 'rgba(30, 150, 255, 0.9)';
-            ctx.lineWidth = 6;
+            const beamLen = 122 + (1 - t) * 36;
+            ctx.strokeStyle = 'rgba(70, 220, 255, 0.98)';
+            ctx.fillStyle = 'rgba(30, 150, 255, 0.95)';
+            ctx.lineWidth = 10;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.rotate(effect.angle);
-            ctx.moveTo(-beamLen, -12);
-            ctx.quadraticCurveTo(-beamLen * 0.55, -30, -beamLen * 0.1, -14);
-            ctx.quadraticCurveTo(beamLen * 0.18, -36, beamLen * 0.52, -10);
-            ctx.quadraticCurveTo(beamLen * 0.78, -18, beamLen, 0);
-            ctx.quadraticCurveTo(beamLen * 0.78, 18, beamLen * 0.52, 10);
-            ctx.quadraticCurveTo(beamLen * 0.18, 36, -beamLen * 0.1, 14);
-            ctx.quadraticCurveTo(-beamLen * 0.55, 30, -beamLen, 12);
+            ctx.moveTo(-beamLen, -16);
+            ctx.quadraticCurveTo(-beamLen * 0.56, -40, -beamLen * 0.08, -18);
+            ctx.quadraticCurveTo(beamLen * 0.18, -44, beamLen * 0.56, -14);
+            ctx.quadraticCurveTo(beamLen * 0.86, -24, beamLen, 0);
+            ctx.quadraticCurveTo(beamLen * 0.86, 24, beamLen * 0.56, 14);
+            ctx.quadraticCurveTo(beamLen * 0.18, 44, -beamLen * 0.08, 18);
+            ctx.quadraticCurveTo(-beamLen * 0.56, 40, -beamLen, 16);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
         } else if (effect.weapon === 'ult-sword') {
-            const slashLen = 58 + (1 - t) * 18;
-            ctx.lineWidth = 4.6;
+            const slashLen = 64 + (1 - t) * 22;
+            ctx.lineWidth = 6.2;
             ctx.lineCap = 'round';
-            for (let i = 0; i < 3; i++) {
+            ctx.save();
+            ctx.rotate(effect.angle);
+            ctx.strokeStyle = 'rgba(255, 250, 240, 0.98)';
+            ctx.beginPath();
+            ctx.moveTo(-slashLen * 0.08, -slashLen * 0.12);
+            ctx.lineTo(slashLen * 1.08, slashLen * 0.12);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 220, 120, 0.9)';
+            ctx.lineWidth = 3.2;
+            ctx.beginPath();
+            ctx.moveTo(0, -slashLen * 0.2);
+            ctx.lineTo(slashLen * 1.18, slashLen * 0.02);
+            ctx.stroke();
+            ctx.restore();
+        } else if (effect.weapon === 'ult-hammer') {
+            const burst = 42 + (1 - t) * 26;
+            ctx.save();
+            ctx.rotate(effect.angle);
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.24)';
+            ctx.strokeStyle = 'rgba(255, 230, 120, 0.95)';
+            ctx.lineWidth = 4.5;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, burst, -Math.PI * 0.42, Math.PI * 0.42);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+            for (let i = -1; i <= 1; i++) {
                 ctx.save();
-                ctx.rotate(effect.angle + (i - 1) * 0.65);
-                ctx.strokeStyle = i === 1 ? 'rgba(255, 255, 255, 0.96)' : 'rgba(255, 210, 120, 0.88)';
+                ctx.rotate(effect.angle + i * 0.18);
+                ctx.strokeStyle = i === 0 ? 'rgba(255, 240, 160, 0.95)' : 'rgba(231, 76, 60, 0.85)';
+                ctx.lineWidth = i === 0 ? 5.5 : 3;
                 ctx.beginPath();
-                ctx.moveTo(-slashLen * 0.9, -slashLen * 0.08);
-                ctx.lineTo(slashLen * 0.9, slashLen * 0.08);
+                ctx.moveTo(10, 0);
+                ctx.lineTo(burst, i * 12);
                 ctx.stroke();
                 ctx.restore();
             }
-        } else if (effect.weapon === 'ult-hammer') {
-            const burst = 32 + (1 - t) * 22;
-            ctx.strokeStyle = 'rgba(241, 196, 15, 0.95)';
-            ctx.fillStyle = 'rgba(231, 76, 60, 0.48)';
-            ctx.lineWidth = 4.5;
-            for (let i = 0; i < 8; i++) {
-                const a = (Math.PI * 2 / 8) * i + effect.angle;
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
-                ctx.lineTo(Math.cos(a) * burst, Math.sin(a) * burst);
-                ctx.stroke();
-            }
-            ctx.beginPath();
-            ctx.arc(0, 0, 12 + (1 - t) * 6, 0, Math.PI * 2);
-            ctx.fill();
         } else if (effect.weapon === 'spear-ult') {
             const ring = 36 + (1 - t) * 26;
             ctx.strokeStyle = 'rgba(255, 245, 180, 0.9)';
@@ -1626,31 +1670,31 @@ function drawDragonProjectiles() {
         const p = Math.max(0, Math.min(1, effect.progress || 0));
         const x = effect.startX + (effect.endX - effect.startX) * p;
         const y = effect.startY + (effect.endY - effect.startY) * p;
-        const len = 110 + (1 - p) * 70;
+        const len = 140 + (1 - p) * 90;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(effect.angle);
         ctx.scale(1, VIEW_Y_SCALE);
         ctx.globalAlpha = 0.95 - p * 0.25;
-        ctx.shadowColor = effect.reflected ? 'rgba(255, 120, 120, 0.9)' : 'rgba(70, 220, 255, 0.95)';
-        ctx.shadowBlur = 24;
-        ctx.fillStyle = effect.reflected ? 'rgba(255, 90, 90, 0.92)' : 'rgba(35, 170, 255, 0.92)';
-        ctx.strokeStyle = effect.reflected ? 'rgba(255, 220, 210, 0.95)' : 'rgba(190, 250, 255, 0.96)';
-        ctx.lineWidth = 3;
+        ctx.shadowColor = effect.reflected ? 'rgba(255, 120, 120, 0.95)' : 'rgba(70, 220, 255, 0.98)';
+        ctx.shadowBlur = 30;
+        ctx.fillStyle = effect.reflected ? 'rgba(255, 90, 90, 0.95)' : 'rgba(35, 170, 255, 0.96)';
+        ctx.strokeStyle = effect.reflected ? 'rgba(255, 230, 220, 0.98)' : 'rgba(210, 255, 255, 0.98)';
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.moveTo(-len * 0.95, 0);
-        ctx.quadraticCurveTo(-len * 0.5, -26, -len * 0.12, -8);
-        ctx.quadraticCurveTo(len * 0.18, -30, len * 0.42, -8);
-        ctx.quadraticCurveTo(len * 0.6, -20, len * 0.98, 0);
-        ctx.quadraticCurveTo(len * 0.6, 18, len * 0.42, 8);
-        ctx.quadraticCurveTo(len * 0.18, 30, -len * 0.12, 8);
-        ctx.quadraticCurveTo(-len * 0.5, 26, -len * 0.95, 0);
+        ctx.moveTo(-len * 0.98, 0);
+        ctx.quadraticCurveTo(-len * 0.68, -36, -len * 0.18, -16);
+        ctx.quadraticCurveTo(len * 0.1, -42, len * 0.5, -14);
+        ctx.quadraticCurveTo(len * 0.8, -26, len, 0);
+        ctx.quadraticCurveTo(len * 0.8, 26, len * 0.5, 14);
+        ctx.quadraticCurveTo(len * 0.1, 42, -len * 0.18, 16);
+        ctx.quadraticCurveTo(-len * 0.68, 36, -len * 0.98, 0);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(-len * 0.35, 0, 14, 0, Math.PI * 2);
-        ctx.fillStyle = effect.reflected ? 'rgba(255, 180, 180, 0.95)' : 'rgba(210, 255, 255, 0.95)';
+        ctx.arc(-len * 0.42, 0, 18, 0, Math.PI * 2);
+        ctx.fillStyle = effect.reflected ? 'rgba(255, 180, 180, 0.98)' : 'rgba(210, 255, 255, 0.98)';
         ctx.fill();
         ctx.restore();
     });

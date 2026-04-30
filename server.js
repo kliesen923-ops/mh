@@ -38,6 +38,8 @@ const GUARD_DURATION_MS = 500;
 const JUST_GUARD_WINDOW_MS = 100;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
+const GAME_WIDTH = 1280;
+const GAME_HEIGHT = 640;
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
@@ -206,6 +208,30 @@ function getAttackRangeMultiplier(player) {
 
 function createProjectileId(prefix) {
     return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function getRayWorldEdge(originX, originY, angle) {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const candidates = [];
+    const pushCandidate = (t) => {
+        if (!Number.isFinite(t) || t <= 0) return;
+        const x = originX + dx * t;
+        const y = originY + dy * t;
+        if (x >= 0 && x <= GAME_WIDTH && y >= 0 && y <= GAME_HEIGHT) {
+            candidates.push({ t, x, y });
+        }
+    };
+    if (dx !== 0) {
+        pushCandidate((0 - originX) / dx);
+        pushCandidate((GAME_WIDTH - originX) / dx);
+    }
+    if (dy !== 0) {
+        pushCandidate((0 - originY) / dy);
+        pushCandidate((GAME_HEIGHT - originY) / dy);
+    }
+    candidates.sort((a, b) => a.t - b.t);
+    return candidates[0] || { x: originX + dx * 1000, y: originY + dy * 1000, t: 1000 };
 }
 
 function createUpgradeCounts() {
@@ -412,11 +438,11 @@ function applyBowUltimate(playerId) {
         extra: 0,
     };
     broadcastUltimateState(playerId);
-    const profile = getWeaponAttackProfile(attacker.weapon);
-    const attackRange = Math.max(300, profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * 1.1);
     const angle = attacker.aAngle || attacker.angle;
-    const endX = attacker.x + Math.cos(angle) * attackRange;
-    const endY = attacker.y + Math.sin(angle) * attackRange;
+    const edge = getRayWorldEdge(attacker.x, attacker.y, angle);
+    const endX = edge.x;
+    const endY = edge.y;
+    const attackRange = Math.max(1, Math.hypot(endX - attacker.x, endY - attacker.y));
     const projectileId = createProjectileId('dragon');
     io.emit('dragonProjectile', {
         projectileId,
@@ -426,13 +452,13 @@ function applyBowUltimate(playerId) {
         endX,
         endY,
         angle,
-        duration: config.durationMs,
+        duration: Math.max(1000, Math.min(1800, Math.round(attackRange * 1.15))),
         reflected: false,
     });
     const hitKey = `${playerId}:ult-bow:${now}`;
     for (const [targetId, target] of Object.entries(players)) {
         if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
-        if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > 42) continue;
+        if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > 54) continue;
         if (hasHitTargetForKey(hitKey, targetId)) continue;
         const damage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
         target.hp -= damage;
@@ -463,7 +489,7 @@ function applyDualUltimate(playerId) {
         extra: 0,
     };
     broadcastUltimateState(playerId);
-    io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attacker.angle, weapon: 'dual' });
+    io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attacker.angle, weapon: 'ult-dual' });
     io.emit('statsUpdate', players);
     setTimeout(() => {
         if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'dual') {
