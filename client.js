@@ -23,6 +23,9 @@ const SKILL_PRESETS = {
     ash: { label: '애쉬궁', cooldown: 2.0 },
     gear: { label: '입체기동', cooldown: 3.0 },
 };
+const DUAL_RUSH_WINDUP_SEC = 0.14;
+const DUAL_RUSH_SLASH_INTERVAL_SEC = 0.05;
+const DUAL_RUSH_SLASH_COUNT = 5;
 const GUARD_DURATION_SEC = 0.5;
 const JUST_GUARD_WINDOW_SEC = 0.1;
 
@@ -44,6 +47,24 @@ function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
 }
 
+function createDefaultGearRush() {
+    return {
+        active: false,
+        startX: 0,
+        startY: 0,
+        tx: 0,
+        ty: 0,
+        startTime: 0,
+        duration: 0.24,
+        mode: 'rush',
+        comboId: '',
+        pauseUntil: 0,
+        slashIndex: 0,
+        lastSlashAt: 0,
+        startResolved: false,
+    };
+}
+
 const player = {
     x: 400, y: 300, hp: 100, maxHp: 100, angle: 0, level: 1,
     weapon: 'sword',
@@ -60,7 +81,7 @@ const player = {
     giantActive: false,
     giantEndsAt: 0,
     giantRecoveryEndsAt: 0,
-    gearRush: { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 },
+    gearRush: createDefaultGearRush(),
     skill: 'wire'
 };
 
@@ -75,7 +96,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign({ active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 }, data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -143,7 +164,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign({ active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 }, data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -152,7 +173,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign({ active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 }, p.gearRush || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), p.gearRush || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -344,7 +365,7 @@ function getVisualAttackRange(weapon, stats, sourcePlayer) {
     const profile = getWeaponAttackProfile(weapon);
     const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;
     const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
-    return profile.reach * statRange * giantScale;
+    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale);
 }
 
 function getBowProjectileBonus(sourcePlayer) {
@@ -490,19 +511,82 @@ function updateBowProjectiles(dt) {
 function updateGearRush(dt) {
     if (!player.gearRush || !player.gearRush.active) return;
     const rush = player.gearRush;
+    const now = Date.now();
     const duration = Math.max(0.08, Number(rush.duration) || 0.24);
-    const elapsed = Math.max(0, (Date.now() - Number(rush.startTime || Date.now())) / 1000);
-    const progress = Math.max(0, Math.min(1, elapsed / duration));
+    const windupMs = rush.mode === 'dualRush' ? Math.round(DUAL_RUSH_WINDUP_SEC * 1000) : 0;
+    const effectiveElapsed = Math.max(0, (now - Number(rush.startTime || now) - windupMs) / 1000);
+    const progress = Math.max(0, Math.min(1, effectiveElapsed / duration));
     const eased = 1 - Math.pow(1 - progress, 3);
     const startX = Number.isFinite(rush.startX) ? rush.startX : player.x;
     const startY = Number.isFinite(rush.startY) ? rush.startY : player.y;
     const tx = Number.isFinite(rush.tx) ? rush.tx : player.x;
     const ty = Number.isFinite(rush.ty) ? rush.ty : player.y;
+    const prevX = player.x;
+    const prevY = player.y;
+    if (rush.mode === 'dualRush' && now < Number(rush.pauseUntil || 0)) {
+        player.animTime += dt * 12;
+        player.moveDir = { x: 0, y: 0 };
+        socket.emit('playerAction', {
+            gearRush: {
+                active: true,
+                startX: rush.startX,
+                startY: rush.startY,
+                tx: rush.tx,
+                ty: rush.ty,
+                startTime: rush.startTime,
+                duration: rush.duration,
+                mode: rush.mode,
+                comboId: rush.comboId,
+                pauseUntil: rush.pauseUntil,
+                slashIndex: rush.slashIndex,
+                lastSlashAt: rush.lastSlashAt,
+                startResolved: rush.startResolved,
+            }
+        });
+        return;
+    }
     player.x = startX + (tx - startX) * eased;
     player.y = startY + (ty - startY) * eased;
     player.angle = Math.atan2(ty - startY, tx - startX);
     player.animTime += dt * 12;
     player.moveDir = { x: 0, y: 0 };
+    if (rush.mode === 'dualRush' && progress > 0 && rush.slashIndex < DUAL_RUSH_SLASH_COUNT) {
+        const slashIntervalMs = Math.round(DUAL_RUSH_SLASH_INTERVAL_SEC * 1000);
+        if (!rush.lastSlashAt || (now - rush.lastSlashAt) >= slashIntervalMs) {
+            const slashIndex = rush.slashIndex++;
+            rush.lastSlashAt = now;
+            socket.emit('dualRushSlash', {
+                comboId: rush.comboId,
+                slashIndex,
+                startX: prevX,
+                startY: prevY,
+                endX: player.x,
+                endY: player.y,
+                angle: player.angle,
+                weapon: player.weapon,
+            });
+            if (rush.slashIndex >= DUAL_RUSH_SLASH_COUNT) {
+                rush.mode = 'rush';
+            }
+        }
+    }
+    socket.emit('playerAction', {
+        gearRush: {
+            active: true,
+            startX: rush.startX,
+            startY: rush.startY,
+            tx: rush.tx,
+            ty: rush.ty,
+            startTime: rush.startTime,
+            duration: rush.duration,
+            mode: rush.mode,
+            comboId: rush.comboId,
+            pauseUntil: rush.pauseUntil,
+            slashIndex: rush.slashIndex,
+            lastSlashAt: rush.lastSlashAt,
+            startResolved: rush.startResolved,
+        }
+    });
     if (progress >= 1) {
         player.gearRush.active = false;
         socket.emit('playerAction', { gearRush: { active: false } });
@@ -595,7 +679,21 @@ function update(dt) {
             isGuarding: player.isGuarding, guardActiveTimer: player.guardActiveTimer,
             isAttacking: player.isAttacking, isDodging: player.isDodging,
             comboStep: player.comboStep, attackPhase: player.attackPhase, aAngle: player.aAngle,
-            gearRush: { active: player.gearRush.active, startX: player.gearRush.startX, startY: player.gearRush.startY, tx: player.gearRush.tx, ty: player.gearRush.ty, startTime: player.gearRush.startTime, duration: player.gearRush.duration },
+            gearRush: {
+                active: player.gearRush.active,
+                startX: player.gearRush.startX,
+                startY: player.gearRush.startY,
+                tx: player.gearRush.tx,
+                ty: player.gearRush.ty,
+                startTime: player.gearRush.startTime,
+                duration: player.gearRush.duration,
+                mode: player.gearRush.mode,
+                comboId: player.gearRush.comboId,
+                pauseUntil: player.gearRush.pauseUntil,
+                slashIndex: player.gearRush.slashIndex,
+                lastSlashAt: player.gearRush.lastSlashAt,
+                startResolved: player.gearRush.startResolved,
+            },
             wire: { active: player.wire.active, kind: player.wire.kind, tx: player.wire.tx, ty: player.wire.ty, progress: player.wire.progress, maxDistance: player.wire.maxDistance },
             level: player.level, weapon: player.weapon, skill: player.skill, stats: player.stats, isUpgrading: isUpgrading
         });
@@ -659,7 +757,11 @@ function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodgi
 function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
 function beginAttack() {
     releaseGuardForAction();
-    if (!canStartAttack() || player.isAttacking || (player.gearRush && player.gearRush.active)) return;
+    if (!canStartAttack() || player.isAttacking) return;
+    if (player.gearRush && player.gearRush.active) {
+        if (normalizeWeapon(player.weapon) === 'dual') triggerDualRushSlash();
+        return;
+    }
     player.isAttacking = true;
     player.comboStep = (player.comboStep % 3) + 1;
     player.attackPhase = 1;
@@ -676,6 +778,35 @@ function endAttack() {
     player.bowShotFired = false;
     socket.emit('playerAction', { isAttacking: false, attackPhase: 0 });
     if (isAttackHeld()) beginAttack();
+}
+function triggerDualRushSlash() {
+    const rush = player.gearRush;
+    if (!rush || !rush.active || normalizeWeapon(player.weapon) !== 'dual') return;
+    if (rush.mode === 'dualRush') return;
+    const now = Date.now();
+    rush.mode = 'dualRush';
+    rush.comboId = `${myId || 'dual'}:${now}:${Math.random().toString(16).slice(2, 8)}`;
+    rush.pauseUntil = now + Math.round(DUAL_RUSH_WINDUP_SEC * 1000);
+    rush.slashIndex = 0;
+    rush.lastSlashAt = 0;
+    rush.startResolved = false;
+    socket.emit('playerAction', {
+        gearRush: {
+            active: true,
+            startX: rush.startX,
+            startY: rush.startY,
+            tx: rush.tx,
+            ty: rush.ty,
+            startTime: rush.startTime,
+            duration: rush.duration,
+            mode: rush.mode,
+            comboId: rush.comboId,
+            pauseUntil: rush.pauseUntil,
+            slashIndex: rush.slashIndex,
+            lastSlashAt: rush.lastSlashAt,
+            startResolved: rush.startResolved,
+        }
+    });
 }
 function startBowShot() {
     releaseGuardForAction();
@@ -734,6 +865,12 @@ function startGearRush() {
         ty,
         startTime: Date.now(),
         duration: 0.24,
+        mode: 'rush',
+        comboId: '',
+        pauseUntil: 0,
+        slashIndex: 0,
+        lastSlashAt: 0,
+        startResolved: false,
     };
     socket.emit('playerAction', { gearRush: player.gearRush });
 }
@@ -897,6 +1034,18 @@ function drawGearRush(p) {
     ctx.beginPath();
     ctx.arc(tipX, tipY, 4.5, 0, Math.PI * 2);
     ctx.fill();
+    if (rush.mode === 'dualRush' && Date.now() < Number(rush.pauseUntil || 0)) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 240, 120, 0.98)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.lineWidth = 4;
+        ctx.font = 'bold 30px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeText('!', tipX, tipY - 28);
+        ctx.fillText('!', tipX, tipY - 28);
+        ctx.restore();
+    }
     ctx.restore();
 }
 function distToSegment(p1, p2, p) { const l2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2); if (l2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y); let t = Math.max(0, Math.min(1, ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2)); return Math.hypot(p.x - (p1.x + t * (p2.x - p1.x)), p.y - (p1.y + t * (p2.y - p1.y))); }
@@ -1725,7 +1874,7 @@ function enterGame(nickname, accountId, weapon, skill) {
         player.maxHp = getMaxHpFromStats(player.stats);
         player.hp = player.maxHp;
         player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
-        player.gearRush = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 };
+        player.gearRush = createDefaultGearRush();
         socket.emit('setWeapon', player.weapon);
     }
     player.skill = normalizeSkill(skill);

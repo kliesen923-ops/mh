@@ -210,6 +210,24 @@ function createUpgradeCounts() {
     return { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
 }
 
+function createDefaultGearRush() {
+    return {
+        active: false,
+        startX: 0,
+        startY: 0,
+        tx: 0,
+        ty: 0,
+        startTime: 0,
+        duration: 0.24,
+        mode: 'rush',
+        comboId: '',
+        pauseUntil: 0,
+        slashIndex: 0,
+        lastSlashAt: 0,
+        startResolved: false,
+    };
+}
+
 function emitHealingCrossUpdate() {
     io.emit('healingCrossUpdate', healingCross ? [healingCross] : []);
 }
@@ -631,6 +649,17 @@ function hasHitTargetThisAttack(playerId, targetId) {
     return false;
 }
 
+function hasHitTargetForKey(key, targetId) {
+    let targets = attackHitTargets.get(key);
+    if (!targets) {
+        targets = new Set();
+        attackHitTargets.set(key, targets);
+    }
+    if (targets.has(targetId)) return true;
+    targets.add(targetId);
+    return false;
+}
+
 function createDefaultStats() {
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
 }
@@ -692,10 +721,11 @@ function sanitizeAction(p, actionData) {
     }
 
     if (actionData.gearRush && typeof actionData.gearRush === 'object') {
-        const gearRush = { active: Boolean(actionData.gearRush.active) };
+        const gearRush = createDefaultGearRush();
+        gearRush.active = Boolean(actionData.gearRush.active);
         if (Number.isFinite(actionData.gearRush.startX)) gearRush.startX = actionData.gearRush.startX;
         if (Number.isFinite(actionData.gearRush.startY)) gearRush.startY = actionData.gearRush.startY;
-        if (Number.isFinite(actionData.gearRush.tx)) {
+        if (Number.isFinite(actionData.gearRush.tx) && Number.isFinite(actionData.gearRush.ty)) {
             const dx = actionData.gearRush.tx - p.x;
             const dy = actionData.gearRush.ty - p.y;
             const distance = Math.hypot(dx, dy);
@@ -710,6 +740,12 @@ function sanitizeAction(p, actionData) {
         }
         if (Number.isFinite(actionData.gearRush.startTime)) gearRush.startTime = actionData.gearRush.startTime;
         if (Number.isFinite(actionData.gearRush.duration)) gearRush.duration = Math.max(0.08, Math.min(1.0, actionData.gearRush.duration));
+        if (typeof actionData.gearRush.mode === 'string') gearRush.mode = actionData.gearRush.mode === 'dualRush' ? 'dualRush' : 'rush';
+        if (typeof actionData.gearRush.comboId === 'string') gearRush.comboId = actionData.gearRush.comboId.slice(0, 64);
+        if (Number.isFinite(actionData.gearRush.pauseUntil)) gearRush.pauseUntil = actionData.gearRush.pauseUntil;
+        if (Number.isInteger(actionData.gearRush.slashIndex)) gearRush.slashIndex = Math.max(0, actionData.gearRush.slashIndex);
+        if (Number.isFinite(actionData.gearRush.lastSlashAt)) gearRush.lastSlashAt = actionData.gearRush.lastSlashAt;
+        if (typeof actionData.gearRush.startResolved === 'boolean') gearRush.startResolved = actionData.gearRush.startResolved;
         action.gearRush = gearRush;
     }
 
@@ -747,7 +783,7 @@ io.on('connection', (socket) => {
         giantEndsAt: 0,
         giantRecoveryEndsAt: 0,
         giantRecoveryArmed: false,
-        gearRush: { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 },
+        gearRush: createDefaultGearRush(),
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
         skill: 'wire',
@@ -1004,7 +1040,7 @@ io.on('connection', (socket) => {
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
                 target.isSelectingLoadout = true;
-                target.gearRush = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 };
+                target.gearRush = createDefaultGearRush();
                 target.giantActive = false;
                 target.giantScale = 1;
                 target.giantAttackMult = 1;
@@ -1021,7 +1057,7 @@ io.on('connection', (socket) => {
                         players[targetId].isStunned = false;
                         players[targetId].isGuarding = false;
                         players[targetId].isSelectingLoadout = true;
-                        players[targetId].gearRush = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, startTime: 0, duration: 0.24 };
+                        players[targetId].gearRush = createDefaultGearRush();
                         players[targetId].giantActive = false;
                         players[targetId].giantScale = 1;
                         players[targetId].giantAttackMult = 1;
@@ -1034,6 +1070,90 @@ io.on('connection', (socket) => {
             }
             io.emit('statsUpdate', players);
         }
+    });
+
+    socket.on('dualRushSlash', (payloadData) => {
+        const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+        const attacker = players[socket.id];
+        if (!attacker || sanitizeWeapon(attacker.weapon) !== 'dual' || !attacker.gearRush || !attacker.gearRush.active) return;
+        if ((attacker.gearRush.mode || 'rush') !== 'dualRush') return;
+        const startX = Number.isFinite(payload.startX) ? payload.startX : attacker.x;
+        const startY = Number.isFinite(payload.startY) ? payload.startY : attacker.y;
+        const endX = Number.isFinite(payload.endX) ? payload.endX : attacker.x;
+        const endY = Number.isFinite(payload.endY) ? payload.endY : attacker.y;
+        const slashIndex = Number.isInteger(payload.slashIndex) ? Math.max(0, payload.slashIndex) : 0;
+        const comboId = String(payload.comboId || attacker.gearRush.comboId || createProjectileId('dualrush')).slice(0, 64);
+        const slashKey = `${socket.id}:dualRush:${comboId}:${slashIndex}`;
+        const attackRange = Math.max(40, Math.hypot(endX - startX, endY - startY) + 18);
+        const profile = getWeaponAttackProfile(attacker.weapon);
+        const slashWidth = profile.lineWidth + 10;
+        const attackAngle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
+        let hitAny = false;
+
+        for (const [targetId, target] of Object.entries(players)) {
+            if (targetId === socket.id || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+            if (Math.hypot(target.x - startX, target.y - startY) > attackRange) continue;
+            if (distToSegment({ x: startX, y: startY }, { x: endX, y: endY }, target) > slashWidth) continue;
+            if (hasHitTargetForKey(slashKey, targetId)) continue;
+
+            const baseDamage = 9 + Math.min(8, slashIndex * 2);
+            let damage = Math.floor(baseDamage * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+            const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
+            const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
+            if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.5);
+            io.emit('combatEffect', {
+                x: target.x,
+                y: target.y,
+                angle: attackAngle,
+                weapon: 'dual',
+            });
+            target.hp -= damage;
+            hitAny = true;
+            if (target.hp <= 0) {
+                target.hp = 0; target.deaths++; attacker.kills++;
+                updateAccountScore(attacker.accountId, 'kills', 1);
+                updateAccountScore(target.accountId, 'deaths', 1);
+                const levelsGained = getKillLevelGain(target.level);
+                attacker.level += levelsGained;
+                attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
+                attacker.isUpgrading = true;
+                attacker.pendingUpgrades += levelsGained;
+                target.level = 1;
+                target.stats = createBaseStatsForWeapon(target.weapon);
+                target.upgradeCounts = createUpgradeCounts();
+                target.pendingUpgrades = 0;
+                target.isUpgrading = false;
+                target.isSelectingLoadout = true;
+                target.gearRush = createDefaultGearRush();
+                target.giantActive = false;
+                target.giantScale = 1;
+                target.giantAttackMult = 1;
+                target.giantEndsAt = 0;
+                target.giantRecoveryEndsAt = 0;
+                target.giantRecoveryArmed = false;
+                io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
+                if (levelsGained > 0) socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
+                setTimeout(() => {
+                    if (players[targetId]) {
+                        players[targetId].hp = getMaxHpFromStats(players[targetId].stats);
+                        players[targetId].x = 100 + Math.random() * 800;
+                        players[targetId].y = 100 + Math.random() * 500;
+                        players[targetId].isStunned = false;
+                        players[targetId].isGuarding = false;
+                        players[targetId].isSelectingLoadout = true;
+                        players[targetId].gearRush = createDefaultGearRush();
+                        players[targetId].giantActive = false;
+                        players[targetId].giantScale = 1;
+                        players[targetId].giantAttackMult = 1;
+                        players[targetId].giantEndsAt = 0;
+                        players[targetId].giantRecoveryEndsAt = 0;
+                        players[targetId].giantRecoveryArmed = false;
+                        io.emit('playerRespawn', players[targetId]);
+                    }
+                }, 3000);
+            }
+        }
+        if (hitAny) io.emit('statsUpdate', players);
     });
 
     socket.on('chatMessage', (msg) => {
