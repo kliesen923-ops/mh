@@ -869,15 +869,15 @@ function drawCharacter(p, color) {
         ctx.fillRect(shaftX + shaftLength - 3, 21 - spearThrust * 1.5, 4, 4);
     } else if (weapon === 'dual') {
         const bladeLength = Math.max(18, weaponLength * 0.58);
-        const rightWindup = isAttacking ? (attackPhase === 1 ? -1.0 : (attackPhase === 2 ? -0.18 : 0.75)) : dualPose;
-        const leftWindup = isAttacking ? (attackPhase === 1 ? -0.18 : (attackPhase === 2 ? 1.0 : 0.75)) : dualPose;
-        const rightTilt = attackPhase === 2 ? -0.24 : 0.2;
-        const leftTilt = attackPhase === 1 ? 0.24 : -0.2;
+        const rightWindup = isAttacking ? (attackPhase === 1 ? 1.0 : (attackPhase === 2 ? -0.35 : 1.05)) : dualPose;
+        const leftWindup = isAttacking ? (attackPhase === 1 ? -0.35 : (attackPhase === 2 ? 1.0 : 1.05)) : dualPose;
+        const rightTilt = attackPhase === 1 ? 0.58 : (attackPhase === 2 ? -0.35 : 0.72);
+        const leftTilt = attackPhase === 2 ? -0.58 : (attackPhase === 1 ? 0.35 : -0.72);
         ctx.fillStyle = "#6e4b2f";
         ctx.fillRect(28, 14, 9, 9);
         ctx.fillRect(28, 26, 9, 9);
         ctx.save();
-        ctx.translate(38 + rightWindup * 10, 18 - rightWindup * 2.2);
+        ctx.translate(38 + rightWindup * 12, 16 - rightWindup * 3);
         ctx.rotate(rightTilt);
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(0, -2, bladeLength, 4);
@@ -885,7 +885,7 @@ function drawCharacter(p, color) {
         ctx.fillRect(-3, -1, 4, 2);
         ctx.restore();
         ctx.save();
-        ctx.translate(38 - leftWindup * 10, 30 + leftWindup * 2.2);
+        ctx.translate(38 - leftWindup * 12, 32 + leftWindup * 3);
         ctx.rotate(leftTilt);
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(0, -2, bladeLength, 4);
