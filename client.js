@@ -1084,21 +1084,6 @@ function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
 
 function drawBowArrow(originX, originY, tipX, tipY, angle, progress, reflected) {
     ctx.save();
-    ctx.shadowColor = reflected ? 'rgba(255, 120, 120, 0.55)' : 'rgba(255, 210, 120, 0.55)';
-    ctx.shadowBlur = 18;
-    const trailColor = reflected ? 'rgba(255, 140, 110, 0.78)' : 'rgba(235, 200, 130, 0.82)';
-    ctx.strokeStyle = trailColor;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(originX, originY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = reflected ? 'rgba(255, 245, 235, 0.95)' : 'rgba(255, 244, 220, 0.95)';
-    ctx.beginPath();
-    ctx.moveTo(originX, originY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
     ctx.translate(tipX, tipY);
     ctx.rotate(angle);
     ctx.scale(1, VIEW_Y_SCALE);
