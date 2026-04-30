@@ -1027,7 +1027,24 @@ function drawCharacter(p, color) {
     ctx.fillStyle = isStunned ? "#9b59b6" : (hp > 30 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, (hp/100)*50, 6);
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
-    ctx.save(); let sRot = 0.8; if(isAttacking) { if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5); } else if(isGuarding) sRot = 0.2; ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10);
+    ctx.save(); let sRot = 0.8;
+    if (weapon === 'spear') {
+        if (isAttacking) {
+            if (attackPhase === 1) sRot = -0.08;
+            else if (attackPhase === 2) sRot = 0.0;
+            else if (attackPhase === 3) sRot = 0.08;
+        } else if (isGuarding) {
+            sRot = 0.16;
+        } else {
+            sRot = 0.06;
+        }
+    } else if(isAttacking) {
+        if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5);
+    } else if(isGuarding) sRot = 0.2;
+    const spearThrust = weapon === 'spear' && isAttacking && attackPhase === 2 ? 1 : (weapon === 'spear' && isAttacking ? 0.45 : 0);
+    ctx.rotate(sRot);
+    ctx.fillStyle = "#ffdbac";
+    ctx.fillRect(15 + spearThrust * 4, 18 - spearThrust * 1.5, 20 + spearThrust * 4, 10);
     if (weapon === 'hammer') {
         const handleLength = Math.max(18, weaponLength * 0.7);
         const headSize = Math.max(18, Math.min(40, 20 + Math.max(0, weaponLength - 28) * 0.28));
@@ -1037,19 +1054,21 @@ function drawCharacter(p, color) {
         ctx.fillRect(35 + handleLength - 2, 12, headSize, 26);
         ctx.fillRect(35 + handleLength + headSize - 4, 11, 5, 28);
     } else if (weapon === 'spear') {
-        const shaftLength = Math.max(30, weaponLength);
+        const shaftLength = Math.max(30, weaponLength + spearThrust * 10);
         const tipLength = Math.max(16, Math.min(28, shaftLength * 0.18));
+        const shaftY = 20 - spearThrust * 1.5;
+        const shaftX = 35 + spearThrust * 4;
         ctx.fillStyle = "#7b5a3a";
-        ctx.fillRect(35, 20, shaftLength, 6);
+        ctx.fillRect(shaftX, shaftY, shaftLength, 6);
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.beginPath();
-        ctx.moveTo(35 + shaftLength, 23);
-        ctx.lineTo(35 + shaftLength + tipLength, 15);
-        ctx.lineTo(35 + shaftLength + tipLength, 31);
+        ctx.moveTo(shaftX + shaftLength, 23 - spearThrust * 1.5);
+        ctx.lineTo(shaftX + shaftLength + tipLength, 15 - spearThrust * 1.5);
+        ctx.lineTo(shaftX + shaftLength + tipLength, 31 - spearThrust * 1.5);
         ctx.closePath();
         ctx.fill();
         ctx.fillStyle = "rgba(255,255,255,0.45)";
-        ctx.fillRect(35 + shaftLength - 3, 21, 4, 4);
+        ctx.fillRect(shaftX + shaftLength - 3, 21 - spearThrust * 1.5, 4, 4);
     } else {
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35,18,weaponLength,10);
