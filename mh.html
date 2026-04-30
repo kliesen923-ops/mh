@@ -403,6 +403,7 @@ const WEAPON_PRESETS = {
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
 let pendingAuth = null;
+let currentSession = null;
 let selectedWeapon = 'sword';
 const keys = {};
 
@@ -485,6 +486,13 @@ socket.on('playerRespawn', (p) => {
 });
 
 socket.on('playerDisconnected', (id) => { delete allPlayers[id]; updateLeaderboard(); });
+socket.on('playerDied', (data) => {
+    if (data && data.victimId === myId) {
+        gameState = 'TITLE';
+        showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
+        setWeaponError('사망했습니다. 무기를 다시 선택하세요.');
+    }
+});
 socket.on('chatMessage', (data) => {
     const msgEl = document.createElement('div');
     const nameEl = document.createElement('b');
@@ -898,6 +906,7 @@ async function postAuth(path, payload) {
     return data;
 }
 function enterGame(nickname, accountId, weapon) {
+    currentSession = { id: accountId || '', nickname: nickname || 'Hunter' };
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
     if (nickname) socket.emit('setName', nickname);
     if (weapon) {
