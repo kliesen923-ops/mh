@@ -1090,13 +1090,20 @@ io.on('connection', (socket) => {
         const attackAngle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
         let hitAny = false;
 
+        io.emit('combatEffect', {
+            x: (startX + endX) / 2,
+            y: (startY + endY) / 2,
+            angle: attackAngle,
+            weapon: 'dual',
+        });
+
         for (const [targetId, target] of Object.entries(players)) {
             if (targetId === socket.id || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
             if (Math.hypot(target.x - startX, target.y - startY) > attackRange) continue;
             if (distToSegment({ x: startX, y: startY }, { x: endX, y: endY }, target) > slashWidth) continue;
             if (hasHitTargetForKey(slashKey, targetId)) continue;
 
-            const baseDamage = 9 + Math.min(8, slashIndex * 2);
+            const baseDamage = 6 + Math.min(5, Math.floor(slashIndex / 2));
             let damage = Math.floor(baseDamage * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
             const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
             const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);

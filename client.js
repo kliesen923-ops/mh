@@ -23,9 +23,9 @@ const SKILL_PRESETS = {
     ash: { label: '애쉬궁', cooldown: 2.0 },
     gear: { label: '입체기동', cooldown: 3.0 },
 };
-const DUAL_RUSH_WINDUP_SEC = 0.14;
-const DUAL_RUSH_SLASH_INTERVAL_SEC = 0.05;
-const DUAL_RUSH_SLASH_COUNT = 5;
+const DUAL_RUSH_WINDUP_SEC = 0.18;
+const DUAL_RUSH_SLASH_INTERVAL_SEC = 0.025;
+const DUAL_RUSH_SLASH_COUNT = 10;
 const GUARD_DURATION_SEC = 0.5;
 const JUST_GUARD_WINDOW_SEC = 0.1;
 
@@ -759,7 +759,6 @@ function beginAttack() {
     releaseGuardForAction();
     if (!canStartAttack() || player.isAttacking) return;
     if (player.gearRush && player.gearRush.active) {
-        if (normalizeWeapon(player.weapon) === 'dual') triggerDualRushSlash();
         return;
     }
     player.isAttacking = true;
@@ -873,6 +872,7 @@ function startGearRush() {
         startResolved: false,
     };
     socket.emit('playerAction', { gearRush: player.gearRush });
+    if (normalizeWeapon(player.weapon) === 'dual') triggerDualRushSlash();
 }
 function startWireGrab() {
     releaseGuardForAction();
@@ -1370,21 +1370,31 @@ function drawCombatEffects() {
             ctx.arc(Math.cos(effect.angle) * burst, Math.sin(effect.angle) * burst, 6, 0, Math.PI * 2);
             ctx.fill();
         } else if (effect.weapon === 'dual') {
-            const slashLen = 38 + (1 - t) * 14;
+            const slashLen = 42 + (1 - t) * 20;
+            const burstScale = 1 + (1 - t) * 0.35;
             ctx.lineWidth = 3.4;
             ctx.lineCap = 'round';
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+            const strokes = [
+                { color: 'rgba(255, 255, 255, 0.95)', ang: effect.angle + 0.78, len: 0.82, offX: -4, offY: -2 },
+                { color: 'rgba(241, 196, 15, 0.92)', ang: effect.angle - 0.92, len: 0.72, offX: 3, offY: 1 },
+                { color: 'rgba(255, 255, 255, 0.78)', ang: effect.angle + 1.62, len: 0.58, offX: -1, offY: 4 },
+                { color: 'rgba(241, 196, 15, 0.72)', ang: effect.angle - 1.68, len: 0.52, offX: 5, offY: -3 },
+            ];
+            strokes.forEach((stroke) => {
+                ctx.save();
+                ctx.translate(stroke.offX * burstScale, stroke.offY * burstScale);
+                ctx.rotate(stroke.ang);
+                ctx.strokeStyle = stroke.color;
+                ctx.beginPath();
+                ctx.moveTo(-slashLen * stroke.len, -slashLen * 0.14);
+                ctx.lineTo(slashLen * stroke.len, slashLen * 0.14);
+                ctx.stroke();
+                ctx.restore();
+            });
+            ctx.fillStyle = 'rgba(255, 245, 180, 0.55)';
             ctx.beginPath();
-            ctx.rotate(effect.angle + 0.85);
-            ctx.moveTo(-slashLen * 0.7, -slashLen * 0.18);
-            ctx.lineTo(slashLen * 0.7, slashLen * 0.18);
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(241, 196, 15, 0.88)';
-            ctx.beginPath();
-            ctx.rotate(-1.45);
-            ctx.moveTo(-slashLen * 0.65, slashLen * 0.16);
-            ctx.lineTo(slashLen * 0.62, -slashLen * 0.12);
-            ctx.stroke();
+            ctx.arc(0, 0, 5 + (1 - t) * 4, 0, Math.PI * 2);
+            ctx.fill();
         } else if (effect.weapon === 'ash') {
             const burst = 18 + (1 - t) * 24;
             ctx.strokeStyle = 'rgba(120, 210, 255, 0.95)';
