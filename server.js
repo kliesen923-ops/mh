@@ -226,6 +226,8 @@ function sanitizeAction(p, actionData) {
             wire.tx = p.wire.tx;
             wire.ty = p.wire.ty;
         }
+        if (Number.isFinite(actionData.wire.progress)) wire.progress = Math.max(0, Math.min(1, actionData.wire.progress));
+        if (Number.isFinite(actionData.wire.maxDistance)) wire.maxDistance = Math.max(0, actionData.wire.maxDistance);
         action.wire = wire;
     }
 
@@ -353,11 +355,12 @@ io.on('connection', (socket) => {
 
         const now = Date.now();
         if ((now - (finalAttacker.lastWireAt || 0)) < WIRE_COOLDOWN_MS) return;
+        const maxDistance = Number.isFinite(finalAttacker.wire && finalAttacker.wire.maxDistance) ? finalAttacker.wire.maxDistance : 500;
         const wireEnd = {
-            x: finalAttacker.x + Math.cos(finalAttacker.angle) * 500,
-            y: finalAttacker.y + Math.sin(finalAttacker.angle) * 500
+            x: finalAttacker.x + Math.cos(finalAttacker.angle) * maxDistance,
+            y: finalAttacker.y + Math.sin(finalAttacker.angle) * maxDistance
         };
-        if (distToSegment(finalAttacker, wireEnd, finalTarget) >= 35) return;
+        if (Math.hypot(finalTarget.x - wireEnd.x, finalTarget.y - wireEnd.y) > 35) return;
         finalAttacker.lastWireAt = now;
 
         const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
