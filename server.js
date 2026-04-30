@@ -181,6 +181,10 @@ function createProjectileId(prefix) {
     return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function createUpgradeCounts() {
+    return { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
+}
+
 function getKillLevelGain(victimLevel) {
     const level = Math.max(1, Math.floor(Number.isFinite(victimLevel) ? victimLevel : 1));
     return Math.max(1, Math.ceil(level * 0.5));
@@ -256,6 +260,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         finalAttacker.pendingUpgrades += levelsGained;
         finalTarget.level = 1;
         finalTarget.stats = createBaseStatsForWeapon(finalTarget.weapon);
+        finalTarget.upgradeCounts = createUpgradeCounts();
         finalTarget.pendingUpgrades = 0;
         finalTarget.isUpgrading = false;
         io.emit('playerDied', { victimId: targetId, attackerId });
@@ -521,6 +526,7 @@ io.on('connection', (socket) => {
         isUpgrading: false,
         pendingUpgrades: 0,
         isSelectingLoadout: true,
+        upgradeCounts: createUpgradeCounts(),
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
         skill: 'wire',
@@ -614,11 +620,13 @@ io.on('connection', (socket) => {
         const p = players[socket.id];
         if (!p) return;
         p.stats = normalizeStats(p.stats);
+        p.upgradeCounts = p.upgradeCounts || createUpgradeCounts();
         if (type === 'dmg') p.stats.dmg += 0.2;
         else if (type === 'projectile') p.stats.projectile += 0.2;
         else if (type === 'speed') p.stats.speed += 0.25;
         else if (type === 'move') p.stats.move += 0.1;
         else if (type === 'dodge') p.stats.dodge += 0.15;
+        if (Object.prototype.hasOwnProperty.call(p.upgradeCounts, type)) p.upgradeCounts[type] += 1;
         p.pendingUpgrades--;
         if (p.pendingUpgrades <= 0) {
             p.pendingUpgrades = 0;
@@ -769,6 +777,7 @@ io.on('connection', (socket) => {
                 attacker.pendingUpgrades += levelsGained;
                 target.level = 1;
                 target.stats = createBaseStatsForWeapon(target.weapon);
+                target.upgradeCounts = createUpgradeCounts();
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
                 target.isSelectingLoadout = true;

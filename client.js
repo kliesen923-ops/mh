@@ -50,6 +50,7 @@ const player = {
     wire: { active: false, kind: 'wire', tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
     stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 },
+    upgradeCounts: { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 },
     skill: 'wire'
 };
 
@@ -64,7 +65,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -132,7 +133,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -141,7 +142,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -301,20 +302,14 @@ function getEffectiveMoveMultiplier() {
     return (Number.isFinite(player.stats.move) ? player.stats.move : 1) * guardMultiplier;
 }
 
-function getUpgradeLevelFromMultiplier(multiplier, step) {
-    const value = Number.isFinite(multiplier) ? multiplier : 1;
-    const increment = Number.isFinite(step) && step > 0 ? step : 1;
-    return Math.max(1, 1 + Math.round(((value - 1) / increment) + 1e-6));
-}
-
 function getUpgradeLevelLabel(type) {
-    const stats = normalizeStats(player.stats);
-    if (type === 'dmg') return `Lv.${getUpgradeLevelFromMultiplier(stats.dmg, 0.2)}`;
-    if (type === 'range') return `Lv.${getUpgradeLevelFromMultiplier(stats.range, 0.15)}`;
-    if (type === 'speed') return `Lv.${getUpgradeLevelFromMultiplier(stats.speed, 0.25)}`;
-    if (type === 'move') return `Lv.${getUpgradeLevelFromMultiplier(stats.move, 0.1)}`;
-    if (type === 'dodge') return `Lv.${getUpgradeLevelFromMultiplier(stats.dodge, 0.15)}`;
-    if (type === 'projectile') return `Lv.${getUpgradeLevelFromMultiplier(stats.projectile, 0.2)}`;
+    const counts = player.upgradeCounts || {};
+    if (type === 'dmg') return `Lv.${(counts.dmg || 0) + 1}`;
+    if (type === 'range') return `Lv.${(counts.range || 0) + 1}`;
+    if (type === 'speed') return `Lv.${(counts.speed || 0) + 1}`;
+    if (type === 'move') return `Lv.${(counts.move || 0) + 1}`;
+    if (type === 'dodge') return `Lv.${(counts.dodge || 0) + 1}`;
+    if (type === 'projectile') return `Lv.${(counts.projectile || 0) + 1}`;
     return 'Lv.1';
 }
 
@@ -1397,6 +1392,7 @@ function enterGame(nickname, accountId, weapon, skill) {
         player.stats = normalizeStats(createBaseStatsForWeapon(player.weapon));
         player.maxHp = getMaxHpFromStats(player.stats);
         player.hp = player.maxHp;
+        player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
         socket.emit('setWeapon', player.weapon);
     }
     player.skill = normalizeSkill(skill);
