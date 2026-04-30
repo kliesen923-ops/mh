@@ -29,7 +29,7 @@ const MAX_MOVE_SPEED = 1500;
 const MOVE_TOLERANCE = 80;
 const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
-const WIRE_STUN_MS = 1500;
+const WIRE_STUN_MS = 1000;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
 const ATTACK_PROFILES = {
@@ -351,8 +351,8 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
 
     const distanceTravelled = Math.max(0, Math.min(maxDistance, maxDistance * wireProgress));
     const ratio = maxDistance > 0 ? distanceTravelled / maxDistance : 0;
-    let stunMs = Math.round((0.35 + (ratio * 2.25)) * 1000);
-    stunMs = Math.max(350, Math.min(2600, stunMs));
+    let stunMs = Math.round((0.3 + (ratio * 1.7)) * 1000);
+    stunMs = Math.max(300, Math.min(2000, stunMs));
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
 

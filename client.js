@@ -15,8 +15,8 @@ const ATTACK_PROFILES = {
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
 };
 const SKILL_PRESETS = {
-    wire: { label: '땡겨', cooldown: 1.0 },
-    ash: { label: '애쉬궁', cooldown: 2.6 },
+    wire: { label: '땡겨', cooldown: 2.0 },
+    ash: { label: '애쉬궁', cooldown: 2.0 },
 };
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
@@ -556,7 +556,7 @@ function startWire() {
     }
     releaseGuardForAction();
     if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
-    player.wireCooldown = 1.0;
+    player.wireCooldown = SKILL_PRESETS.wire.cooldown;
     const rawTx = player.x + Math.cos(player.angle) * 500;
     const rawTy = player.y + Math.sin(player.angle) * 500;
     const tx = Math.max(25, Math.min(canvas.width - 25, rawTx));
