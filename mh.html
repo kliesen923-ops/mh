@@ -470,7 +470,7 @@ function updateAttack(dt) {
             if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
         });
     } else if(player.attackPhase === 2 && player.attackTimer <= 0) { player.attackPhase = 3; player.attackTimer = 0.15 / player.stats.speed; socket.emit('playerAction', { attackPhase: 3 }); }
-    else if(player.attackPhase === 3 && player.attackTimer <= 0) { player.isAttacking = false; player.attackPhase = 0; socket.emit('playerAction', { isAttacking: false, attackPhase: 0 }); }
+    else if(player.attackPhase === 3 && player.attackTimer <= 0) { endAttack(); }
 }
 
 function isTargetInAttackArc(target, range) {
@@ -493,6 +493,24 @@ function getAngleDiff(a1, a2) {
 function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
 function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
 function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) return; player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
+function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
+function beginAttack() {
+    if (!canStartAttack() || player.isAttacking) return;
+    player.isAttacking = true;
+    player.comboStep = (player.comboStep % 3) + 1;
+    player.attackPhase = 1;
+    player.attackTimer = 0.12 / player.stats.speed;
+    player.aAngle = player.angle;
+    socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle });
+}
+function isAttackHeld() { return attackHoldSources.size > 0; }
+function endAttack() {
+    if (!player.isAttacking && player.attackPhase === 0) return;
+    player.isAttacking = false;
+    player.attackPhase = 0;
+    socket.emit('playerAction', { isAttacking: false, attackPhase: 0 });
+    if (isAttackHeld()) beginAttack();
+}
 function startWire() {
     if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
     player.wireCooldown = 1.0;
@@ -515,11 +533,13 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Enter') { if (!isChatting) { isChatting = true; document.getElementById('chat-container').classList.add('active'); document.getElementById('chat-input-container').style.display = 'block'; Object.keys(keys).forEach(k => keys[k] = false); setTimeout(() => document.getElementById('chat-input').focus(), 10); e.preventDefault(); } return; }
     if (player.hp <= 0 || player.isStunned) return;
     keys[e.code] = true; if(e.code === 'Space') startDodge(); if(e.code === 'ShiftLeft') startGuard();
-    if(e.code === 'KeyR' || e.code === 'KeyF') { if(player.isAttacking) return; player.isAttacking = true; player.comboStep = (player.comboStep % 3) + 1; player.attackPhase = 1; player.attackTimer = 0.12 / player.stats.speed; player.aAngle = player.angle; socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle }); }
+    if(e.code === 'KeyR' || e.code === 'KeyF') beginAttack();
 });
 document.getElementById('chat-input').addEventListener('keydown', e => { if (e.code === 'Enter') { if (e.target.value.trim()) socket.emit('chatMessage', e.target.value); e.target.value = ''; e.target.blur(); isChatting = false; document.getElementById('chat-container').classList.remove('active'); document.getElementById('chat-input-container').style.display = 'none'; e.preventDefault(); e.stopPropagation(); } });
 window.addEventListener('keyup', e => { keys[e.code] = false; if(e.code === 'ShiftLeft') releaseGuard(); });
-window.addEventListener('mousedown', e => { if(gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned) { if(e.button === 0) { if(player.isAttacking) return; player.isAttacking = true; player.comboStep = (player.comboStep % 3) + 1; player.attackPhase = 1; player.attackTimer = 0.12 / player.stats.speed; player.aAngle = player.angle; socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle }); } if(e.button === 2) { e.preventDefault(); startWire(); } } });
+const attackHoldSources = new Set();
+window.addEventListener('mousedown', e => { if(canStartAttack()) { if(e.button === 0) { attackHoldSources.add('mouse'); beginAttack(); } if(e.button === 2) { e.preventDefault(); startWire(); } } });
+window.addEventListener('mouseup', e => { if(e.button === 0) attackHoldSources.delete('mouse'); });
 window.addEventListener('contextmenu', e => e.preventDefault());
 
 function drawCharacter(p, color) {
@@ -548,8 +568,8 @@ let joyId = null;
 joyContainer.addEventListener('pointerdown', e => { if(gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned) { joyId = e.pointerId; joyContainer.setPointerCapture(e.pointerId); } });
 window.addEventListener('pointermove', e => { if(joyId === e.pointerId) { const r = joyContainer.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2; let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy); if(d > 50) { dx *= 50/d; dy *= 50/d; } joyStick.style.transform = `translate(${dx}px, ${dy}px)`; player.moveDir = { x: dx/50, y: (dy/50)/VIEW_Y_SCALE }; } });
 window.addEventListener('pointerup', e => { if(joyId === e.pointerId) { joyId = null; joyStick.style.transform = 'translate(0,0)'; player.moveDir = { x: 0, y: 0 }; } });
-const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) return; el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting && !isUpgrading) fn(); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); } };
-bind('btn-attack', () => { if(player.isAttacking || player.hp <= 0 || player.isStunned) return; player.isAttacking = true; player.comboStep = (player.comboStep % 3) + 1; player.attackPhase = 1; player.attackTimer = 0.12 / player.stats.speed; player.aAngle = player.angle; socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle }); });
+const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) return; el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting && !isUpgrading) fn(e); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); el.addEventListener('pointercancel', end); } };
+bind('btn-attack', () => { attackHoldSources.add('button'); beginAttack(); }, () => { attackHoldSources.delete('button'); });
 bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire);
 let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateCooldownUI(); draw(); }
 function normalizeNameInput(value) {
