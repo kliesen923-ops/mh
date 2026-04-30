@@ -8,12 +8,14 @@ const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
     hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, projectile: 1.0, hp: 115 } },
     spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, projectile: 1.0, hp: 95 } },
+    dual: { label: '쌍검', stats: { dmg: 0.82, range: 0.82, speed: 1.45, move: 1.02, dodge: 1.0, projectile: 1.0, hp: 92 } },
     bow: { label: '활', stats: { dmg: 1.2, range: 1.0, speed: 0.84, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
     spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 16 },
+    dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
 };
 const SKILL_PRESETS = {
@@ -279,7 +281,7 @@ function normalizeStats(stats) {
 }
 
 function normalizeWeapon(weapon) {
-    return weapon === 'hammer' ? 'hammer' : (weapon === 'spear' ? 'spear' : (weapon === 'bow' ? 'bow' : 'sword'));
+    return weapon === 'hammer' ? 'hammer' : (weapon === 'spear' ? 'spear' : (weapon === 'dual' ? 'dual' : (weapon === 'bow' ? 'bow' : 'sword')));
 }
 
 function createBaseStatsForWeapon(weapon) {
@@ -803,6 +805,7 @@ function drawCharacter(p, color) {
     ctx.save(); let sRot = 0.8;
     let spearPose = 0;
     let bowPose = 0;
+    let dualPose = 0;
     if (weapon === 'spear') {
         if (isAttacking) {
             if (attackPhase === 1) { sRot = -0.16; spearPose = -1.35; }
@@ -825,11 +828,23 @@ function drawCharacter(p, color) {
         } else {
             sRot = 0.03;
         }
+    } else if (weapon === 'dual') {
+        if (isAttacking) {
+            if (attackPhase === 1) { sRot = comboStep === 2 ? 1.08 : -1.08; dualPose = -1; }
+            else if (attackPhase === 2) { sRot = comboStep === 2 ? -0.06 : 0.06; dualPose = 1.05; }
+            else if (attackPhase === 3) { sRot = comboStep === 2 ? 0.24 : -0.24; dualPose = 0.22; }
+        } else if (isGuarding) {
+            sRot = 0.1;
+            dualPose = -0.12;
+        } else {
+            sRot = 0.02;
+        }
     } else if(isAttacking) {
         if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5);
     } else if(isGuarding) sRot = 0.2;
     const spearThrust = weapon === 'spear' ? (isAttacking ? (attackPhase === 1 ? -1.35 : (attackPhase === 2 ? 1.45 : 0.35)) : spearPose) : 0;
     const bowThrust = weapon === 'bow' ? (isAttacking ? (attackPhase === 1 ? -1 : (attackPhase === 2 ? 1 : 0.3)) : bowPose) : 0;
+    const dualThrust = weapon === 'dual' ? (isAttacking ? (attackPhase === 1 ? -0.95 : (attackPhase === 2 ? 1.05 : 0.2)) : dualPose) : 0;
     ctx.rotate(sRot);
     ctx.fillStyle = "#ffdbac";
     ctx.fillRect(15 + spearThrust * 7 + bowThrust * 5, 18 - spearThrust * 2 - bowThrust * 1.5, 20 + spearThrust * 5, 10);
@@ -857,6 +872,29 @@ function drawCharacter(p, color) {
         ctx.fill();
         ctx.fillStyle = "rgba(255,255,255,0.45)";
         ctx.fillRect(shaftX + shaftLength - 3, 21 - spearThrust * 1.5, 4, 4);
+    } else if (weapon === 'dual') {
+        const bladeLength = Math.max(18, weaponLength * 0.58);
+        const bladeOffset = 11 + dualThrust * 7;
+        const bladeTilt = comboStep === 2 ? -0.36 : 0.36;
+        ctx.fillStyle = "#6e4b2f";
+        ctx.fillRect(30, 17, 8, 8);
+        ctx.fillRect(30, 27, 8, 8);
+        ctx.save();
+        ctx.translate(32 + bladeOffset, 21 - dualThrust * 1.2);
+        ctx.rotate(bladeTilt);
+        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.fillRect(0, -2, bladeLength, 4);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(-3, -1, 4, 2);
+        ctx.restore();
+        ctx.save();
+        ctx.translate(32 - bladeOffset, 29 + dualThrust * 1.2);
+        ctx.rotate(-bladeTilt);
+        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.fillRect(0, -2, bladeLength, 4);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(-3, -1, 4, 2);
+        ctx.restore();
     } else if (weapon === 'bow') {
         const bowX = 38 + bowThrust * 10;
         const crescentY = 22 - bowThrust * 1.5;
@@ -1011,6 +1049,22 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(Math.cos(effect.angle) * burst, Math.sin(effect.angle) * burst, 6, 0, Math.PI * 2);
             ctx.fill();
+        } else if (effect.weapon === 'dual') {
+            const slashLen = 38 + (1 - t) * 14;
+            ctx.lineWidth = 3.4;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.beginPath();
+            ctx.rotate(effect.angle + 0.85);
+            ctx.moveTo(-slashLen * 0.7, -slashLen * 0.18);
+            ctx.lineTo(slashLen * 0.7, slashLen * 0.18);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.88)';
+            ctx.beginPath();
+            ctx.rotate(-1.45);
+            ctx.moveTo(-slashLen * 0.65, slashLen * 0.16);
+            ctx.lineTo(slashLen * 0.62, -slashLen * 0.12);
+            ctx.stroke();
         } else if (effect.weapon === 'ash') {
             const burst = 18 + (1 - t) * 24;
             ctx.strokeStyle = 'rgba(120, 210, 255, 0.95)';
