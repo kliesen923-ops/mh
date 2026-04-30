@@ -1,7 +1,7 @@
 ﻿
         :root { --game-ui-scale: 1; }
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; touch-action: none; }
-        canvas { display: block; background: #1a1a1a; width: min(100vw, 200vh); height: min(50vw, 100vh); }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; touch-action: none; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        canvas { display: block; background: #1a1a1a; width: min(100vw, 200vh); height: min(50vw, 100vh); margin: auto; }
         #hud { position: absolute; top: calc(20px * var(--game-ui-scale)); left: calc(20px * var(--game-ui-scale)); width: 182px; background: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 8px; color: white; font-size: 13px; z-index: 500; pointer-events: none; transform: scale(var(--game-ui-scale)); transform-origin: top left; }
         #hp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: bold; }
         #hp-bar { width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
