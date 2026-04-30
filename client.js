@@ -333,6 +333,13 @@ function getAttackMultiplier() {
     return Math.max(1, Number.isFinite(player.giantAttackMult) ? player.giantAttackMult : 1);
 }
 
+function getEffectiveAttackRange(weapon, stats, sourcePlayer) {
+    const profile = getWeaponAttackProfile(weapon);
+    const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;
+    const giantMult = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantAttackMult) ? sourcePlayer.giantAttackMult : 1);
+    return profile.reach * statRange * giantMult;
+}
+
 function getVisualScale() {
     return Math.max(1, Number.isFinite(player.giantScale) ? player.giantScale : 1);
 }
@@ -663,6 +670,7 @@ function startBowShot() {
     releaseGuardForAction();
     if(player.isDodging || player.hp <= 0 || player.isStunned) return;
     const angle = player.aAngle || player.angle;
+    const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
     const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
     const totalShots = Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)));
     const spreadStep = Math.min(0.24, Math.max(0.05, 0.05 + (totalShots - 1) * 0.035));
@@ -670,7 +678,10 @@ function startBowShot() {
     for (let i = 0; i < totalShots; i++) {
         const offset = (i - centerOffset) * spreadStep;
         const shotAngle = angle + offset;
-        const edge = getRayCanvasEdge(player.x, player.y, shotAngle);
+        const edge = {
+            x: player.x + Math.cos(shotAngle) * attackRange,
+            y: player.y + Math.sin(shotAngle) * attackRange,
+        };
         const projectileId = `${myId || 'bow'}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}:${i}`;
         bowProjectiles.push({
             id: projectileId,
@@ -1120,14 +1131,15 @@ function drawCharacter(p, color) {
         } else if (weapon === 'bow') {
             ctx.strokeStyle = "rgba(255, 230, 170, 0.95)";
             ctx.lineWidth = 2.4;
+            const bowReach = Math.max(28, attackRange * 0.32);
             ctx.beginPath();
             ctx.moveTo(12, 0);
-            ctx.lineTo(34, 0);
+            ctx.lineTo(12 + bowReach, 0);
             ctx.stroke();
             ctx.beginPath();
-            ctx.moveTo(34, 0);
-            ctx.lineTo(26, -3);
-            ctx.lineTo(26, 3);
+            ctx.moveTo(12 + bowReach, 0);
+            ctx.lineTo(12 + bowReach - 8, -3);
+            ctx.lineTo(12 + bowReach - 8, 3);
             ctx.closePath();
             ctx.fillStyle = "rgba(255, 220, 120, 0.95)";
             ctx.fill();
