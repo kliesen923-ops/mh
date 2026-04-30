@@ -333,6 +333,39 @@
                 <button id="btn-weapon-back" class="start-btn" type="button">뒤로</button>
             </div>
         </div>
+        <div id="skill-panel" class="weapon-panel hidden">
+            <h2 style="margin: 0; color: #f1c40f;">보조스킬 선택</h2>
+            <div id="skill-note">땡겨 또는 애쉬궁 중 하나를 선택하세요.</div>
+            <div class="weapon-grid">
+                <div class="weapon-card selected" data-skill="wire" role="button" tabindex="0">
+                    <div class="weapon-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M5 12h9" />
+                            <path d="M12 8l4 4-4 4" />
+                            <path d="M3 12c2-4 6-6 10-6" />
+                        </svg>
+                    </div>
+                    <h4>땡겨</h4>
+                    <p>전방으로 손을 뻗어<br>대상을 끌어옵니다.</p>
+                </div>
+                <div class="weapon-card" data-skill="ash" role="button" tabindex="0">
+                    <div class="weapon-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M4 20L20 4" />
+                            <path d="M14 5h5v5" />
+                            <path d="M8 16l2-2" />
+                            <path d="M10 14l2-2" />
+                        </svg>
+                    </div>
+                    <h4>애쉬궁</h4>
+                    <p>파란 수정화살을 날려<br>맞은 적을 경직시킵니다.</p>
+                </div>
+            </div>
+            <div class="start-actions">
+                <button id="btn-skill-confirm" class="start-btn" type="button">시작하기</button>
+                <button id="btn-skill-back" class="start-btn" type="button">뒤로</button>
+            </div>
+        </div>
     </div>
 
     <div id="overlay-upgrade" class="overlay hidden">
@@ -399,12 +432,17 @@ const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 } },
     hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 } },
 };
+const SKILL_PRESETS = {
+    wire: { label: '땡겨', cooldown: 1.0 },
+    ash: { label: '애쉬궁', cooldown: 1.35 },
+};
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
 let pendingAuth = null;
 let currentSession = null;
 let selectedWeapon = 'sword';
+let selectedSkill = 'wire';
 let combatEffects = [];
 const keys = {};
 
@@ -414,9 +452,10 @@ const player = {
     isGuarding: false, guardCooldown: 0, guardActiveTimer: 0,
     isAttacking: false, isStunned: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
     isDodging: false, dTimer: 0, dDX: 0, dDY: 0, dodgeCooldown: 0,
-    wire: { active: false, tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
+    wire: { active: false, kind: 'wire', tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
-    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 }
+    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 },
+    skill: 'wire'
 };
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -425,7 +464,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -471,7 +510,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -480,7 +519,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = 100; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); 
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -492,6 +531,12 @@ socket.on('playerDied', (data) => {
         gameState = 'TITLE';
         showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
         setWeaponError('사망했습니다. 무기를 다시 선택하세요.');
+    }
+});
+socket.on('skillChanged', (data) => {
+    if (data && data.id === myId) {
+        player.skill = normalizeSkill(data.skill);
+        updateSkillButtonLabel();
     }
 });
 socket.on('combatEffect', (effect) => {
@@ -661,18 +706,21 @@ function update(dt) {
     } else if(player.wire.active) {
         const wire = player.wire;
         const prevProgress = wire.progress || 0;
-        wire.progress = Math.min(1, (wire.progress || 0) + dt * 3.2);
+        const nextProgress = Math.min(1, (wire.progress || 0) + dt * (wire.kind === 'ash' ? 3.6 : 3.2));
+        wire.progress = nextProgress;
         const prevTipX = player.x + (wire.tx - player.x) * prevProgress;
         const prevTipY = player.y + (wire.ty - player.y) * prevProgress;
         const tipX = player.x + (wire.tx - player.x) * wire.progress;
         const tipY = player.y + (wire.ty - player.y) * wire.progress;
-        const hitId = findWireHitTarget(tipX, tipY, prevTipX, prevTipY);
+        const hitId = findSecondaryHitTarget(tipX, tipY, prevTipX, prevTipY, wire.kind);
         if (hitId) {
-            resolveWireHit(hitId);
+            if (wire.kind === 'ash') resolveAshHit(hitId);
+            else resolveWireHit(hitId);
         } else if (wire.progress >= 1) {
-            resolveWireHit();
+            if (wire.kind === 'ash') resolveAshHit();
+            else resolveWireHit();
         } else {
-            socket.emit('playerAction', { wire: { active: true, tx: wire.tx, ty: wire.ty, progress: wire.progress, maxDistance: wire.maxDistance || 500 } });
+            socket.emit('playerAction', { wire: { active: true, kind: wire.kind || 'wire', tx: wire.tx, ty: wire.ty, progress: wire.progress, maxDistance: wire.maxDistance || 500 } });
         }
     } else if(mx !== 0 || my !== 0) {
         player.stats = normalizeStats(player.stats);
@@ -699,8 +747,8 @@ function update(dt) {
             isGuarding: player.isGuarding, guardActiveTimer: player.guardActiveTimer,
             isAttacking: player.isAttacking, isDodging: player.isDodging,
             comboStep: player.comboStep, attackPhase: player.attackPhase, aAngle: player.aAngle,
-            wire: { active: player.wire.active, tx: player.wire.tx, ty: player.wire.ty, progress: player.wire.progress, maxDistance: player.wire.maxDistance },
-            level: player.level, weapon: player.weapon, stats: player.stats, isUpgrading: isUpgrading
+            wire: { active: player.wire.active, kind: player.wire.kind, tx: player.wire.tx, ty: player.wire.ty, progress: player.wire.progress, maxDistance: player.wire.maxDistance },
+            level: player.level, weapon: player.weapon, skill: player.skill, stats: player.stats, isUpgrading: isUpgrading
         });
     }
     if(prev.x !== player.x || prev.y !== player.y || prev.angle !== player.angle) socket.emit('playerMovement', { x: player.x, y: player.y, angle: player.angle });
@@ -761,6 +809,10 @@ function endAttack() {
     if (isAttackHeld()) beginAttack();
 }
 function startWire() {
+    if (selectedSkill !== 'wire') {
+        startAshArrow();
+        return;
+    }
     releaseGuardForAction();
     if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
     player.wireCooldown = 1.0;
@@ -769,22 +821,41 @@ function startWire() {
     const tx = Math.max(25, Math.min(canvas.width - 25, rawTx));
     const ty = Math.max(25, Math.min(canvas.height - 25, rawTy));
     player.wire.active = true;
+    player.wire.kind = 'wire';
     player.wire.tx = tx;
     player.wire.ty = ty;
     player.wire.progress = 0;
     player.wire.maxDistance = Math.max(1, Math.hypot(tx - player.x, ty - player.y));
-    socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
+    socket.emit('playerAction', { wire: { active: true, kind: 'wire', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
 }
 
-function findWireHitTarget(tipX, tipY, prevTipX, prevTipY) {
+function startAshArrow() {
+    releaseGuardForAction();
+    if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
+    player.wireCooldown = SKILL_PRESETS.ash.cooldown;
+    const rawTx = player.x + Math.cos(player.angle) * 620;
+    const rawTy = player.y + Math.sin(player.angle) * 620;
+    const tx = Math.max(18, Math.min(canvas.width - 18, rawTx));
+    const ty = Math.max(18, Math.min(canvas.height - 18, rawTy));
+    player.wire.active = true;
+    player.wire.kind = 'ash';
+    player.wire.tx = tx;
+    player.wire.ty = ty;
+    player.wire.progress = 0;
+    player.wire.maxDistance = Math.max(1, Math.hypot(tx - player.x, ty - player.y));
+    socket.emit('playerAction', { wire: { active: true, kind: 'ash', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
+}
+
+function findSecondaryHitTarget(tipX, tipY, prevTipX, prevTipY, kind) {
     return Object.keys(allPlayers).find((id) => {
         if (id === myId) return false;
         const target = allPlayers[id];
         if (!target || target.hp <= 0) return false;
+        const hitRadius = kind === 'ash' ? 28 : 35;
         if (Number.isFinite(prevTipX) && Number.isFinite(prevTipY)) {
-            return distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target) <= 35;
+            return distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target) <= hitRadius;
         }
-        return Math.hypot(target.x - tipX, target.y - tipY) <= 35;
+        return Math.hypot(target.x - tipX, target.y - tipY) <= hitRadius;
     });
 }
 
@@ -794,19 +865,33 @@ function resolveWireHit(forcedHitId) {
     const progress = Math.max(0, Math.min(1, wire.progress || 1));
     const tipX = player.x + (wire.tx - player.x) * progress;
     const tipY = player.y + (wire.ty - player.y) * progress;
-    const hitId = forcedHitId || findWireHitTarget(tipX, tipY);
+    const hitId = forcedHitId || findSecondaryHitTarget(tipX, tipY, null, null, 'wire');
     if (hitId) {
-        socket.emit('wireGrabHit', { targetId: hitId, progress, tx: wire.tx, ty: wire.ty, maxDistance: wire.maxDistance || 500 });
+        socket.emit('wireGrabHit', { targetId: hitId, progress, tx: wire.tx, ty: wire.ty, maxDistance: wire.maxDistance || 500, kind: 'wire' });
         const target = allPlayers[hitId];
         wire.tx = target ? target.x : wire.tx;
         wire.ty = target ? target.y : wire.ty;
         wire.progress = progress;
-        socket.emit('playerAction', { wire: { active: true, tx: wire.tx, ty: wire.ty, progress, maxDistance: wire.maxDistance || 500 } });
+        socket.emit('playerAction', { wire: { active: true, kind: 'wire', tx: wire.tx, ty: wire.ty, progress, maxDistance: wire.maxDistance || 500 } });
         setTimeout(() => {
             wire.active = false;
             socket.emit('playerAction', { wire: { active: false } });
         }, 300);
         return;
+    }
+    wire.active = false;
+    socket.emit('playerAction', { wire: { active: false } });
+}
+
+function resolveAshHit(forcedHitId) {
+    if (!player.wire.active) return;
+    const wire = player.wire;
+    const progress = Math.max(0, Math.min(1, wire.progress || 1));
+    const tipX = player.x + (wire.tx - player.x) * progress;
+    const tipY = player.y + (wire.ty - player.y) * progress;
+    const hitId = forcedHitId || findSecondaryHitTarget(tipX, tipY, null, null, 'ash');
+    if (hitId) {
+        socket.emit('ashArrowHit', { targetId: hitId, progress, tx: wire.tx, ty: wire.ty, maxDistance: wire.maxDistance || 500, kind: 'ash' });
     }
     wire.active = false;
     socket.emit('playerAction', { wire: { active: false } });
@@ -844,15 +929,19 @@ function drawCharacter(p, color) {
         const tipY = y + (wire.ty - y) * wireProgress;
         const handAngle = Math.atan2(wire.ty - y, wire.tx - x);
         ctx.save();
-        ctx.beginPath();
-        ctx.setLineDash([5, 5]);
-        ctx.moveTo(x, y);
-        ctx.lineTo(tipX, tipY);
-        ctx.strokeStyle = "#f1c40f";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        if (wire.kind === 'ash') {
+            drawAshArrow(x, y, tipX, tipY, handAngle, wireProgress);
+        } else {
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(x, y);
+            ctx.lineTo(tipX, tipY);
+            ctx.strokeStyle = "#f1c40f";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            drawWireHand(tipX, tipY, handAngle, wireProgress);
+        }
         ctx.restore();
-        drawWireHand(tipX, tipY, handAngle, wireProgress);
     }
     if(isGuarding) { const isPerfect = (guardActiveTimer < 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
     ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
@@ -900,6 +989,21 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(0, 0, 10 + (1 - t) * 8, 0, Math.PI * 2);
             ctx.fill();
+        } else if (effect.weapon === 'ash') {
+            const burst = 18 + (1 - t) * 24;
+            ctx.strokeStyle = 'rgba(120, 210, 255, 0.95)';
+            ctx.fillStyle = 'rgba(45, 125, 255, 0.55)';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 8; i++) {
+                const a = (Math.PI * 2 / 8) * i + effect.angle;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
+                ctx.lineTo(Math.cos(a) * burst, Math.sin(a) * burst);
+                ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.arc(0, 0, 8 + (1 - t) * 6, 0, Math.PI * 2);
+            ctx.fill();
         } else {
             const slashLen = 44 + (1 - t) * 18;
             const slashWidth = 4 + (1 - t) * 2;
@@ -920,6 +1024,46 @@ function drawCombatEffects() {
         }
         ctx.restore();
     });
+}
+
+function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
+    const length = Math.max(20, Math.hypot(tipX - originX, tipY - originY));
+    const crystalScale = 0.78 + Math.min(0.3, progress * 0.16);
+    ctx.save();
+    ctx.translate(tipX, tipY);
+    ctx.rotate(angle);
+    ctx.scale(crystalScale, crystalScale * VIEW_Y_SCALE);
+    ctx.shadowColor = 'rgba(90, 180, 255, 0.75)';
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = 'rgba(160, 230, 255, 0.95)';
+    ctx.fillStyle = 'rgba(80, 160, 255, 0.92)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-10, -4);
+    ctx.lineTo(-20, 0);
+    ctx.lineTo(-10, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(35, 120, 255, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(-2, 0);
+    ctx.lineTo(-16, -2.4);
+    ctx.lineTo(-length * 0.7, 0);
+    ctx.lineTo(-16, 2.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(195, 245, 255, 0.95)';
+    ctx.beginPath();
+    ctx.moveTo(-6, 0);
+    ctx.lineTo(-11, -1.6);
+    ctx.lineTo(-15, 0);
+    ctx.lineTo(-11, 1.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 }
 
 function drawWireHand(tipX, tipY, angle, progress) {
@@ -1016,13 +1160,25 @@ function normalizeAccountId(value) {
 function normalizeAccountPassword(value) {
     return String(value || '').trim().replace(/[\r\n,]/g, '').slice(0, 32);
 }
+function normalizeSkill(value) {
+    return String(value || '').trim().toLowerCase() === 'ash' ? 'ash' : 'wire';
+}
+function getSkillLabel(skill) {
+    return SKILL_PRESETS[normalizeSkill(skill)]?.label || SKILL_PRESETS.wire.label;
+}
+function updateSkillButtonLabel() {
+    const btn = document.getElementById('btn-wire');
+    if (btn) btn.textContent = getSkillLabel(player.skill || selectedSkill);
+}
 function setAuthMode(mode) {
     const loginPanel = document.getElementById('login-panel');
     const registerPanel = document.getElementById('register-panel');
     const weaponPanel = document.getElementById('weapon-panel');
+    const skillPanel = document.getElementById('skill-panel');
     if (loginPanel) loginPanel.classList.toggle('hidden', mode !== 'login');
     if (registerPanel) registerPanel.classList.toggle('hidden', mode !== 'register');
     if (weaponPanel) weaponPanel.classList.toggle('hidden', mode !== 'weapon');
+    if (skillPanel) skillPanel.classList.toggle('hidden', mode !== 'skill');
 }
 function setAuthError(target, message) {
     const errorEl = document.getElementById(target + '-error');
@@ -1032,12 +1188,23 @@ function setWeaponError(message) {
     const errorEl = document.getElementById('weapon-note');
     if (errorEl) errorEl.textContent = message || '한손검 또는 망치를 선택하세요.';
 }
+function setSkillError(message) {
+    const errorEl = document.getElementById('skill-note');
+    if (errorEl) errorEl.textContent = message || '땡겨 또는 애쉬궁 중 하나를 선택하세요.';
+}
 function setWeaponSelection(weapon) {
     selectedWeapon = normalizeWeapon(weapon);
     document.querySelectorAll('.weapon-card').forEach((card) => {
-        card.classList.toggle('selected', card.dataset.weapon === selectedWeapon);
+        if (card.dataset.weapon) card.classList.toggle('selected', card.dataset.weapon === selectedWeapon);
     });
     setWeaponError(`${getWeaponLabel(selectedWeapon)}가 선택되었습니다.`);
+}
+function setSkillSelection(skill) {
+    selectedSkill = normalizeSkill(skill);
+    document.querySelectorAll('.weapon-card').forEach((card) => {
+        if (card.dataset.skill) card.classList.toggle('selected', card.dataset.skill === selectedSkill);
+    });
+    setSkillError(`${getSkillLabel(selectedSkill)}가 선택되었습니다.`);
 }
 function showWeaponPanel(auth) {
     pendingAuth = auth;
@@ -1045,15 +1212,31 @@ function showWeaponPanel(auth) {
     setAuthMode('weapon');
     const weaponPanel = document.getElementById('weapon-panel');
     if (weaponPanel) weaponPanel.classList.remove('hidden');
+    const skillPanel = document.getElementById('skill-panel');
+    if (skillPanel) skillPanel.classList.add('hidden');
     const loginPanel = document.getElementById('login-panel');
     const registerPanel = document.getElementById('register-panel');
     if (loginPanel) loginPanel.classList.add('hidden');
     if (registerPanel) registerPanel.classList.add('hidden');
-    setWeaponSelection('sword');
+    setWeaponSelection(normalizeWeapon(auth && auth.weapon ? auth.weapon : selectedWeapon));
+}
+function showSkillPanel(auth, weapon) {
+    pendingAuth = Object.assign({}, auth || {}, { weapon: normalizeWeapon(weapon || selectedWeapon) });
+    document.getElementById('overlay-start')?.classList.remove('hidden');
+    setAuthMode('skill');
+    const weaponPanel = document.getElementById('weapon-panel');
+    if (weaponPanel) weaponPanel.classList.add('hidden');
+    const skillPanel = document.getElementById('skill-panel');
+    if (skillPanel) skillPanel.classList.remove('hidden');
+    setSkillSelection('wire');
 }
 function hideWeaponPanel() {
     const weaponPanel = document.getElementById('weapon-panel');
     if (weaponPanel) weaponPanel.classList.add('hidden');
+}
+function hideSkillPanel() {
+    const skillPanel = document.getElementById('skill-panel');
+    if (skillPanel) skillPanel.classList.add('hidden');
 }
 async function postAuth(path, payload) {
     const response = await fetch(path, {
@@ -1067,7 +1250,7 @@ async function postAuth(path, payload) {
     }
     return data;
 }
-function enterGame(nickname, accountId, weapon) {
+function enterGame(nickname, accountId, weapon, skill) {
     currentSession = { id: accountId || '', nickname: nickname || 'Hunter' };
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
     if (accountId) socket.emit('setAccount', accountId);
@@ -1076,9 +1259,13 @@ function enterGame(nickname, accountId, weapon) {
         player.weapon = normalizeWeapon(weapon);
         player.stats = normalizeStats(createBaseStatsForWeapon(player.weapon));
         socket.emit('setWeapon', player.weapon);
-        updateHUD();
     }
+    player.skill = normalizeSkill(skill);
+    updateSkillButtonLabel();
+    socket.emit('setSkill', player.skill);
+    updateHUD();
     hideWeaponPanel();
+    hideSkillPanel();
     document.getElementById('overlay-start').classList.add('hidden');
     gameState = 'PLAYING';
     requestAnimationFrame(loop);
@@ -1121,6 +1308,7 @@ if (savedLoginId) {
     if (loginId) loginId.value = savedLoginId;
 }
 setAuthMode('login');
+updateSkillButtonLabel();
 document.getElementById('btn-login')?.addEventListener('click', handleLogin);
 document.getElementById('btn-signin')?.addEventListener('click', () => {
     setAuthMode('register');
@@ -1132,11 +1320,15 @@ document.getElementById('btn-back-login')?.addEventListener('click', () => {
     setAuthError('login', '');
 });
 document.querySelectorAll('.weapon-card').forEach((card) => {
-    card.addEventListener('click', () => setWeaponSelection(card.dataset.weapon));
+    card.addEventListener('click', () => {
+        if (card.dataset.weapon) setWeaponSelection(card.dataset.weapon);
+        if (card.dataset.skill) setSkillSelection(card.dataset.skill);
+    });
     card.addEventListener('keydown', (e) => {
         if (e.code === 'Enter' || e.code === 'Space') {
             e.preventDefault();
-            setWeaponSelection(card.dataset.weapon);
+            if (card.dataset.weapon) setWeaponSelection(card.dataset.weapon);
+            if (card.dataset.skill) setSkillSelection(card.dataset.skill);
         }
     });
 });
@@ -1149,7 +1341,19 @@ document.getElementById('btn-weapon-back')?.addEventListener('click', () => {
 document.getElementById('btn-weapon-confirm')?.addEventListener('click', async () => {
     if (!pendingAuth) return;
     setWeaponError('');
-    enterGame(pendingAuth.nickname, pendingAuth.id, normalizeWeapon(selectedWeapon));
+    hideWeaponPanel();
+    showSkillPanel(pendingAuth, selectedWeapon);
+});
+document.getElementById('btn-skill-back')?.addEventListener('click', () => {
+    if (!pendingAuth) return;
+    hideSkillPanel();
+    showWeaponPanel(pendingAuth);
+    setSkillError('');
+});
+document.getElementById('btn-skill-confirm')?.addEventListener('click', async () => {
+    if (!pendingAuth) return;
+    setSkillError('');
+    enterGame(pendingAuth.nickname, pendingAuth.id, normalizeWeapon(selectedWeapon), normalizeSkill(selectedSkill));
     pendingAuth = null;
 });
 document.getElementById('login-id')?.addEventListener('keydown', (e) => {

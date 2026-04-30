@@ -51,6 +51,12 @@ function sanitizeWeapon(value) {
     return 'sword';
 }
 
+function sanitizeSkill(value) {
+    const skill = String(value || '').trim().toLowerCase();
+    if (skill === 'ash') return 'ash';
+    return 'wire';
+}
+
 function loadAccounts() {
     ensureAccountFile();
     const raw = fs.readFileSync(ACCOUNT_FILE, 'utf8').trim();
@@ -210,6 +216,7 @@ function sanitizeAction(p, actionData) {
 
     if (actionData.wire && typeof actionData.wire === 'object') {
         const wire = { active: Boolean(actionData.wire.active) };
+        wire.kind = sanitizeSkill(actionData.wire.kind);
         if (Number.isFinite(actionData.wire.tx) && Number.isFinite(actionData.wire.ty)) {
             const dx = actionData.wire.tx - p.x;
             const dy = actionData.wire.ty - p.y;
@@ -259,6 +266,7 @@ io.on('connection', (socket) => {
         pendingUpgrades: 0,
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
+        skill: 'wire',
         lastMoveAt: Date.now(),
         lastWireAt: 0
     };
@@ -290,6 +298,13 @@ io.on('connection', (socket) => {
         const nextWeapon = sanitizeWeapon(weapon);
         p.weapon = nextWeapon;
         p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
+        io.emit('statsUpdate', players);
+    });
+
+    socket.on('setSkill', (skill) => {
+        const p = players[socket.id];
+        if (!p) return;
+        p.skill = sanitizeSkill(skill);
         io.emit('statsUpdate', players);
     });
 
@@ -354,6 +369,7 @@ io.on('connection', (socket) => {
         let finalAttacker = players[attackerId];
         let finalTarget = players[targetId];
         if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
+        if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'wire') return;
 
         const now = Date.now();
         if ((now - (finalAttacker.lastWireAt || 0)) < WIRE_COOLDOWN_MS) return;
@@ -406,6 +422,63 @@ io.on('connection', (socket) => {
                 }
             }, 30);
         }
+    });
+
+    socket.on('ashArrowHit', (payloadData) => {
+        const payload = (payloadData && typeof payloadData === 'object') ? payloadData : { targetId: payloadData };
+        let attackerId = socket.id;
+        let targetId = payload.targetId;
+        const finalAttacker = players[attackerId];
+        const finalTarget = players[targetId];
+        if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
+        if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'ash') return;
+
+        const now = Date.now();
+        if ((now - (finalAttacker.lastWireAt || 0)) < WIRE_COOLDOWN_MS) return;
+        const wireProgress = Number.isFinite(payload.progress)
+            ? Math.max(0, Math.min(1, payload.progress))
+            : Math.max(0, Math.min(1, finalAttacker.wire && Number.isFinite(finalAttacker.wire.progress) ? finalAttacker.wire.progress : 1));
+        const wireTx = Number.isFinite(payload.tx)
+            ? payload.tx
+            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.tx) ? finalAttacker.wire.tx : finalAttacker.x);
+        const wireTy = Number.isFinite(payload.ty)
+            ? payload.ty
+            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.ty) ? finalAttacker.wire.ty : finalAttacker.y);
+        const maxDistance = Number.isFinite(payload.maxDistance)
+            ? Math.max(1, payload.maxDistance)
+            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.maxDistance) ? finalAttacker.wire.maxDistance : 500);
+        const wireTip = {
+            x: finalAttacker.x + (wireTx - finalAttacker.x) * wireProgress,
+            y: finalAttacker.y + (wireTy - finalAttacker.y) * wireProgress
+        };
+        if (Math.hypot(finalTarget.x - wireTip.x, finalTarget.y - wireTip.y) > 28) return;
+        finalAttacker.lastWireAt = now;
+
+        const distanceTravelled = Math.max(0, Math.min(maxDistance, maxDistance * wireProgress));
+        const ratio = maxDistance > 0 ? distanceTravelled / maxDistance : 0;
+        let stunMs = Math.round((0.35 + (ratio * 2.25)) * 1000);
+        stunMs = Math.max(350, Math.min(2600, stunMs));
+        const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
+        const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
+        if (finalTarget.isGuarding && isFacingAttacker) {
+            stunMs = Math.round(stunMs * 0.5);
+        }
+
+        if (finalTarget.isStunned) return;
+        io.emit('combatEffect', {
+            x: finalTarget.x,
+            y: finalTarget.y,
+            angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
+            weapon: 'ash',
+        });
+        finalTarget.isStunned = true;
+        io.emit('playerStunned', { id: targetId, stunned: true });
+        setTimeout(() => {
+            if (players[targetId]) {
+                players[targetId].isStunned = false;
+                io.emit('playerStunned', { id: targetId, stunned: false });
+            }
+        }, stunMs);
     });
 
     socket.on('playerHitTarget', (targetId) => {
