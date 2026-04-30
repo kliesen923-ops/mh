@@ -25,6 +25,8 @@ app.get('/', (req, res) => {
 let players = {};
 let attackSequences = {};
 let attackHitTargets = new Map();
+let healingCross = null;
+let healingCrossTimer = null;
 const MAX_MOVE_SPEED = 1500;
 const MOVE_TOLERANCE = 80;
 const ATTACK_ARC = Math.PI * 0.65;
@@ -41,6 +43,10 @@ const ATTACK_PROFILES = {
     dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
 };
+const HEAL_CROSS_SPAWN_DELAY_MS = 18000;
+const HEAL_CROSS_LIFETIME_MS = 12000;
+const HEAL_CROSS_BOUNDS = { xMin: 120, xMax: 1160, yMin: 110, yMax: 530 };
+const HEAL_CROSS_PICKUP_RADIUS = 34;
 const dbPool = Pool && process.env.DATABASE_URL ? new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
@@ -183,6 +189,65 @@ function createProjectileId(prefix) {
 
 function createUpgradeCounts() {
     return { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
+}
+
+function emitHealingCrossUpdate() {
+    io.emit('healingCrossUpdate', healingCross ? [healingCross] : []);
+}
+
+function spawnHealingCross() {
+    healingCrossTimer = null;
+    healingCross = {
+        id: createProjectileId('heal'),
+        x: HEAL_CROSS_BOUNDS.xMin + Math.random() * (HEAL_CROSS_BOUNDS.xMax - HEAL_CROSS_BOUNDS.xMin),
+        y: HEAL_CROSS_BOUNDS.yMin + Math.random() * (HEAL_CROSS_BOUNDS.yMax - HEAL_CROSS_BOUNDS.yMin),
+        createdAt: Date.now(),
+        expiresAt: Date.now() + HEAL_CROSS_LIFETIME_MS,
+    };
+    emitHealingCrossUpdate();
+}
+
+function scheduleNextHealingCross(delayMs = HEAL_CROSS_SPAWN_DELAY_MS) {
+    if (healingCrossTimer) clearTimeout(healingCrossTimer);
+    healingCrossTimer = setTimeout(spawnHealingCross, delayMs);
+}
+
+function clearHealingCross(scheduleNext = true) {
+    healingCross = null;
+    emitHealingCrossUpdate();
+    if (scheduleNext) scheduleNextHealingCross();
+}
+
+function pickupHealingCross(playerId) {
+    const p = players[playerId];
+    if (!p || !healingCross || p.hp <= 0 || p.isSelectingLoadout || p.isUpgrading) return;
+    const distance = Math.hypot(p.x - healingCross.x, p.y - healingCross.y);
+    if (distance > HEAL_CROSS_PICKUP_RADIUS) return;
+    const maxHp = getMaxHpFromStats(p.stats);
+    const amount = Math.min(Math.max(0, maxHp - p.hp), Math.max(1, Math.floor(maxHp * 0.3)));
+    if (amount <= 0) {
+        clearHealingCross(true);
+        return;
+    }
+    p.hp = Math.min(maxHp, p.hp + amount);
+    io.emit('healFloatingText', { playerId, amount, x: p.x, y: p.y });
+    io.emit('statsUpdate', players);
+    clearHealingCross(true);
+}
+
+function updateHealingCrosses() {
+    if (!healingCross) return;
+    if (Date.now() >= healingCross.expiresAt) {
+        clearHealingCross(true);
+        return;
+    }
+    for (const [id, p] of Object.entries(players)) {
+        if (!p || p.hp <= 0 || p.isSelectingLoadout || p.isUpgrading) continue;
+        if (Math.hypot(p.x - healingCross.x, p.y - healingCross.y) <= HEAL_CROSS_PICKUP_RADIUS) {
+            pickupHealingCross(id);
+            return;
+        }
+    }
 }
 
 function getKillLevelGain(victimLevel) {
@@ -535,6 +600,7 @@ io.on('connection', (socket) => {
     };
 
     socket.emit('currentPlayers', players);
+    socket.emit('healingCrossUpdate', healingCross ? [healingCross] : []);
     socket.broadcast.emit('newPlayer', players[socket.id]);
 
     socket.on('setName', (name) => {
@@ -819,4 +885,6 @@ initDatabase().catch((error) => {
 });
 
 const PORT = process.env.PORT || 3000;
+scheduleNextHealingCross(8000);
+setInterval(updateHealingCrosses, 100);
 http.listen(PORT, () => { console.log(`서버 실행 중: ${PORT}`); });

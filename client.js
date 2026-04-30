@@ -35,6 +35,8 @@ let selectedSkill = 'wire';
 let combatEffects = [];
 let ashProjectiles = [];
 let bowProjectiles = [];
+let healingCrosses = [];
+let healingTexts = [];
 const keys = {};
 function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
@@ -171,6 +173,20 @@ socket.on('combatEffect', (effect) => {
         weapon: normalizeWeapon(effect.weapon),
         life: 0.22,
         maxLife: 0.22,
+    });
+});
+socket.on('healingCrossUpdate', (data) => {
+    healingCrosses = Array.isArray(data) ? data : [];
+});
+socket.on('healFloatingText', (data) => {
+    if (!data || !data.playerId) return;
+    const amount = Math.max(0, Math.floor(Number(data.amount) || 0));
+    if (amount <= 0) return;
+    healingTexts.push({
+        playerId: String(data.playerId),
+        text: `+${amount}`,
+        life: 1.0,
+        maxLife: 1.0,
     });
 });
 socket.on('ashProjectile', (effect) => {
@@ -390,6 +406,13 @@ function updateCombatEffects(dt) {
     });
 }
 
+function updateHealingTexts(dt) {
+    healingTexts = healingTexts.filter((effect) => {
+        effect.life -= dt;
+        return effect.life > 0;
+    });
+}
+
 function updateAshProjectiles(dt) {
     ashProjectiles = ashProjectiles.filter((effect) => {
         effect.progress = Math.min(1, (effect.progress || 0) + dt / Math.max(0.001, effect.duration || 0.35));
@@ -517,6 +540,7 @@ function update(dt) {
     }
     if(prev.x !== player.x || prev.y !== player.y || prev.angle !== player.angle) socket.emit('playerMovement', { x: player.x, y: player.y, angle: player.angle });
     if(player.isAttacking) updateAttack(dt);
+    updateHealingTexts(dt);
 }
 
 function updateAttack(dt) {
@@ -1125,6 +1149,63 @@ function drawBowProjectiles() {
     });
 }
 
+function drawHealingCrosses() {
+    const now = Date.now();
+    healingCrosses.forEach((cross) => {
+        const remaining = Math.max(0, Number(cross.expiresAt || 0) - now);
+        const lifeRatio = Math.max(0, Math.min(1, remaining / 12000));
+        const bob = Math.sin(now / 220 + Number(cross.x || 0) * 0.01) * 4;
+        const blink = remaining <= 3000 ? (Math.floor(now / 140) % 2 === 0) : true;
+        if (!blink) return;
+        ctx.save();
+        ctx.translate(Number(cross.x) || 0, (Number(cross.y) || 0) + bob);
+        ctx.scale(1, VIEW_Y_SCALE);
+        ctx.globalAlpha = remaining <= 3000 ? Math.max(0.25, lifeRatio) : 1;
+        ctx.shadowColor = 'rgba(80, 255, 120, 0.85)';
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = 'rgba(70, 220, 100, 0.95)';
+        ctx.lineWidth = 9;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(10, 0);
+        ctx.moveTo(0, -10);
+        ctx.lineTo(0, 10);
+        ctx.stroke();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(170, 255, 180, 0.95)';
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(10, 0);
+        ctx.moveTo(0, -10);
+        ctx.lineTo(0, 10);
+        ctx.stroke();
+        ctx.restore();
+    });
+}
+
+function drawHealingTexts() {
+    healingTexts.forEach((effect) => {
+        const p = Math.max(0, Math.min(1, effect.life / effect.maxLife));
+        const target = allPlayers[effect.playerId] || (effect.playerId === myId ? player : null);
+        if (!target) return;
+        const rise = (1 - p) * 36;
+        ctx.save();
+        ctx.globalAlpha = p;
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.fillStyle = '#46e06a';
+        const x = target.x;
+        const y = target.y - 78 - rise;
+        ctx.strokeText(effect.text, x, y);
+        ctx.fillText(effect.text, x, y);
+        ctx.restore();
+    });
+}
+
 function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
     const crystalScale = 0.92;
     ctx.save();
@@ -1245,7 +1326,9 @@ function drawWireHand(tipX, tipY, angle, progress) {
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+    drawHealingCrosses();
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
+    drawHealingTexts();
     drawCombatEffects();
     drawAshProjectiles();
     drawBowProjectiles();
