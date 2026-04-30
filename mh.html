@@ -225,13 +225,13 @@
 
     <div id="overlay-upgrade" class="overlay hidden">
         <h1 style="color:#f1c40f; text-shadow: 0 0 10px #f1c40f; margin-bottom: 5px;">LEVEL UP!</h1>
-        <p>Choose one upgrade to strengthen your hunter.</p>
-        <div id="upgrade-timer">Upgrade time: 9s</div>
+        <p>업그레이드를 하나 선택해서 캐릭터를 강화하세요.</p>
+        <div id="upgrade-timer">업그레이드 시간: 9초</div>
         <div id="upgrade-cards">
-            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">DMG</div><h4>Attack Power</h4><p>All attacks deal <br><b>20%</b> more damage.</p></div>
-            <div class="card" onclick="selectUpgrade('range')"><div class="icon">RNG</div><h4>Range Boost</h4><p>Attack reach increases by <br><b>15%</b>.</p></div>
-            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">SPD</div><h4>Attack Speed</h4><p>Attack speed increases by <br><b>25%</b>.</p></div>
-            <div class="card" onclick="selectUpgrade('move')"><div class="icon">MOV</div><h4>Move Speed</h4><p>Move speed increases by <br><b>10%</b>.</p></div>
+            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">DMG</div><h4>공격력 강화</h4><p>모든 공격의 피해가 <br><b>20%</b> 증가합니다.</p></div>
+            <div class="card" onclick="selectUpgrade('range')"><div class="icon">RNG</div><h4>사거리 강화</h4><p>공격의 도달 범위가 <br><b>15%</b> 증가합니다.</p></div>
+            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">SPD</div><h4>공격 속도 강화</h4><p>공격 속도가 <br><b>25%</b> 증가합니다.</p></div>
+            <div class="card" onclick="selectUpgrade('move')"><div class="icon">MOV</div><h4>이동 속도 강화</h4><p>이동 속도가 <br><b>10%</b> 증가합니다.</p></div>
         </div>
     </div>
 
@@ -290,11 +290,11 @@ function showUpgradeUI() {
     Object.keys(keys).forEach(k => keys[k] = false);
     upgradeTimeLeft = 9;
     const timerEl = document.getElementById('upgrade-timer');
-    timerEl.innerText = 'Upgrade time: ' + upgradeTimeLeft + 's';
+    timerEl.innerText = '업그레이드 시간: ' + upgradeTimeLeft + '초';
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
     upgradeTimerInterval = setInterval(() => {
         upgradeTimeLeft--;
-        timerEl.innerText = 'Upgrade time: ' + upgradeTimeLeft + 's';
+        timerEl.innerText = '업그레이드 시간: ' + upgradeTimeLeft + '초';
         if (upgradeTimeLeft <= 0) { clearInterval(upgradeTimerInterval); selectUpgrade('dmg'); }
     }, 1000);
 }
