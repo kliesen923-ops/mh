@@ -440,6 +440,7 @@ let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, a
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
 let pendingAuth = null;
 let currentSession = null;
+const isLocalAuthBypass = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 let selectedWeapon = 'sword';
 let selectedSkill = 'wire';
 let combatEffects = [];
@@ -1331,6 +1332,11 @@ async function handleLogin() {
     const password = normalizeAccountPassword(document.getElementById('login-password')?.value);
     try {
         setAuthError('login', '');
+        if (isLocalAuthBypass) {
+            const localId = id || 'local-test';
+            showWeaponPanel({ id: localId, nickname: localId });
+            return;
+        }
         const result = await postAuth('/api/auth/login', { id, password });
         showWeaponPanel(result);
     } catch (error) {
