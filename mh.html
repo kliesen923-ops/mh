@@ -838,7 +838,22 @@ function drawCharacter(p, color) {
     const weapon = normalizeWeapon(p.weapon);
     const attackRange = 85 * (stats ? stats.range : 1.0);
     const weaponLength = Math.max(28, attackRange - 35);
-    if(wire && wire.active) { ctx.save(); ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.moveTo(x, y); ctx.lineTo(x + (wire.tx - x) * (wire.progress ?? 1), y + (wire.ty - y) * (wire.progress ?? 1)); ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); }
+    if(wire && wire.active) {
+        const wireProgress = wire.progress ?? 1;
+        const tipX = x + (wire.tx - x) * wireProgress;
+        const tipY = y + (wire.ty - y) * wireProgress;
+        const handAngle = Math.atan2(wire.ty - y, wire.tx - x);
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.moveTo(x, y);
+        ctx.lineTo(tipX, tipY);
+        ctx.strokeStyle = "#f1c40f";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+        drawWireHand(tipX, tipY, handAngle, wireProgress);
+    }
     if(isGuarding) { const isPerfect = (guardActiveTimer < 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
     ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
     ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-60, 50, 6);
@@ -905,6 +920,48 @@ function drawCombatEffects() {
         }
         ctx.restore();
     });
+}
+
+function drawWireHand(tipX, tipY, angle, progress) {
+    const palmScale = 0.9 + Math.min(0.25, Math.max(0, progress) * 0.18);
+    ctx.save();
+    ctx.translate(tipX, tipY);
+    ctx.rotate(angle);
+    ctx.scale(palmScale, palmScale * VIEW_Y_SCALE);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(255, 214, 140, 0.35)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = 'rgba(255, 225, 195, 0.95)';
+    ctx.strokeStyle = 'rgba(110, 70, 35, 0.75)';
+    ctx.lineWidth = 1.4;
+    if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(-8, -7, 16, 14, 5);
+        ctx.fill();
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.rect(-8, -7, 16, 14);
+        ctx.fill();
+        ctx.stroke();
+    }
+    const fingerYs = [-6, -2.5, 1.5, 5];
+    fingerYs.forEach((fy, idx) => {
+        ctx.beginPath();
+        ctx.moveTo(6, fy);
+        ctx.lineTo(16 + idx * 0.3, fy * 0.72);
+        ctx.stroke();
+    });
+    ctx.beginPath();
+    ctx.moveTo(-3, 4);
+    ctx.lineTo(4, 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-1, -1, 2.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 240, 220, 0.95)';
+    ctx.fill();
+    ctx.restore();
 }
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
