@@ -35,6 +35,7 @@ const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
     spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 10 },
+    bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
 };
 const dbPool = Pool && process.env.DATABASE_URL ? new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -61,6 +62,7 @@ function sanitizeWeapon(value) {
     const weapon = String(value || '').trim().toLowerCase();
     if (weapon === 'hammer') return 'hammer';
     if (weapon === 'spear') return 'spear';
+    if (weapon === 'bow') return 'bow';
     return 'sword';
 }
 
@@ -117,6 +119,9 @@ function createBaseStatsForWeapon(weapon) {
     if (nextWeapon === 'spear') {
         return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96 };
     }
+    if (nextWeapon === 'bow') {
+        return { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98 };
+    }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
 }
 
@@ -127,6 +132,7 @@ function getWeaponAttackProfile(weapon) {
 function isTargetInWeaponAttack(attacker, target) {
     if (!attacker || !target) return false;
     const profile = getWeaponAttackProfile(attacker.weapon);
+    if (sanitizeWeapon(attacker.weapon) === 'bow') return false;
     const attackAngle = Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle;
     const dx = target.x - attacker.x;
     const dy = target.y - attacker.y;
@@ -157,6 +163,98 @@ async function updateAccountScore(accountId, field, delta) {
         [delta, id]
     );
     return result.rows[0] || null;
+}
+
+function createProjectileId(prefix) {
+    return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function applyBowImpact(attackerId, targetId, payload, reflected) {
+    const finalAttacker = players[attackerId];
+    const finalTarget = players[targetId];
+    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
+
+    const now = Date.now();
+    const startX = Number.isFinite(payload.startX) ? payload.startX : finalAttacker.x;
+    const startY = Number.isFinite(payload.startY) ? payload.startY : finalAttacker.y;
+    const endX = Number.isFinite(payload.endX) ? payload.endX : finalTarget.x;
+    const endY = Number.isFinite(payload.endY) ? payload.endY : finalTarget.y;
+    const projectileId = String(payload.projectileId || createProjectileId('bow'));
+    const attackRange = getWeaponAttackProfile(finalAttacker.weapon).reach * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.range) ? finalAttacker.stats.range : 1);
+    if (Math.hypot(finalTarget.x - endX, finalTarget.y - endY) > 26) return;
+
+    const angle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
+    const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
+    const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
+    let damage = Math.floor(12 * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
+    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500 && !reflected) {
+        const reflectedId = createProjectileId('bowr');
+        const reflectedPayload = {
+            projectileId: reflectedId,
+            startX: finalTarget.x,
+            startY: finalTarget.y,
+            endX: finalAttacker.x,
+            endY: finalAttacker.y,
+            angle: Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x),
+            maxDistance: Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y)),
+        };
+        io.emit('bowProjectileResolved', { projectileId });
+        io.emit('bowProjectile', {
+            projectileId: reflectedId,
+            originId: targetId,
+            startX: reflectedPayload.startX,
+            startY: reflectedPayload.startY,
+            endX: reflectedPayload.endX,
+            endY: reflectedPayload.endY,
+            angle: reflectedPayload.angle,
+            reflected: true,
+            duration: Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))),
+        });
+        setTimeout(() => applyBowImpact(targetId, attackerId, reflectedPayload, true), Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))));
+        return;
+    }
+
+    if (finalTarget.isGuarding && isFacingAttacker) {
+        damage = Math.floor(damage * 0.5);
+    }
+
+    io.emit('bowProjectileResolved', { projectileId });
+    io.emit('combatEffect', {
+        x: finalTarget.x,
+        y: finalTarget.y,
+        angle,
+        weapon: 'bow',
+    });
+    finalTarget.hp -= damage;
+    if (finalTarget.hp <= 0) {
+        finalTarget.hp = 0;
+        finalTarget.deaths++;
+        finalAttacker.kills++;
+        updateAccountScore(finalAttacker.accountId, 'kills', 1);
+        updateAccountScore(finalTarget.accountId, 'deaths', 1);
+        const levelsGained = Math.max(1, finalTarget.level - finalAttacker.level);
+        finalAttacker.level += levelsGained;
+        finalAttacker.hp = Math.min(100, finalAttacker.hp + 50);
+        finalAttacker.isUpgrading = true;
+        finalAttacker.pendingUpgrades += levelsGained;
+        finalTarget.level = 1;
+        finalTarget.stats = createBaseStatsForWeapon(finalTarget.weapon);
+        finalTarget.pendingUpgrades = 0;
+        finalTarget.isUpgrading = false;
+        io.emit('playerDied', { victimId: targetId, attackerId });
+        if (levelsGained > 0) io.to(attackerId).emit('levelUp', { newLevel: finalAttacker.level, count: levelsGained });
+        setTimeout(() => {
+            if (players[targetId]) {
+                players[targetId].hp = 100;
+                players[targetId].x = 100 + Math.random() * 800;
+                players[targetId].y = 100 + Math.random() * 500;
+                players[targetId].isStunned = false;
+                players[targetId].isGuarding = false;
+                io.emit('playerRespawn', players[targetId]);
+            }
+        }, 3000);
+    }
+    io.emit('statsUpdate', players);
 }
 
 app.post('/api/auth/register', async (req, res) => {
@@ -575,9 +673,43 @@ io.on('connection', (socket) => {
         applyAshImpact(attackerId, targetId, payload, false);
     });
 
+    socket.on('playerBowShot', (payloadData) => {
+        const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+        const attacker = players[socket.id];
+        if (!attacker || sanitizeWeapon(attacker.weapon) !== 'bow' || attacker.hp <= 0 || attacker.isStunned) return;
+        const projectileId = String(payload.projectileId || createProjectileId('bow'));
+        const angle = Number.isFinite(payload.angle) ? payload.angle : (Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle);
+        const startX = Number.isFinite(payload.startX) ? payload.startX : attacker.x;
+        const startY = Number.isFinite(payload.startY) ? payload.startY : attacker.y;
+        const endX = Number.isFinite(payload.endX) ? payload.endX : (startX + Math.cos(angle) * 600);
+        const endY = Number.isFinite(payload.endY) ? payload.endY : (startY + Math.sin(angle) * 600);
+        const maxDistance = Number.isFinite(payload.maxDistance) ? Math.max(1, payload.maxDistance) : Math.max(1, Math.hypot(endX - startX, endY - startY));
+        io.emit('bowProjectile', {
+            projectileId,
+            originId: socket.id,
+            startX,
+            startY,
+            endX,
+            endY,
+            angle,
+            reflected: false,
+            duration: Math.max(180, Math.min(800, Math.round(maxDistance * 0.9))),
+        });
+    });
+
+    socket.on('bowArrowHit', (payloadData) => {
+        const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+        const attacker = players[socket.id];
+        const targetId = payload.targetId;
+        const target = players[targetId];
+        if (!attacker || !target || sanitizeWeapon(attacker.weapon) !== 'bow' || target.isUpgrading) return;
+        applyBowImpact(socket.id, targetId, payload, Boolean(payload.reflected));
+    });
+
     socket.on('playerHitTarget', (targetId) => {
         const attacker = players[socket.id];
         const target = players[targetId];
+        if (attacker && sanitizeWeapon(attacker.weapon) === 'bow') return;
         if (attacker && target && target.hp > 0 && !target.isUpgrading) {
             const now = Date.now();
             const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1);
