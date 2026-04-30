@@ -347,20 +347,29 @@ io.on('connection', (socket) => {
         socket.emit('upgradeApplied');
     });
 
-    socket.on('wireGrabHit', (targetId) => {
+    socket.on('wireGrabHit', (payloadData) => {
+        const payload = (payloadData && typeof payloadData === 'object') ? payloadData : { targetId: payloadData };
         let attackerId = socket.id;
         let finalAttacker = players[attackerId];
-        let finalTarget = players[targetId];
+        let finalTarget = players[payload.targetId];
         if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
 
         const now = Date.now();
         if ((now - (finalAttacker.lastWireAt || 0)) < WIRE_COOLDOWN_MS) return;
-        const maxDistance = Number.isFinite(finalAttacker.wire && finalAttacker.wire.maxDistance) ? finalAttacker.wire.maxDistance : 500;
-        const wireEnd = {
-            x: finalAttacker.x + Math.cos(finalAttacker.angle) * maxDistance,
-            y: finalAttacker.y + Math.sin(finalAttacker.angle) * maxDistance
+        const wireProgress = Number.isFinite(payload.progress)
+            ? Math.max(0, Math.min(1, payload.progress))
+            : Math.max(0, Math.min(1, finalAttacker.wire && Number.isFinite(finalAttacker.wire.progress) ? finalAttacker.wire.progress : 1));
+        const wireTx = Number.isFinite(payload.tx)
+            ? payload.tx
+            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.tx) ? finalAttacker.wire.tx : finalAttacker.x);
+        const wireTy = Number.isFinite(payload.ty)
+            ? payload.ty
+            : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.ty) ? finalAttacker.wire.ty : finalAttacker.y);
+        const wireTip = {
+            x: finalAttacker.x + (wireTx - finalAttacker.x) * wireProgress,
+            y: finalAttacker.y + (wireTy - finalAttacker.y) * wireProgress
         };
-        if (Math.hypot(finalTarget.x - wireEnd.x, finalTarget.y - wireEnd.y) > 35) return;
+        if (Math.hypot(finalTarget.x - wireTip.x, finalTarget.y - wireTip.y) > 35) return;
         finalAttacker.lastWireAt = now;
 
         const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
@@ -432,14 +441,11 @@ io.on('connection', (socket) => {
                 updateAccountScore(attacker.accountId, 'kills', 1);
                 updateAccountScore(target.accountId, 'deaths', 1);
                 let levelsGained = 0;
-                if (attacker.level < 10) {
-                    levelsGained = Math.max(1, target.level - attacker.level);
-                    levelsGained = Math.min(levelsGained, 10 - attacker.level);
-                    attacker.level += levelsGained;
-                    attacker.hp = Math.min(100, attacker.hp + 50);
-                    attacker.isUpgrading = true;
-                    attacker.pendingUpgrades += levelsGained;
-                }
+                levelsGained = Math.max(1, target.level - attacker.level);
+                attacker.level += levelsGained;
+                attacker.hp = Math.min(100, attacker.hp + 50);
+                attacker.isUpgrading = true;
+                attacker.pendingUpgrades += levelsGained;
                 target.level = 1;
                 target.stats = createBaseStatsForWeapon(target.weapon);
                 target.pendingUpgrades = 0;

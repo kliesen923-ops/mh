@@ -532,7 +532,7 @@ function updateLeaderboard() {
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
     Object.values(allPlayers).sort((a,b) => b.kills - a.kills).forEach(p => {
-        const lvlTxt = p.level >= 10 ? "MAX" : "Lv." + (p.level || 1);
+        const lvlTxt = "Lv." + (p.level || 1);
         const row = document.createElement('tr');
         const nameCell = document.createElement('td');
         const nameWrap = document.createElement('span');
@@ -660,8 +660,16 @@ function update(dt) {
         player.x += Math.cos(player.aAngle) * 150 * dt; player.y += Math.sin(player.aAngle) * 150 * dt;
     } else if(player.wire.active) {
         const wire = player.wire;
+        const prevProgress = wire.progress || 0;
         wire.progress = Math.min(1, (wire.progress || 0) + dt * 3.2);
-        if (wire.progress >= 1) {
+        const prevTipX = player.x + (wire.tx - player.x) * prevProgress;
+        const prevTipY = player.y + (wire.ty - player.y) * prevProgress;
+        const tipX = player.x + (wire.tx - player.x) * wire.progress;
+        const tipY = player.y + (wire.ty - player.y) * wire.progress;
+        const hitId = findWireHitTarget(tipX, tipY, prevTipX, prevTipY);
+        if (hitId) {
+            resolveWireHit(hitId);
+        } else if (wire.progress >= 1) {
             resolveWireHit();
         } else {
             socket.emit('playerAction', { wire: { active: true, tx: wire.tx, ty: wire.ty, progress: wire.progress, maxDistance: wire.maxDistance || 500 } });
@@ -768,23 +776,32 @@ function startWire() {
     socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
 }
 
-function resolveWireHit() {
-    if (!player.wire.active) return;
-    const wire = player.wire;
-    const tipX = player.x + (wire.tx - player.x) * (wire.progress || 1);
-    const tipY = player.y + (wire.ty - player.y) * (wire.progress || 1);
-    const hitId = Object.keys(allPlayers).find((id) => {
+function findWireHitTarget(tipX, tipY, prevTipX, prevTipY) {
+    return Object.keys(allPlayers).find((id) => {
         if (id === myId) return false;
         const target = allPlayers[id];
-        return target && target.hp > 0 && Math.hypot(target.x - tipX, target.y - tipY) <= 35;
+        if (!target || target.hp <= 0) return false;
+        if (Number.isFinite(prevTipX) && Number.isFinite(prevTipY)) {
+            return distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target) <= 35;
+        }
+        return Math.hypot(target.x - tipX, target.y - tipY) <= 35;
     });
+}
+
+function resolveWireHit(forcedHitId) {
+    if (!player.wire.active) return;
+    const wire = player.wire;
+    const progress = Math.max(0, Math.min(1, wire.progress || 1));
+    const tipX = player.x + (wire.tx - player.x) * progress;
+    const tipY = player.y + (wire.ty - player.y) * progress;
+    const hitId = forcedHitId || findWireHitTarget(tipX, tipY);
     if (hitId) {
-        socket.emit('wireGrabHit', hitId);
+        socket.emit('wireGrabHit', { targetId: hitId, progress, tx: wire.tx, ty: wire.ty, maxDistance: wire.maxDistance || 500 });
         const target = allPlayers[hitId];
         wire.tx = target ? target.x : wire.tx;
         wire.ty = target ? target.y : wire.ty;
-        wire.progress = 1;
-        socket.emit('playerAction', { wire: { active: true, tx: wire.tx, ty: wire.ty, progress: 1, maxDistance: wire.maxDistance || 500 } });
+        wire.progress = progress;
+        socket.emit('playerAction', { wire: { active: true, tx: wire.tx, ty: wire.ty, progress, maxDistance: wire.maxDistance || 500 } });
         setTimeout(() => {
             wire.active = false;
             socket.emit('playerAction', { wire: { active: false } });
@@ -894,7 +911,7 @@ function draw() {
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
     drawCombatEffects();
-    if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?⑤같?덉뒿?덈떎! 3珥???遺?쒗빀?덈떎.", canvas.width/2, canvas.height/2); }
+    if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }
 const joyContainer = document.getElementById('joy-container'), joyStick = document.getElementById('joy-stick');
