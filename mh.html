@@ -205,20 +205,20 @@
         <div id="hp-row"><span>HP</span><span id="hp-text">100/100</span></div>
         <div id="hp-bar"><div id="hp-fill"></div></div>
         <div id="damage-readout">
-            <div>1?: <b id="damage-basic">10</b></div>
-            <div>2?: <b id="damage-second">20</b></div>
-            <div>3?: <b id="damage-heavy">35</b></div>
-            <div>?ш굅由? <b id="range-value">100</b></div>
-            <div>怨듦꺽?띾룄: <b id="attack-speed-value">100</b></div>
-            <div>?대룞?띾룄: <b id="move-speed-value">100</b></div>
+            <div>1타: <b id="damage-basic">10</b></div>
+            <div>2타: <b id="damage-second">20</b></div>
+            <div>3타: <b id="damage-heavy">35</b></div>
+            <div>사거리: <b id="range-value">100</b></div>
+            <div>이동속도: <b id="move-speed-value">100</b></div>
+            <div>공격속도: <b id="attack-speed-value">100</b></div>
         </div>
     </div>
-    <div id="leaderboard"><h3>RANKING</h3><div id="score-list"></div></div>
+    <div id="leaderboard"><h3>랭킹</h3><div id="score-list"></div></div>
     <div id="chat-container"><div id="chat-messages"></div><div id="chat-input-container"><input type="text" id="chat-input" placeholder="硫붿떆吏 ?낅젰..." maxlength="50"></div></div>
     <div id="joy-container"><div id="joy-stick"></div></div>
     <div class="action-buttons">
-        <div class="btn" id="btn-wire">WIRE</div><div class="btn" id="btn-dodge">DODGE</div>
-        <div class="btn" id="btn-guard">GUARD</div><div class="btn" id="btn-attack">ATTACK</div>
+        <div class="btn" id="btn-wire">땡겨</div><div class="btn" id="btn-dodge">회피</div>
+        <div class="btn" id="btn-guard">방어</div><div class="btn" id="btn-attack">공격</div>
     </div>
     
     <div id="overlay-start" class="overlay">
@@ -406,7 +406,7 @@ function updateLeaderboard() {
     table.className = 'score-table';
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['NAME', 'KILLS', 'DEATHS'].forEach(text => {
+    ['이름', '킬', '데스'].forEach(text => {
         const th = document.createElement('th');
         th.textContent = text;
         headerRow.appendChild(th);
