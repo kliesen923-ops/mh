@@ -301,6 +301,15 @@ function updateGiantPotions() {
     if (giantPotion && now >= giantPotion.expiresAt) {
         clearGiantPotion(true);
     }
+    if (giantPotion) {
+        for (const [id, p] of Object.entries(players)) {
+            if (!p || p.hp <= 0 || p.isSelectingLoadout || p.isUpgrading) continue;
+            if (Math.hypot(p.x - giantPotion.x, p.y - giantPotion.y) <= GIANT_POTION_PICKUP_RADIUS) {
+                pickupGiantPotion(id);
+                return;
+            }
+        }
+    }
     for (const [id, p] of Object.entries(players)) {
         if (!p || !p.giantActive) continue;
         if (!p.giantRecoveryArmed && now >= (p.giantEndsAt || 0)) {
