@@ -494,8 +494,8 @@ function getAngleDiff(a1, a2) {
 
 function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
 function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
-function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) return; player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
-function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
+function startDodge() { if (player.hp <= 0 || player.isStunned || player.isGuarding || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) return; player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
+function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned && !player.isGuarding; }
 function beginAttack() {
     if (!canStartAttack() || player.isAttacking) return;
     player.isAttacking = true;
@@ -514,7 +514,7 @@ function endAttack() {
     if (isAttackHeld()) beginAttack();
 }
 function startWire() {
-    if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
+    if(player.isAttacking || player.isGuarding || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
     player.wireCooldown = 1.0;
     const tx = player.x + Math.cos(player.angle) * 500, ty = player.y + Math.sin(player.angle) * 500;
     let hitId = null;
