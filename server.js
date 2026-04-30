@@ -384,6 +384,7 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
         stunMs = Math.round(stunMs * 0.5);
     }
 
+    const stunEndsAt = Date.now() + stunMs;
     io.emit('combatEffect', {
         x: finalTarget.x,
         y: finalTarget.y,
@@ -391,11 +392,11 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
         weapon: 'ash',
     });
     finalTarget.isStunned = true;
-    io.emit('playerStunned', { id: targetId, stunned: true });
+    io.emit('playerStunned', { id: targetId, stunned: true, stunEndsAt, stunMs });
     setTimeout(() => {
         if (players[targetId]) {
             players[targetId].isStunned = false;
-            io.emit('playerStunned', { id: targetId, stunned: false });
+            io.emit('playerStunned', { id: targetId, stunned: false, stunEndsAt: 0 });
         }
     }, stunMs);
 }
@@ -638,8 +639,9 @@ io.on('connection', (socket) => {
         }
 
         if (finalAttacker && finalTarget && !finalTarget.isStunned) {
+            const stunEndsAt = Date.now() + WIRE_STUN_MS;
             finalTarget.isStunned = true;
-            io.emit('playerStunned', { id: targetId, stunned: true });
+            io.emit('playerStunned', { id: targetId, stunned: true, stunEndsAt, stunMs: WIRE_STUN_MS });
             let steps = 10;
             let currentStep = 0;
             let pullInterval = setInterval(() => {
@@ -655,7 +657,7 @@ io.on('connection', (socket) => {
                     setTimeout(() => {
                         if (players[targetId]) {
                             players[targetId].isStunned = false;
-                            io.emit('playerStunned', { id: targetId, stunned: false });
+                            io.emit('playerStunned', { id: targetId, stunned: false, stunEndsAt: 0 });
                         }
                     }, WIRE_STUN_MS);
                 }

@@ -510,7 +510,16 @@ socket.on('playerMoved', (p) => {
     } 
 });
 socket.on('playerActionUpdate', (data) => { if(allPlayers[data.id]) Object.assign(allPlayers[data.id], data.action); });
-socket.on('playerStunned', (data) => { if(allPlayers[data.id]) allPlayers[data.id].isStunned = data.stunned; if(data.id === myId) player.isStunned = data.stunned; });
+socket.on('playerStunned', (data) => {
+    if(allPlayers[data.id]) {
+        allPlayers[data.id].isStunned = data.stunned;
+        allPlayers[data.id].stunEndsAt = data.stunned ? (data.stunEndsAt || (Date.now() + (data.stunMs || 0))) : 0;
+    }
+    if(data.id === myId) {
+        player.isStunned = data.stunned;
+        player.stunEndsAt = data.stunned ? (data.stunEndsAt || (Date.now() + (data.stunMs || 0))) : 0;
+    }
+});
 
 socket.on('levelUp', (data) => {
     player.level = data.newLevel;
@@ -1109,7 +1118,7 @@ window.addEventListener('mouseup', e => { if(e.button === 0) attackHoldSources.d
 window.addEventListener('contextmenu', e => e.preventDefault());
 
 function drawCharacter(p, color) {
-    const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats } = p;
+    const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
     const profile = getWeaponAttackProfile(weapon);
     const attackRange = profile.reach * (stats ? stats.range : 1.0);
@@ -1238,6 +1247,22 @@ function drawCharacter(p, color) {
         ctx.fillRect(35,18,weaponLength,10);
     }
     ctx.restore(); ctx.restore(); ctx.restore();
+    if (isStunned && Number.isFinite(stunEndsAt)) {
+        const stunRemaining = Math.max(0, (stunEndsAt - Date.now()) / 1000);
+        if (stunRemaining > 0) {
+            ctx.save();
+            ctx.font = "bold 14px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(0,0,0,0.65)";
+            ctx.fillStyle = "#ffffff";
+            const label = `${stunRemaining.toFixed(1)}초`;
+            ctx.strokeText(label, x, y - 82);
+            ctx.fillText(label, x, y - 82);
+            ctx.restore();
+        }
+    }
     if(isAttacking && attackPhase === 2) {
         ctx.save();
         ctx.translate(x, y);
