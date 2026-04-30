@@ -1325,6 +1325,7 @@ function enterGame(nickname, accountId, weapon, skill) {
     player.skill = normalizeSkill(skill);
     updateSkillButtonLabel();
     socket.emit('setSkill', player.skill);
+    socket.emit('setLoadoutReady');
     updateHUD();
     hideWeaponPanel();
     hideSkillPanel();

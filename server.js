@@ -184,7 +184,7 @@ function getKillLevelGain(victimLevel) {
 function applyBowImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
+    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
 
     const now = Date.now();
     const startX = Number.isFinite(payload.startX) ? payload.startX : finalAttacker.x;
@@ -338,7 +338,7 @@ function emitAshProjectile(originId, impactId, startX, startY, endX, endY, refle
 function applyAshImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isStunned) return;
+    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout || finalTarget.isStunned) return;
 
     const now = Date.now();
     const wireProgress = Number.isFinite(payload.progress)
@@ -515,6 +515,7 @@ io.on('connection', (socket) => {
         isStunned: false,
         isUpgrading: false,
         pendingUpgrades: 0,
+        isSelectingLoadout: true,
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
         skill: 'wire',
@@ -557,6 +558,13 @@ io.on('connection', (socket) => {
         const p = players[socket.id];
         if (!p) return;
         p.skill = sanitizeSkill(skill);
+        io.emit('statsUpdate', players);
+    });
+
+    socket.on('setLoadoutReady', () => {
+        const p = players[socket.id];
+        if (!p) return;
+        p.isSelectingLoadout = false;
         io.emit('statsUpdate', players);
     });
 
@@ -621,7 +629,7 @@ io.on('connection', (socket) => {
         let targetId = payload.targetId;
         let finalAttacker = players[attackerId];
         let finalTarget = players[targetId];
-        if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
+        if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
         if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'wire') return;
 
         const now = Date.now();
@@ -684,7 +692,7 @@ io.on('connection', (socket) => {
         let targetId = payload.targetId;
         const finalAttacker = players[attackerId];
         const finalTarget = players[targetId];
-        if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
+        if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
         if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'ash') return;
         applyAshImpact(attackerId, targetId, payload, false);
     });
@@ -718,7 +726,7 @@ io.on('connection', (socket) => {
         const attacker = players[socket.id];
         const targetId = payload.targetId;
         const target = players[targetId];
-        if (!attacker || !target || sanitizeWeapon(attacker.weapon) !== 'bow' || target.isUpgrading) return;
+        if (!attacker || !target || sanitizeWeapon(attacker.weapon) !== 'bow' || target.isUpgrading || target.isSelectingLoadout) return;
         applyBowImpact(socket.id, targetId, payload, Boolean(payload.reflected));
     });
 
@@ -726,7 +734,7 @@ io.on('connection', (socket) => {
         const attacker = players[socket.id];
         const target = players[targetId];
         if (attacker && sanitizeWeapon(attacker.weapon) === 'bow') return;
-        if (attacker && target && target.hp > 0 && !target.isUpgrading) {
+        if (attacker && target && target.hp > 0 && !target.isUpgrading && !target.isSelectingLoadout) {
             const now = Date.now();
             const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1);
             const canHit = attacker.isAttacking && attacker.attackPhase === 2 && isTargetInWeaponAttack(attacker, target);
@@ -758,6 +766,7 @@ io.on('connection', (socket) => {
                 target.stats = createBaseStatsForWeapon(target.weapon);
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
+                target.isSelectingLoadout = true;
                 io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
                 if (levelsGained > 0) socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
                 setTimeout(() => {
@@ -767,6 +776,7 @@ io.on('connection', (socket) => {
                         players[targetId].y = 100 + Math.random() * 500;
                         players[targetId].isStunned = false;
                         players[targetId].isGuarding = false;
+                        players[targetId].isSelectingLoadout = true;
                         io.emit('playerRespawn', players[targetId]);
                     }
                 }, 3000);
