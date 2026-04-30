@@ -89,7 +89,15 @@
         #btn-weapon-back, #btn-skill-back { background: #2c3e50; }
         .weapon-panel { display: flex; flex-direction: column; align-items: center; width: min(720px, calc(100vw - 24px)); }
         .weapon-panel.hidden { display: none; }
-        .weapon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 18px 0 16px; }
+        .weapon-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            width: min(560px, 100%);
+            margin: 18px auto 16px;
+            justify-content: center;
+        }
+        #skill-panel .weapon-grid { width: min(420px, 100%); }
         .weapon-card {
             min-height: 200px;
             border: 2px solid rgba(255,255,255,0.18);
@@ -187,7 +195,7 @@
             #upgrade-timer { font-size: 18px; margin-top: 12px; }
             .overlay h1 { font-size: 26px; text-align: center; }
             .overlay p { max-width: calc(100vw - 32px); text-align: center; }
-            .weapon-grid { gap: 10px; }
+            .weapon-grid { gap: 10px; width: min(520px, 100%); }
             .weapon-card { min-height: 150px; padding: 12px 10px; }
             .weapon-icon { width: 60px; height: 60px; }
             .weapon-icon svg { width: 30px; height: 30px; }
@@ -227,9 +235,9 @@
             .card .icon { grid-row: 1 / span 2; margin: 0; width: 36px; height: 36px; }
             .card .icon svg { width: 20px; height: 20px; }
             .card h4 { margin: 0 0 4px 0; }
-            .weapon-panel { width: min(360px, calc(100vw - 24px)); }
-            .weapon-grid { grid-template-columns: 1fr; }
-            .weapon-card { min-height: 138px; align-items: flex-start; text-align: left; }
+            .weapon-panel { width: min(400px, calc(100vw - 24px)); }
+            .weapon-grid { width: min(360px, 100%); }
+            .weapon-card { min-height: 138px; align-items: center; text-align: center; }
             .weapon-card .weapon-icon { width: 54px; height: 54px; }
             .weapon-card .weapon-icon svg { width: 26px; height: 26px; }
         }
