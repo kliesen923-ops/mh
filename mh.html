@@ -85,6 +85,8 @@
         #btn-signin { background: #e67e22; }
         #btn-register { background: #e74c3c; }
         #btn-back-login { background: #2c3e50; }
+        #btn-weapon-confirm, #btn-skill-confirm { background: #2ecc71; }
+        #btn-weapon-back, #btn-skill-back { background: #2c3e50; }
         .weapon-panel { display: flex; flex-direction: column; align-items: center; width: min(560px, calc(100vw - 24px)); }
         .weapon-panel.hidden { display: none; }
         .weapon-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 18px 0 16px; }
@@ -130,9 +132,6 @@
             stroke-linejoin: round;
         }
         #weapon-note { min-height: 18px; color: #ddd; font-size: 12px; margin-bottom: 2px; text-align: center; }
-        #btn-weapon-confirm { background: #2ecc71; }
-        #btn-weapon-back { background: #2c3e50; }
-
         @media (max-width: 700px), (max-height: 500px) {
             #hud {
                 top: calc(10px + env(safe-area-inset-top));
