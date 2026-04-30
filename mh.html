@@ -317,12 +317,11 @@
                 <div class="weapon-card" data-weapon="hammer" role="button" tabindex="0">
                     <div class="weapon-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24">
-                            <path d="M7 4h6l2 3H9z" />
-                            <path d="M9 7l-5 5" />
-                            <path d="M14 7l4 4" />
-                            <path d="M5 12l4 4" />
-                            <path d="M15 11l4 4" />
-                            <path d="M9 7v8" />
+                            <path d="M6 5h8l2 2v3h-3l-2-2H7l-1 1H3V7z" />
+                            <path d="M10 10l-5 5" />
+                            <path d="M11 9l5 5" />
+                            <path d="M9 10v8" />
+                            <path d="M12 10v8" />
                         </svg>
                     </div>
                     <h4>망치</h4>
@@ -767,12 +766,12 @@ function drawCharacter(p, color) {
     ctx.save(); let sRot = 0.8; if(isAttacking) { if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5); } else if(isGuarding) sRot = 0.2; ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10);
     if (weapon === 'hammer') {
         const handleLength = Math.max(18, weaponLength * 0.7);
-        const headSize = Math.max(12, Math.min(28, 12 + Math.max(0, weaponLength - 28) * 0.18));
+        const headSize = Math.max(18, Math.min(40, 20 + Math.max(0, weaponLength - 28) * 0.28));
         ctx.fillStyle = "#6e4b2f";
-        ctx.fillRect(35, 20, handleLength, 8);
+        ctx.fillRect(35, 19, handleLength, 9);
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
-        ctx.fillRect(35 + handleLength - 2, 14, headSize, 20);
-        ctx.fillRect(35 + handleLength + headSize - 4, 13, 4, 22);
+        ctx.fillRect(35 + handleLength - 2, 12, headSize, 26);
+        ctx.fillRect(35 + handleLength + headSize - 4, 11, 5, 28);
     } else {
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35,18,weaponLength,10);
