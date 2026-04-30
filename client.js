@@ -18,6 +18,8 @@ const SKILL_PRESETS = {
     wire: { label: '땡겨', cooldown: 2.0 },
     ash: { label: '애쉬궁', cooldown: 2.0 },
 };
+const GUARD_DURATION_SEC = 0.5;
+const JUST_GUARD_WINDOW_SEC = 0.1;
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
@@ -428,7 +430,7 @@ function update(dt) {
 
     player.x = Math.max(25, Math.min(canvas.width - 25, player.x));
     player.y = Math.max(25, Math.min(canvas.height - 25, player.y));
-    if (player.isGuarding) { player.guardActiveTimer += dt; if (player.guardActiveTimer >= 1.0) releaseGuard(); }
+    if (player.isGuarding) { player.guardActiveTimer += dt; if (player.guardActiveTimer >= GUARD_DURATION_SEC) releaseGuard(); }
     
     if(player.guardCooldown > 0) player.guardCooldown -= dt;
     if(player.dodgeCooldown > 0) player.dodgeCooldown -= dt;
@@ -715,7 +717,7 @@ function drawCharacter(p, color) {
         }
         ctx.restore();
     }
-    if(isGuarding) { const isPerfect = (guardActiveTimer < 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
+    if(isGuarding) { const isPerfect = (guardActiveTimer < JUST_GUARD_WINDOW_SEC); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
     ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
     const maxHp = getMaxHpFromStats(stats);
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;

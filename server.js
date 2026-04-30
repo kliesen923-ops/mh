@@ -30,6 +30,8 @@ const MOVE_TOLERANCE = 80;
 const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
 const WIRE_STUN_MS = 1000;
+const GUARD_DURATION_MS = 500;
+const JUST_GUARD_WINDOW_MS = 100;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
 const ATTACK_PROFILES = {
@@ -192,7 +194,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
     let damage = Math.floor(12 * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
-    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500 && !reflected) {
+    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS && !reflected) {
         const reflectedId = createProjectileId('bowr');
         const reflectedPayload = {
             projectileId: reflectedId,
@@ -360,7 +362,7 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
 
-    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500) {
+    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS) {
         const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
         const reflectedPayload = {
             targetId: attackerId,
@@ -637,7 +639,7 @@ io.on('connection', (socket) => {
         const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
         const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
 
-        if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500) {
+        if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS) {
             const tempId = attackerId; attackerId = targetId; targetId = tempId;
             finalAttacker = players[attackerId]; finalTarget = players[targetId];
             io.emit('chatMessage', { id: 'SYSTEM', message: `저스트 가드 성공! ${finalAttacker.name}에게 반격했습니다.` });
