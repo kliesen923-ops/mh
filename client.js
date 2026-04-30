@@ -265,7 +265,7 @@ function formatPercentStat(multiplier) {
 
 function getBowProjectileCount(stats) {
     const projectileMultiplier = Number.isFinite(stats && stats.projectile) ? stats.projectile : 1;
-    return Math.max(1, Math.min(5, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2))));
+    return Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)));
 }
 
 function normalizeStats(stats) {
@@ -574,7 +574,7 @@ function startBowShot() {
     if(player.isDodging || player.hp <= 0 || player.isStunned) return;
     const angle = player.aAngle || player.angle;
     const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
-    const totalShots = Math.max(1, Math.min(5, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2))));
+    const totalShots = Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)));
     const spreadStep = Math.min(0.24, Math.max(0.05, 0.05 + (totalShots - 1) * 0.035));
     const centerOffset = (totalShots - 1) / 2;
     for (let i = 0; i < totalShots; i++) {

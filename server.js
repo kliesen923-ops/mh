@@ -176,6 +176,11 @@ function createProjectileId(prefix) {
     return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function getKillLevelGain(victimLevel) {
+    const level = Math.max(1, Math.floor(Number.isFinite(victimLevel) ? victimLevel : 1));
+    return Math.max(1, Math.ceil(level * 0.5));
+}
+
 function applyBowImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
@@ -239,7 +244,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         finalAttacker.kills++;
         updateAccountScore(finalAttacker.accountId, 'kills', 1);
         updateAccountScore(finalTarget.accountId, 'deaths', 1);
-        const levelsGained = Math.max(1, Math.ceil(finalTarget.level * (2 / 3)));
+        const levelsGained = getKillLevelGain(finalTarget.level);
         finalAttacker.level += levelsGained;
         finalAttacker.hp = Math.min(getMaxHpFromStats(finalAttacker.stats), finalAttacker.hp + Math.floor(getMaxHpFromStats(finalAttacker.stats) * 0.5));
         finalAttacker.isUpgrading = true;
@@ -744,8 +749,7 @@ io.on('connection', (socket) => {
                 target.hp = 0; target.deaths++; attacker.kills++;
                 updateAccountScore(attacker.accountId, 'kills', 1);
                 updateAccountScore(target.accountId, 'deaths', 1);
-                let levelsGained = 0;
-                levelsGained = Math.max(1, Math.ceil(target.level * (2 / 3)));
+                const levelsGained = getKillLevelGain(target.level);
                 attacker.level += levelsGained;
                 attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
                 attacker.isUpgrading = true;
