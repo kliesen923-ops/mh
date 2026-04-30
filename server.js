@@ -125,7 +125,7 @@ function createBaseStatsForWeapon(weapon) {
     if (nextWeapon === 'bow') {
         return { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, dodge: 1.0, hp: 90 };
     }
-    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 };
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
 }
 
 function getWeaponAttackProfile(weapon) {
@@ -597,7 +597,7 @@ io.on('connection', (socket) => {
         if (!p) return;
         p.stats = normalizeStats(p.stats);
         if (type === 'dmg') p.stats.dmg += 0.2;
-        else if (type === 'range') p.stats.range += 0.15;
+        else if (type === 'projectile') p.stats.projectile += 0.2;
         else if (type === 'speed') p.stats.speed += 0.25;
         else if (type === 'move') p.stats.move += 0.1;
         else if (type === 'dodge') p.stats.dodge += 0.15;

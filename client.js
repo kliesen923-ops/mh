@@ -3,10 +3,10 @@ const socket = window.io ? io() : { on() {}, emit() {}, id: null };
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 const VIEW_Y_SCALE = 0.7;
 const WEAPON_PRESETS = {
-    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 } },
-    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, hp: 115 } },
-    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, hp: 95 } },
-    bow: { label: '활', stats: { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, dodge: 1.0, hp: 90 } },
+    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
+    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, projectile: 1.0, hp: 115 } },
+    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, projectile: 1.0, hp: 95 } },
+    bow: { label: '활', stats: { dmg: 1.05, range: 1.0, speed: 1.02, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
@@ -45,7 +45,7 @@ const player = {
     isDodging: false, dTimer: 0, dDX: 0, dDY: 0, dodgeCooldown: 0,
     wire: { active: false, kind: 'wire', tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
-    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 },
+    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 },
     skill: 'wire'
 };
 
@@ -88,6 +88,15 @@ function showUpgradeUI() {
     const upgradeOverlay = document.getElementById('overlay-upgrade');
     upgradeOverlay.classList.remove('hidden');
     upgradeOverlay.querySelector('h1').innerText = `LEVEL ${player.level} UP!`;
+    const rangeCard = document.getElementById('upgrade-range-card');
+    const rangeTitle = document.getElementById('upgrade-range-title');
+    const rangeDesc = document.getElementById('upgrade-range-desc');
+    const isBow = normalizeWeapon(player.weapon) === 'bow';
+    if (rangeCard && rangeTitle && rangeDesc) {
+        rangeCard.setAttribute('onclick', isBow ? "selectUpgrade('projectile')" : "selectUpgrade('range')");
+        rangeTitle.textContent = isBow ? '투사체 증가' : '사거리 강화';
+        rangeDesc.innerHTML = isBow ? '활의 화살이<br><b>부채꼴 멀티샷</b>으로 늘어납니다.' : '공격의 도달 범위가 <br><b>15%</b> 증가합니다.';
+    }
     
     Object.keys(keys).forEach(k => keys[k] = false);
     upgradeTimeLeft = 9;
@@ -250,7 +259,7 @@ function formatPercentStat(multiplier) {
 }
 
 function normalizeStats(stats) {
-    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 }, stats || {});
+    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 }, stats || {});
 }
 
 function normalizeWeapon(weapon) {
@@ -533,29 +542,37 @@ function startBowShot() {
     releaseGuardForAction();
     if(player.isDodging || player.hp <= 0 || player.isStunned) return;
     const angle = player.aAngle || player.angle;
-    const edge = getRayCanvasEdge(player.x, player.y, angle);
-    const projectileId = `${myId || 'bow'}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
-    bowProjectiles.push({
-        id: projectileId,
-        originId: myId || '',
-        startX: player.x,
-        startY: player.y,
-        endX: edge.x,
-        endY: edge.y,
-        angle,
-        duration: Math.max(0.18, Math.min(0.8, Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)) * 0.9 / 1000)),
-        progress: 0,
-        reflected: false,
-    });
-    socket.emit('playerBowShot', {
-        projectileId,
-        startX: player.x,
-        startY: player.y,
-        endX: edge.x,
-        endY: edge.y,
-        angle,
-        maxDistance: Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)),
-    });
+    const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
+    const totalShots = Math.max(1, Math.min(5, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2))));
+    const spreadStep = Math.min(0.24, Math.max(0.05, 0.05 + (totalShots - 1) * 0.035));
+    const centerOffset = (totalShots - 1) / 2;
+    for (let i = 0; i < totalShots; i++) {
+        const offset = (i - centerOffset) * spreadStep;
+        const shotAngle = angle + offset;
+        const edge = getRayCanvasEdge(player.x, player.y, shotAngle);
+        const projectileId = `${myId || 'bow'}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}:${i}`;
+        bowProjectiles.push({
+            id: projectileId,
+            originId: myId || '',
+            startX: player.x,
+            startY: player.y,
+            endX: edge.x,
+            endY: edge.y,
+            angle: shotAngle,
+            duration: Math.max(0.18, Math.min(0.8, Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)) * 0.9 / 1000)),
+            progress: 0,
+            reflected: false,
+        });
+        socket.emit('playerBowShot', {
+            projectileId,
+            startX: player.x,
+            startY: player.y,
+            endX: edge.x,
+            endY: edge.y,
+            angle: shotAngle,
+            maxDistance: Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)),
+        });
+    }
 }
 function startWire() {
     if (selectedSkill !== 'wire') {
