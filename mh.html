@@ -632,8 +632,7 @@ function update(dt) {
     } else if(player.isAttacking) {
         player.x += Math.cos(player.aAngle) * 150 * dt; player.y += Math.sin(player.aAngle) * 150 * dt;
     } else if(player.wire.active) {
-        const dx = player.wire.tx - player.x, dy = player.wire.ty - player.y, d = Math.hypot(dx,dy);
-        if(d > 20) { player.x += (dx/d)*1200*dt; player.y += (dy/d)*1200*dt; } else { player.wire.active = false; socket.emit('playerAction', { wire: { active: false } }); }
+        player.animTime = 0;
     } else if(mx !== 0 || my !== 0) {
         player.stats = normalizeStats(player.stats);
         const d = Math.hypot(mx, my), s = (player.isGuarding ? 175 : 350) * player.stats.move * dt;
@@ -726,8 +725,25 @@ function startWire() {
     const tx = player.x + Math.cos(player.angle) * 500, ty = player.y + Math.sin(player.angle) * 500;
     let hitId = null;
     Object.keys(allPlayers).forEach(id => { if(id !== myId && allPlayers[id].hp > 0 && distToSegment({x: player.x, y: player.y}, {x: tx, y: ty}, allPlayers[id]) < 35) hitId = id; });
-    if(hitId) { socket.emit('wireGrabHit', hitId); player.wire.active = true; player.wire.tx = allPlayers[hitId].x; player.wire.ty = allPlayers[hitId].y; socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty } }); setTimeout(() => { player.wire.active = false; socket.emit('playerAction', { wire: { active: false } }); }, 300); }
-    else { player.wire.active = true; player.wire.tx = Math.max(25, Math.min(canvas.width-25, tx)); player.wire.ty = Math.max(25, Math.min(canvas.height-25, ty)); socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty } }); }
+    const clearWire = () => {
+        player.wire.active = false;
+        socket.emit('playerAction', { wire: { active: false } });
+    };
+    if(hitId) {
+        socket.emit('wireGrabHit', hitId);
+        player.wire.active = true;
+        player.wire.tx = allPlayers[hitId].x;
+        player.wire.ty = allPlayers[hitId].y;
+        socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty } });
+        setTimeout(clearWire, 300);
+    }
+    else {
+        player.wire.active = true;
+        player.wire.tx = Math.max(25, Math.min(canvas.width-25, tx));
+        player.wire.ty = Math.max(25, Math.min(canvas.height-25, ty));
+        socket.emit('playerAction', { wire: { active: true, tx: player.wire.tx, ty: player.wire.ty } });
+        setTimeout(clearWire, 200);
+    }
 }
 function distToSegment(p1, p2, p) { const l2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2); if (l2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y); let t = Math.max(0, Math.min(1, ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2)); return Math.hypot(p.x - (p1.x + t * (p2.x - p1.x)), p.y - (p1.y + t * (p2.y - p1.y))); }
 
