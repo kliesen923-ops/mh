@@ -172,7 +172,7 @@
             <div>1타: <b id="damage-basic">10</b></div>
             <div>2타: <b id="damage-second">20</b></div>
             <div>3타: <b id="damage-heavy">35</b></div>
-            <div>사정거리: <b id="range-value">100</b></div>
+            <div>사거리: <b id="range-value">100</b></div>
             <div>공격속도: <b id="attack-speed-value">100</b></div>
             <div>이동속도: <b id="move-speed-value">100</b></div>
         </div>
@@ -360,7 +360,7 @@ function normalizeStats(stats) {
 }
 
 function getEffectiveMoveMultiplier() {
-    const guardMultiplier = player.isGuarding ? (150 / 350) : 1;
+    const guardMultiplier = player.isGuarding ? 0.5 : 1;
     return (Number.isFinite(player.stats.move) ? player.stats.move : 1) * guardMultiplier;
 }
 
@@ -432,7 +432,7 @@ function update(dt) {
         if(d > 20) { player.x += (dx/d)*1200*dt; player.y += (dy/d)*1200*dt; } else { player.wire.active = false; socket.emit('playerAction', { wire: { active: false } }); }
     } else if(mx !== 0 || my !== 0) {
         player.stats = normalizeStats(player.stats);
-        const d = Math.hypot(mx, my), s = (player.isGuarding ? 150 : 350) * player.stats.move * dt;
+        const d = Math.hypot(mx, my), s = (player.isGuarding ? 175 : 350) * player.stats.move * dt;
         player.x += (mx/d) * s; player.y += (my/d) * s; player.angle = Math.atan2(my, mx); player.animTime += dt * 10;
     } else player.animTime = 0;
 
