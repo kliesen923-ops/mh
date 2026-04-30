@@ -27,6 +27,8 @@ let attackSequences = {};
 let attackHitTargets = new Map();
 let healingCross = null;
 let healingCrossTimer = null;
+let giantPotion = null;
+let giantPotionTimer = null;
 const MAX_MOVE_SPEED = 1500;
 const MOVE_TOLERANCE = 80;
 const ATTACK_ARC = Math.PI * 0.65;
@@ -47,6 +49,12 @@ const HEAL_CROSS_SPAWN_DELAY_MS = 18000;
 const HEAL_CROSS_LIFETIME_MS = 12000;
 const HEAL_CROSS_BOUNDS = { xMin: 120, xMax: 1160, yMin: 110, yMax: 530 };
 const HEAL_CROSS_PICKUP_RADIUS = 34;
+const GIANT_POTION_SPAWN_DELAY_MS = 28000;
+const GIANT_POTION_LIFETIME_MS = 14000;
+const GIANT_POTION_BOUNDS = { xMin: 120, xMax: 1160, yMin: 110, yMax: 530 };
+const GIANT_POTION_PICKUP_RADIUS = 36;
+const GIANT_POTION_DURATION_MS = 9000;
+const GIANT_POTION_RECOVERY_STUN_MS = 1000;
 const dbPool = Pool && process.env.DATABASE_URL ? new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
@@ -151,7 +159,7 @@ function isTargetInWeaponAttack(attacker, target) {
     const dx = target.x - attacker.x;
     const dy = target.y - attacker.y;
     const distance = Math.hypot(dx, dy);
-    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1);
+    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackMultiplier(attacker);
     if (distance > attackRange) return false;
     if (sanitizeWeapon(attacker.weapon) === 'spear') {
         const endX = attacker.x + Math.cos(attackAngle) * attackRange;
@@ -183,6 +191,10 @@ function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
 }
 
+function getAttackMultiplier(player) {
+    return Math.max(1, Number.isFinite(player && player.giantAttackMult) ? player.giantAttackMult : 1);
+}
+
 function createProjectileId(prefix) {
     return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -193,6 +205,10 @@ function createUpgradeCounts() {
 
 function emitHealingCrossUpdate() {
     io.emit('healingCrossUpdate', healingCross ? [healingCross] : []);
+}
+
+function emitGiantPotionUpdate() {
+    io.emit('giantPotionUpdate', giantPotion ? [giantPotion] : []);
 }
 
 function spawnHealingCross() {
@@ -216,6 +232,101 @@ function clearHealingCross(scheduleNext = true) {
     healingCross = null;
     emitHealingCrossUpdate();
     if (scheduleNext) scheduleNextHealingCross();
+}
+
+function spawnGiantPotion() {
+    giantPotionTimer = null;
+    giantPotion = {
+        id: createProjectileId('giant'),
+        x: GIANT_POTION_BOUNDS.xMin + Math.random() * (GIANT_POTION_BOUNDS.xMax - GIANT_POTION_BOUNDS.xMin),
+        y: GIANT_POTION_BOUNDS.yMin + Math.random() * (GIANT_POTION_BOUNDS.yMax - GIANT_POTION_BOUNDS.yMin),
+        createdAt: Date.now(),
+        expiresAt: Date.now() + GIANT_POTION_LIFETIME_MS,
+    };
+    emitGiantPotionUpdate();
+}
+
+function scheduleNextGiantPotion(delayMs = GIANT_POTION_SPAWN_DELAY_MS) {
+    if (giantPotionTimer) clearTimeout(giantPotionTimer);
+    giantPotionTimer = setTimeout(spawnGiantPotion, delayMs);
+}
+
+function clearGiantPotion(scheduleNext = true) {
+    giantPotion = null;
+    emitGiantPotionUpdate();
+    if (scheduleNext) scheduleNextGiantPotion();
+}
+
+function endGiantPotion(playerId) {
+    const p = players[playerId];
+    if (!p || !p.giantActive) return;
+    p.giantActive = false;
+    p.giantScale = 1;
+    p.giantAttackMult = 1;
+    p.giantEndsAt = 0;
+    p.giantRecoveryEndsAt = 0;
+    p.giantRecoveryArmed = false;
+    io.emit('statsUpdate', players);
+    const stunEndsAt = Date.now() + GIANT_POTION_RECOVERY_STUN_MS;
+    p.isStunned = true;
+    p.stunEndsAt = stunEndsAt;
+    io.emit('playerStunned', { id: playerId, stunned: true, stunEndsAt, stunMs: GIANT_POTION_RECOVERY_STUN_MS });
+    setTimeout(() => {
+        const current = players[playerId];
+        if (!current) return;
+        current.isStunned = false;
+        current.stunEndsAt = 0;
+        io.emit('playerStunned', { id: playerId, stunned: false, stunEndsAt: 0, stunMs: 0 });
+        io.emit('statsUpdate', players);
+    }, GIANT_POTION_RECOVERY_STUN_MS);
+}
+
+function pickupGiantPotion(playerId) {
+    const p = players[playerId];
+    if (!p || !giantPotion || p.hp <= 0 || p.isSelectingLoadout || p.isUpgrading) return;
+    const distance = Math.hypot(p.x - giantPotion.x, p.y - giantPotion.y);
+    if (distance > GIANT_POTION_PICKUP_RADIUS) return;
+    p.giantActive = true;
+    p.giantScale = 4;
+    p.giantAttackMult = 2;
+    p.giantEndsAt = Date.now() + GIANT_POTION_DURATION_MS;
+    p.giantRecoveryEndsAt = 0;
+    p.giantRecoveryArmed = false;
+    io.emit('statsUpdate', players);
+    clearGiantPotion(true);
+}
+
+function updateGiantPotions() {
+    const now = Date.now();
+    if (giantPotion && now >= giantPotion.expiresAt) {
+        clearGiantPotion(true);
+    }
+    for (const [id, p] of Object.entries(players)) {
+        if (!p || !p.giantActive) continue;
+        if (!p.giantRecoveryArmed && now >= (p.giantEndsAt || 0)) {
+            p.giantRecoveryArmed = true;
+            p.giantActive = false;
+            p.giantScale = 1;
+            p.giantAttackMult = 1;
+            p.giantRecoveryEndsAt = now + GIANT_POTION_RECOVERY_STUN_MS;
+            const stunEndsAt = p.giantRecoveryEndsAt;
+            p.isStunned = true;
+            p.stunEndsAt = stunEndsAt;
+            io.emit('playerStunned', { id, stunned: true, stunEndsAt, stunMs: GIANT_POTION_RECOVERY_STUN_MS });
+            io.emit('statsUpdate', players);
+            setTimeout(() => {
+                const current = players[id];
+                if (!current || !current.giantRecoveryArmed) return;
+                if (Date.now() < (current.giantRecoveryEndsAt || 0)) return;
+                current.isStunned = false;
+                current.stunEndsAt = 0;
+                current.giantRecoveryArmed = false;
+                current.giantRecoveryEndsAt = 0;
+                io.emit('playerStunned', { id, stunned: false, stunEndsAt: 0, stunMs: 0 });
+                io.emit('statsUpdate', players);
+            }, GIANT_POTION_RECOVERY_STUN_MS);
+        }
+    }
 }
 
 function pickupHealingCross(playerId) {
@@ -266,7 +377,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
     const endX = Number.isFinite(payload.endX) ? payload.endX : finalTarget.x;
     const endY = Number.isFinite(payload.endY) ? payload.endY : finalTarget.y;
     const projectileId = String(payload.projectileId || createProjectileId('bow'));
-    const attackRange = getWeaponAttackProfile(finalAttacker.weapon).reach * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.range) ? finalAttacker.stats.range : 1);
+    const attackRange = getWeaponAttackProfile(finalAttacker.weapon).reach * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.range) ? finalAttacker.stats.range : 1) * getAttackMultiplier(finalAttacker);
     if (Math.hypot(finalTarget.x - endX, finalTarget.y - endY) > 26) return;
 
     const angle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
@@ -592,6 +703,12 @@ io.on('connection', (socket) => {
         pendingUpgrades: 0,
         isSelectingLoadout: true,
         upgradeCounts: createUpgradeCounts(),
+        giantActive: false,
+        giantScale: 1,
+        giantAttackMult: 1,
+        giantEndsAt: 0,
+        giantRecoveryEndsAt: 0,
+        giantRecoveryArmed: false,
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
         skill: 'wire',
@@ -601,6 +718,7 @@ io.on('connection', (socket) => {
 
     socket.emit('currentPlayers', players);
     socket.emit('healingCrossUpdate', healingCross ? [healingCross] : []);
+    socket.emit('giantPotionUpdate', giantPotion ? [giantPotion] : []);
     socket.broadcast.emit('newPlayer', players[socket.id]);
 
     socket.on('setName', (name) => {
@@ -815,13 +933,13 @@ io.on('connection', (socket) => {
         if (attacker && sanitizeWeapon(attacker.weapon) === 'bow') return;
         if (attacker && target && target.hp > 0 && !target.isUpgrading && !target.isSelectingLoadout) {
             const now = Date.now();
-            const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1);
+            const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackMultiplier(attacker);
             const canHit = attacker.isAttacking && attacker.attackPhase === 2 && isTargetInWeaponAttack(attacker, target);
             if (!canHit) return;
             if (hasHitTargetThisAttack(socket.id, targetId)) return;
 
             const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
-            let damage = Math.floor(baseDamage * attacker.stats.dmg);
+            let damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
             const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
             const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
             if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.5);
@@ -847,6 +965,12 @@ io.on('connection', (socket) => {
                 target.pendingUpgrades = 0;
                 target.isUpgrading = false;
                 target.isSelectingLoadout = true;
+                target.giantActive = false;
+                target.giantScale = 1;
+                target.giantAttackMult = 1;
+                target.giantEndsAt = 0;
+                target.giantRecoveryEndsAt = 0;
+                target.giantRecoveryArmed = false;
                 io.emit('playerDied', { victimId: targetId, attackerId: socket.id });
                 if (levelsGained > 0) socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
                 setTimeout(() => {
@@ -857,6 +981,12 @@ io.on('connection', (socket) => {
                         players[targetId].isStunned = false;
                         players[targetId].isGuarding = false;
                         players[targetId].isSelectingLoadout = true;
+                        players[targetId].giantActive = false;
+                        players[targetId].giantScale = 1;
+                        players[targetId].giantAttackMult = 1;
+                        players[targetId].giantEndsAt = 0;
+                        players[targetId].giantRecoveryEndsAt = 0;
+                        players[targetId].giantRecoveryArmed = false;
                         io.emit('playerRespawn', players[targetId]);
                     }
                 }, 3000);
@@ -887,4 +1017,6 @@ initDatabase().catch((error) => {
 const PORT = process.env.PORT || 3000;
 scheduleNextHealingCross(8000);
 setInterval(updateHealingCrosses, 100);
+scheduleNextGiantPotion(12000);
+setInterval(updateGiantPotions, 100);
 http.listen(PORT, () => { console.log(`서버 실행 중: ${PORT}`); });

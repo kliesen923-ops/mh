@@ -37,6 +37,7 @@ let ashProjectiles = [];
 let bowProjectiles = [];
 let healingCrosses = [];
 let healingTexts = [];
+let giantPotions = [];
 const keys = {};
 function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
@@ -53,6 +54,11 @@ const player = {
     moveDir: { x: 0, y: 0 }, animTime: 0,
     stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 },
     upgradeCounts: { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 },
+    giantScale: 1,
+    giantAttackMult: 1,
+    giantActive: false,
+    giantEndsAt: 0,
+    giantRecoveryEndsAt: 0,
     skill: 'wire'
 };
 
@@ -67,7 +73,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -135,7 +141,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -144,7 +150,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -177,6 +183,9 @@ socket.on('combatEffect', (effect) => {
 });
 socket.on('healingCrossUpdate', (data) => {
     healingCrosses = Array.isArray(data) ? data : [];
+});
+socket.on('giantPotionUpdate', (data) => {
+    giantPotions = Array.isArray(data) ? data : [];
 });
 socket.on('healFloatingText', (data) => {
     if (!data || !data.playerId) return;
@@ -316,6 +325,14 @@ function getWeaponAttackProfile(weapon) {
 function getEffectiveMoveMultiplier() {
     const guardMultiplier = player.isGuarding ? 0.5 : 1;
     return (Number.isFinite(player.stats.move) ? player.stats.move : 1) * guardMultiplier;
+}
+
+function getAttackMultiplier() {
+    return Math.max(1, Number.isFinite(player.giantAttackMult) ? player.giantAttackMult : 1);
+}
+
+function getVisualScale() {
+    return Math.max(1, Number.isFinite(player.giantScale) ? player.giantScale : 1);
 }
 
 function getUpgradeLevelLabel(type) {
@@ -557,7 +574,7 @@ function updateAttack(dt) {
         } else {
             player.attackTimer = 0.08 / player.stats.speed;
             socket.emit('playerAction', { attackPhase: 2 });
-            const attackRange = getWeaponAttackProfile(player.weapon).reach * player.stats.range;
+            const attackRange = getWeaponAttackProfile(player.weapon).reach * player.stats.range * getAttackMultiplier();
             Object.keys(allPlayers).forEach(id => {
                 if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
             });
@@ -791,8 +808,12 @@ function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
     const profile = getWeaponAttackProfile(weapon);
-    const attackRange = profile.reach * (stats ? stats.range : 1.0);
+    const attackRange = profile.reach * (stats ? stats.range : 1.0) * getAttackMultiplier(p);
     const weaponLength = Math.max(28, attackRange - 28);
+    const bodyScale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
+    const nameOffset = 65 * bodyScale;
+    const hpOffset = 60 * bodyScale;
+    const stunOffset = 82 * bodyScale;
     if(wire && wire.active) {
         const wireProgress = wire.progress ?? 1;
         const tipX = x + (wire.tx - x) * wireProgress;
@@ -814,13 +835,13 @@ function drawCharacter(p, color) {
         ctx.restore();
     }
     if(isGuarding) { const isPerfect = (guardActiveTimer < JUST_GUARD_WINDOW_SEC); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
-    ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
+    ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - nameOffset);
     const maxHp = getMaxHpFromStats(stats);
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
-    ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-60, 50, 6);
-    ctx.fillStyle = isStunned ? "#9b59b6" : (hpRatio > 0.3 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, hpRatio*50, 6);
-    ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-hpOffset, 50, 6);
+    ctx.fillStyle = isStunned ? "#9b59b6" : (hpRatio > 0.3 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-hpOffset, hpRatio*50, 6);
+    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale * VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale * VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
     ctx.save(); let sRot = 0.8;
     let spearPose = 0;
     let bowPose = 0;
@@ -976,8 +997,8 @@ function drawCharacter(p, color) {
             ctx.strokeStyle = "rgba(0,0,0,0.65)";
             ctx.fillStyle = "#ffffff";
             const label = `${stunRemaining.toFixed(1)}초`;
-            ctx.strokeText(label, x, y - 82);
-            ctx.fillText(label, x, y - 82);
+            ctx.strokeText(label, x, y - stunOffset);
+            ctx.fillText(label, x, y - stunOffset);
             ctx.restore();
         }
     }
@@ -1184,6 +1205,96 @@ function drawHealingCrosses() {
     });
 }
 
+function drawGiantPotions() {
+    const now = Date.now();
+    giantPotions.forEach((potion) => {
+        const remaining = Math.max(0, Number(potion.expiresAt || 0) - now);
+        const lifeRatio = Math.max(0, Math.min(1, remaining / 14000));
+        const bob = Math.sin(now / 240 + Number(potion.x || 0) * 0.01) * 4;
+        const blink = remaining <= 3000 ? (Math.floor(now / 120) % 2 === 0) : true;
+        if (!blink) return;
+        const x = Number(potion.x) || 0;
+        const y = Number(potion.y) || 0;
+        ctx.save();
+        ctx.translate(x, y + bob);
+        ctx.scale(1, VIEW_Y_SCALE);
+        ctx.globalAlpha = remaining <= 3000 ? Math.max(0.25, lifeRatio) : 1;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.18)';
+        ctx.shadowBlur = 12;
+
+        ctx.fillStyle = 'rgba(25, 25, 30, 0.95)';
+        if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(-12, -24, 24, 38, 7);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.rect(-12, -24, 24, 38);
+            ctx.fill();
+        }
+
+        ctx.fillStyle = 'rgba(55, 60, 70, 0.96)';
+        if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(-8, -39, 16, 18, 5);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.rect(-8, -39, 16, 18);
+            ctx.fill();
+        }
+
+        ctx.fillStyle = 'rgba(120, 190, 255, 0.95)';
+        ctx.beginPath();
+        ctx.moveTo(-8, -39);
+        ctx.lineTo(8, -39);
+        ctx.lineTo(6, -51);
+        ctx.lineTo(-6, -51);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(10, 10, 10, 0.95)';
+        if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(-13, -6, 26, 16, 4);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.rect(-13, -6, 26, 16);
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-13, -2);
+        ctx.lineTo(13, -2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(235, 235, 235, 0.96)';
+        ctx.beginPath();
+        ctx.arc(0, 1, 4.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-5, 5);
+        ctx.lineTo(5, 5);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(235, 235, 235, 0.96)';
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(235, 235, 235, 0.96)';
+        ctx.beginPath();
+        ctx.arc(-1.8, -0.5, 0.9, 0, Math.PI * 2);
+        ctx.arc(1.8, -0.5, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(120, 255, 170, 0.95)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-14, -25, 28, 39);
+        ctx.restore();
+    });
+}
+
 function drawHealingTexts() {
     healingTexts.forEach((effect) => {
         const p = Math.max(0, Math.min(1, effect.life / effect.maxLife));
@@ -1327,6 +1438,7 @@ function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
     drawHealingCrosses();
+    drawGiantPotions();
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
     drawHealingTexts();
     drawCombatEffects();
