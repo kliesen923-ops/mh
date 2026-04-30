@@ -350,8 +350,9 @@ io.on('connection', (socket) => {
     socket.on('wireGrabHit', (payloadData) => {
         const payload = (payloadData && typeof payloadData === 'object') ? payloadData : { targetId: payloadData };
         let attackerId = socket.id;
+        let targetId = payload.targetId;
         let finalAttacker = players[attackerId];
-        let finalTarget = players[payload.targetId];
+        let finalTarget = players[targetId];
         if (!finalAttacker || !finalTarget || finalTarget.isUpgrading) return;
 
         const now = Date.now();
