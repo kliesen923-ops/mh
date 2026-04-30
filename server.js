@@ -1,9 +1,19 @@
-const express = require('express');
+﻿const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+let Pool = null;
+if (process.env.DATABASE_URL) {
+    try {
+        ({ Pool } = require('pg'));
+    } catch (error) {
+        console.warn('pg module is unavailable:', error.message);
+    }
+}
 
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -12,7 +22,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'mh.html'));
 });
 
-const ACCOUNT_FILE = path.join(__dirname, 'account.txt');
 let players = {};
 let attackSequences = {};
 let attackHitTargets = new Map();
@@ -22,12 +31,10 @@ const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
-
-function ensureAccountFile() {
-    if (!fs.existsSync(ACCOUNT_FILE)) {
-        fs.writeFileSync(ACCOUNT_FILE, '', 'utf8');
-    }
-}
+const dbPool = Pool && process.env.DATABASE_URL ? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+}) : null;
 
 function sanitizeAccountId(value) {
     return String(value || '')
@@ -57,47 +64,81 @@ function sanitizeSkill(value) {
     return 'wire';
 }
 
-function loadAccounts() {
-    ensureAccountFile();
-    const raw = fs.readFileSync(ACCOUNT_FILE, 'utf8').trim();
-    if (!raw) return [];
-    return raw.split(/\r?\n/).map((line) => {
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+    const derived = crypto.scryptSync(String(password || ''), salt, 64).toString('hex');
+    return `${salt}:${derived}`;
+}
+
+function verifyPassword(password, storedHash) {
+    const [salt, derived] = String(storedHash || '').split(':');
+    if (!salt || !derived) return false;
+    const nextDerived = crypto.scryptSync(String(password || ''), salt, 64).toString('hex');
+    const a = Buffer.from(derived, 'hex');
+    const b = Buffer.from(nextDerived, 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+async function initDatabase() {
+    if (!dbPool) return;
+    await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS accounts (
+            id TEXT PRIMARY KEY,
+            nickname TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            kills INTEGER NOT NULL DEFAULT 0,
+            deaths INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    const { rows } = await dbPool.query('SELECT COUNT(*)::int AS count FROM accounts');
+    if ((rows[0] && rows[0].count) > 0) return;
+
+    const legacyFile = path.join(__dirname, 'account.txt');
+    if (!fs.existsSync(legacyFile)) return;
+    const raw = fs.readFileSync(legacyFile, 'utf8').trim();
+    if (!raw) return;
+
+    for (const line of raw.split(/\r?\n/)) {
         const [id, nickname, password, kills, deaths] = line.split(',');
-        return {
-            id: id || '',
-            nickname: nickname || '',
-            password: password || '',
-            kills: Number.parseInt(kills, 10) || 0,
-            deaths: Number.parseInt(deaths, 10) || 0,
-        };
-    }).filter((account) => account.id && account.nickname && account.password);
+        const accountId = sanitizeAccountId(id);
+        const safeNickname = sanitizeName(nickname, '');
+        const safePassword = sanitizeAccountPassword(password);
+        if (!accountId || !safeNickname || !safePassword) continue;
+        await dbPool.query(
+            `INSERT INTO accounts (id, nickname, password_hash, kills, deaths)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (id) DO NOTHING`,
+            [accountId, safeNickname, hashPassword(safePassword), Number.parseInt(kills, 10) || 0, Number.parseInt(deaths, 10) || 0]
+        );
+    }
 }
 
-function saveAccounts(accounts) {
-    const body = accounts.map((account) => [
-        account.id,
-        account.nickname,
-        account.password,
-        Number.isFinite(account.kills) ? account.kills : 0,
-        Number.isFinite(account.deaths) ? account.deaths : 0,
-    ].join(',')).join('\n');
-    fs.writeFileSync(ACCOUNT_FILE, body ? `${body}\n` : '', 'utf8');
-}
-
-function appendAccount(account) {
-    ensureAccountFile();
-    const line = [
-        account.id,
-        account.nickname,
-        account.password,
-        Number.isFinite(account.kills) ? account.kills : 0,
-        Number.isFinite(account.deaths) ? account.deaths : 0,
-    ].join(',');
-    fs.appendFileSync(ACCOUNT_FILE, `${line}\n`, 'utf8');
-}
-
-function findAccountById(id) {
-    return loadAccounts().find((account) => account.id === id);
+function getAccountById(id) {
+    const accountId = sanitizeAccountId(id);
+    if (!accountId) return Promise.resolve(null);
+    if (!dbPool) {
+        const legacyFile = path.join(__dirname, 'account.txt');
+        if (!fs.existsSync(legacyFile)) return Promise.resolve(null);
+        const raw = fs.readFileSync(legacyFile, 'utf8').trim();
+        if (!raw) return Promise.resolve(null);
+        const legacy = raw.split(/\r?\n/).map((line) => {
+            const [rowId, nickname, password, kills, deaths] = line.split(',');
+            return {
+                id: rowId || '',
+                nickname: nickname || '',
+                password_hash: password || '',
+                kills: Number.parseInt(kills, 10) || 0,
+                deaths: Number.parseInt(deaths, 10) || 0,
+            };
+        }).find((account) => account.id === accountId);
+        return Promise.resolve(legacy || null);
+    }
+    return dbPool.query(
+        'SELECT id, nickname, password_hash, kills, deaths FROM accounts WHERE id = $1',
+        [accountId]
+    ).then((result) => result.rows[0] || null);
 }
 
 function createBaseStatsForWeapon(weapon) {
@@ -107,22 +148,23 @@ function createBaseStatsForWeapon(weapon) {
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
 }
 
-function getAccountById(id) {
-    return loadAccounts().find((account) => account.id === id);
-}
-
-function updateAccountScore(accountId, field, delta) {
+async function updateAccountScore(accountId, field, delta) {
     const id = sanitizeAccountId(accountId);
     if (!id || !Number.isFinite(delta)) return null;
-    const accounts = loadAccounts();
-    const account = accounts.find((entry) => entry.id === id);
-    if (!account) return null;
-    account[field] = Math.max(0, (Number.isFinite(account[field]) ? account[field] : 0) + delta);
-    saveAccounts(accounts);
-    return account;
+    if (!dbPool) return null;
+    if (field !== 'kills' && field !== 'deaths') return null;
+    const result = await dbPool.query(
+        `UPDATE accounts
+         SET ${field} = GREATEST(0, ${field} + $1),
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING id, nickname, password_hash, kills, deaths`,
+        [delta, id]
+    );
+    return result.rows[0] || null;
 }
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
     const id = sanitizeAccountId(req.body && req.body.id);
     const nickname = sanitizeName(req.body && req.body.nickname, '');
     const password = sanitizeAccountPassword(req.body && req.body.password);
@@ -130,28 +172,31 @@ app.post('/api/auth/register', (req, res) => {
 
     if (!id || id.length < 2) return res.status(400).json({ ok: false, error: '아이디는 2자 이상이어야 합니다.' });
     if (!nickname || nickname.length < 2) return res.status(400).json({ ok: false, error: '닉네임은 2자 이상이어야 합니다.' });
-    if (!password) return res.status(400).json({ ok: false, error: '비밀번호를 입력하세요.' });
-    if (password !== confirmPassword) return res.status(400).json({ ok: false, error: '비밀번호 확인이 일치하지 않습니다.' });
+    if (!password) return res.status(400).json({ ok: false, error: '비밀번호를 입력해 주세요.' });
+    if (password !== confirmPassword) return res.status(400).json({ ok: false, error: '비밀번호가 일치하지 않습니다.' });
+    if (!dbPool) return res.status(500).json({ ok: false, error: 'DATABASE_URL이 설정되지 않았습니다.' });
 
-    const accounts = loadAccounts();
-    if (accounts.some((account) => account.id === id)) {
-        return res.status(409).json({ ok: false, error: '이미 사용 중인 아이디입니다.' });
-    }
-    if (accounts.some((account) => account.nickname === nickname)) {
-        return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
+    const existing = await dbPool.query('SELECT 1 FROM accounts WHERE id = $1 OR nickname = $2 LIMIT 1', [id, nickname]);
+    if (existing.rowCount > 0) {
+        return res.status(409).json({ ok: false, error: '이미 사용 중인 아이디 또는 닉네임입니다.' });
     }
 
-    appendAccount({ id, nickname, password, kills: 0, deaths: 0 });
+    await dbPool.query(
+        'INSERT INTO accounts (id, nickname, password_hash, kills, deaths) VALUES ($1, $2, $3, 0, 0)',
+        [id, nickname, hashPassword(password)]
+    );
     return res.json({ ok: true, id, nickname });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     const id = sanitizeAccountId(req.body && req.body.id);
     const password = sanitizeAccountPassword(req.body && req.body.password);
-    if (!id || !password) return res.status(400).json({ ok: false, error: '아이디와 비밀번호를 입력하세요.' });
+    if (!id || !password) return res.status(400).json({ ok: false, error: '아이디와 비밀번호를 입력해 주세요.' });
+    if (!dbPool) return res.status(500).json({ ok: false, error: 'DATABASE_URL이 설정되지 않았습니다.' });
 
-    const account = findAccountById(id);
-    if (!account || account.password !== password) {
+    const result = await dbPool.query('SELECT id, nickname, password_hash FROM accounts WHERE id = $1', [id]);
+    const account = result.rows[0];
+    if (!account || !verifyPassword(password, account.password_hash)) {
         return res.status(401).json({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
 
@@ -342,7 +387,7 @@ function sanitizeAction(p, actionData) {
 }
 
 io.on('connection', (socket) => {
-    console.log('플레이어 접속:', socket.id);
+    console.log('???쟿??곷선 ?臾믩꺗:', socket.id);
 
     players[socket.id] = {
         id: socket.id,
@@ -381,10 +426,10 @@ io.on('connection', (socket) => {
         io.emit('statsUpdate', players);
     });
 
-    socket.on('setAccount', (accountId) => {
+    socket.on('setAccount', async (accountId) => {
         const p = players[socket.id];
         if (!p) return;
-        const account = getAccountById(accountId);
+        const account = await getAccountById(accountId);
         if (!account) return;
         p.accountId = account.id;
         p.kills = Number.isFinite(account.kills) ? account.kills : 0;
@@ -495,7 +540,7 @@ io.on('connection', (socket) => {
         if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < 500) {
             const tempId = attackerId; attackerId = targetId; targetId = tempId;
             finalAttacker = players[attackerId]; finalTarget = players[targetId];
-            io.emit('chatMessage', { id: 'SYSTEM', message: `⚔️ ${finalAttacker.name}의 완벽한 반격!` });
+            io.emit('chatMessage', { id: 'SYSTEM', message: `저스트 가드 성공! ${finalAttacker.name}에게 반격했습니다.` });
         }
 
         if (finalAttacker && finalTarget && !finalTarget.isStunned) {
@@ -610,5 +655,9 @@ io.on('connection', (socket) => {
     });
 });
 
+initDatabase().catch((error) => {
+    console.error('Database init failed:', error);
+});
+
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => { console.log(`서버 실행 중: 포트 ${PORT}`); });
+http.listen(PORT, () => { console.log(`서버 실행 중: ${PORT}`); });
