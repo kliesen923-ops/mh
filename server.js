@@ -549,7 +549,7 @@ io.on('connection', (socket) => {
         const nextWeapon = sanitizeWeapon(weapon);
         p.weapon = nextWeapon;
         p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
-        p.hp = Math.min(getMaxHpFromStats(p.stats), p.hp);
+        p.hp = getMaxHpFromStats(p.stats);
         io.emit('statsUpdate', players);
     });
 

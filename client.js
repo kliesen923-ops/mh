@@ -1318,6 +1318,8 @@ function enterGame(nickname, accountId, weapon, skill) {
     if (weapon) {
         player.weapon = normalizeWeapon(weapon);
         player.stats = normalizeStats(createBaseStatsForWeapon(player.weapon));
+        player.maxHp = getMaxHpFromStats(player.stats);
+        player.hp = player.maxHp;
         socket.emit('setWeapon', player.weapon);
     }
     player.skill = normalizeSkill(skill);
