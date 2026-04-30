@@ -14,7 +14,7 @@ const WEAPON_PRESETS = {
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
-    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 16 },
+    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 24 },
     dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
 };
