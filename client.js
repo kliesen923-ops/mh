@@ -3,10 +3,10 @@ const socket = window.io ? io() : { on() {}, emit() {}, id: null };
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 const VIEW_Y_SCALE = 0.7;
 const WEAPON_PRESETS = {
-    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 } },
-    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 } },
-    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96 } },
-    bow: { label: '활', stats: { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98 } },
+    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 } },
+    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, hp: 115 } },
+    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, hp: 95 } },
+    bow: { label: '활', stats: { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
@@ -30,9 +30,12 @@ let combatEffects = [];
 let ashProjectiles = [];
 let bowProjectiles = [];
 const keys = {};
+function getMaxHpFromStats(stats) {
+    return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
+}
 
 const player = {
-    x: 400, y: 300, hp: 100, angle: 0, level: 1,
+    x: 400, y: 300, hp: 100, maxHp: 100, angle: 0, level: 1,
     weapon: 'sword',
     isGuarding: false, guardCooldown: 0, guardActiveTimer: 0,
     isAttacking: false, isStunned: false, comboStep: 0, attackPhase: 0, attackTimer: 0, aAngle: 0,
@@ -50,7 +53,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -105,16 +108,16 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
 socket.on('playerRespawn', (p) => { 
     allPlayers[p.id] = p; 
     if(p.id === myId) { 
-        player.x = p.x; player.y = p.y; player.hp = 100; 
+        player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -245,7 +248,7 @@ function formatPercentStat(multiplier) {
 }
 
 function normalizeStats(stats) {
-    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 }, stats || {});
+    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 }, stats || {});
 }
 
 function normalizeWeapon(weapon) {
@@ -289,9 +292,10 @@ function updateHUD() {
     const heavyDamage = document.getElementById('damage-heavy');
     if (!hpText || !hpFill || !basicDamage || !secondDamage || !heavyDamage) return;
 
+    const maxHp = getMaxHpFromStats(player.stats);
     const hp = Math.max(0, Math.ceil(player.hp || 0));
-    hpText.textContent = `${hp}/100`;
-    hpFill.style.width = `${Math.max(0, Math.min(100, hp))}%`;
+    hpText.textContent = `${hp}/${maxHp}`;
+    hpFill.style.width = `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`;
 
     player.stats = normalizeStats(player.stats);
     const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
@@ -713,8 +717,10 @@ function drawCharacter(p, color) {
     }
     if(isGuarding) { const isPerfect = (guardActiveTimer < 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
     ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
+    const maxHp = getMaxHpFromStats(stats);
+    const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-60, 50, 6);
-    ctx.fillStyle = isStunned ? "#9b59b6" : (hp > 30 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, (hp/100)*50, 6);
+    ctx.fillStyle = isStunned ? "#9b59b6" : (hpRatio > 0.3 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, hpRatio*50, 6);
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
     ctx.save(); let sRot = 0.8;

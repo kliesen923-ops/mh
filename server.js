@@ -115,15 +115,15 @@ function getAccountById(id) {
 function createBaseStatsForWeapon(weapon) {
     const nextWeapon = sanitizeWeapon(weapon);
     if (nextWeapon === 'hammer') {
-        return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 };
+        return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, hp: 115 };
     }
     if (nextWeapon === 'spear') {
-        return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96 };
+        return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, hp: 95 };
     }
     if (nextWeapon === 'bow') {
-        return { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98 };
+        return { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, hp: 90 };
     }
-    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 };
 }
 
 function getWeaponAttackProfile(weapon) {
@@ -164,6 +164,10 @@ async function updateAccountScore(accountId, field, delta) {
         [delta, id]
     );
     return result.rows[0] || null;
+}
+
+function getMaxHpFromStats(stats) {
+    return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
 }
 
 function createProjectileId(prefix) {
@@ -235,7 +239,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         updateAccountScore(finalTarget.accountId, 'deaths', 1);
         const levelsGained = Math.max(1, finalTarget.level - finalAttacker.level);
         finalAttacker.level += levelsGained;
-        finalAttacker.hp = Math.min(100, finalAttacker.hp + 50);
+        finalAttacker.hp = Math.min(getMaxHpFromStats(finalAttacker.stats), finalAttacker.hp + Math.floor(getMaxHpFromStats(finalAttacker.stats) * 0.5));
         finalAttacker.isUpgrading = true;
         finalAttacker.pendingUpgrades += levelsGained;
         finalTarget.level = 1;
@@ -246,7 +250,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         if (levelsGained > 0) io.to(attackerId).emit('levelUp', { newLevel: finalAttacker.level, count: levelsGained });
         setTimeout(() => {
             if (players[targetId]) {
-                players[targetId].hp = 100;
+                players[targetId].hp = getMaxHpFromStats(players[targetId].stats);
                 players[targetId].x = 100 + Math.random() * 800;
                 players[targetId].y = 100 + Math.random() * 500;
                 players[targetId].isStunned = false;
@@ -419,7 +423,7 @@ function hasHitTargetThisAttack(playerId, targetId) {
 }
 
 function createDefaultStats() {
-    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 };
 }
 
 function normalizeStats(stats) {
@@ -491,7 +495,7 @@ io.on('connection', (socket) => {
         weapon: 'sword',
         x: 200 + Math.random() * 600,
         y: 200 + Math.random() * 400,
-        hp: 100,
+        hp: getMaxHpFromStats(createBaseStatsForWeapon('sword')),
         angle: 0,
         kills: 0,
         deaths: 0,
@@ -538,6 +542,7 @@ io.on('connection', (socket) => {
         const nextWeapon = sanitizeWeapon(weapon);
         p.weapon = nextWeapon;
         p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
+        p.hp = Math.min(getMaxHpFromStats(p.stats), p.hp);
         io.emit('statsUpdate', players);
     });
 
@@ -739,7 +744,7 @@ io.on('connection', (socket) => {
                 let levelsGained = 0;
                 levelsGained = Math.max(1, target.level - attacker.level);
                 attacker.level += levelsGained;
-                attacker.hp = Math.min(100, attacker.hp + 50);
+                attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
                 attacker.isUpgrading = true;
                 attacker.pendingUpgrades += levelsGained;
                 target.level = 1;
@@ -750,7 +755,7 @@ io.on('connection', (socket) => {
                 if (levelsGained > 0) socket.emit('levelUp', { newLevel: attacker.level, count: levelsGained });
                 setTimeout(() => {
                     if (players[targetId]) {
-                        players[targetId].hp = 100;
+                        players[targetId].hp = getMaxHpFromStats(players[targetId].stats);
                         players[targetId].x = 100 + Math.random() * 800;
                         players[targetId].y = 100 + Math.random() * 500;
                         players[targetId].isStunned = false;
