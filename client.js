@@ -511,6 +511,8 @@ function updateCooldownUI() {
     updateCooldownButton('btn-dodge', player.dodgeCooldown, 1.0);
     updateCooldownButton('btn-guard', player.guardCooldown, 1.0);
     updateCooldownButton('btn-wire', player.wireCooldown, SKILL_PRESETS[normalizeSkill(player.skill || selectedSkill)]?.cooldown || 1.0);
+    const weapon = normalizeWeapon(player.weapon);
+    updateCooldownButton('btn-ultimate', getUltimateCooldownRemaining(player), ULTIMATE_PRESETS[weapon]?.cooldown || 1.0);
 }
 
 function updateCombatEffects(dt) {
@@ -1971,7 +1973,7 @@ window.addEventListener('mousemove', e => { setMouseAimFromPoint(e.clientX, e.cl
 window.addEventListener('mouseleave', () => { if (aimMode === 'mouse') aimMode = 'none'; });
 const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) return; el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting && !isUpgrading) fn(e); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); el.addEventListener('pointercancel', end); } };
 bind('btn-attack', () => { attackHoldSources.add('button'); beginAttack(); }, () => { attackHoldSources.delete('button'); });
-bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire);
+bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire); bind('btn-ultimate', useUltimate);
 let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateCooldownUI(); draw(); }
 function normalizeNameInput(value) {
     return String(value || '').trim().replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 10);
