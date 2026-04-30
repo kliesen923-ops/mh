@@ -29,6 +29,7 @@ const MAX_MOVE_SPEED = 1500;
 const MOVE_TOLERANCE = 80;
 const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
+const WIRE_STUN_MS = 1500;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
 const ATTACK_PROFILES = {
@@ -656,7 +657,7 @@ io.on('connection', (socket) => {
                             players[targetId].isStunned = false;
                             io.emit('playerStunned', { id: targetId, stunned: false });
                         }
-                    }, 1500);
+                    }, WIRE_STUN_MS);
                 }
             }, 30);
         }
