@@ -54,6 +54,8 @@ const player = {
 function resize() {
     canvas.width = GAME_WIDTH;
     canvas.height = GAME_HEIGHT;
+    const scale = Math.max(0.1, Math.min(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT, 1));
+    document.documentElement.style.setProperty('--game-ui-scale', String(scale));
 }
 window.addEventListener('resize', resize); resize();
 
