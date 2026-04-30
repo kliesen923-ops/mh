@@ -49,7 +49,14 @@ const player = {
     skill: 'wire'
 };
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+function resize() {
+    const width = Math.max(320, Math.floor(Math.min(window.innerWidth, window.innerHeight * 2)));
+    const height = Math.max(160, Math.floor(width / 2));
+    canvas.width = width;
+    canvas.height = height;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+}
 window.addEventListener('resize', resize); resize();
 
 socket.on('connect', () => { myId = socket.id; });
