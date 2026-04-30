@@ -8,11 +8,11 @@
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; touch-action: none; }
         canvas { display: block; background: #1a1a1a; }
-        #hud { position: absolute; top: 20px; left: 20px; width: 154px; background: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 8px; color: white; font-size: 13px; z-index: 500; pointer-events: none; }
+        #hud { position: absolute; top: 20px; left: 20px; width: 182px; background: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 8px; color: white; font-size: 13px; z-index: 500; pointer-events: none; }
         #hp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: bold; }
         #hp-bar { width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
         #hp-fill { height: 100%; width: 100%; background: linear-gradient(to right, #2ecc71, #f1c40f); transition: width 0.2s; }
-        #damage-readout { color: #ddd; line-height: 1.5; }
+        #damage-readout { color: #ddd; line-height: 1.35; display: grid; gap: 2px; }
         #damage-readout b { color: #f1c40f; }
         #leaderboard { position: absolute; top: 20px; right: 20px; width: 210px; max-width: calc(100vw - 40px); box-sizing: border-box; background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 8px; color: white; font-size: 14px; z-index: 500; pointer-events: none; }
         #leaderboard h3 { margin: 0 0 10px 0; font-size: 16px; color: #f1c40f; border-bottom: 1px solid #444; padding-bottom: 5px; }
@@ -56,7 +56,7 @@
             #hud {
                 top: calc(10px + env(safe-area-inset-top));
                 left: 10px;
-                width: min(133px, calc(50vw - 18px));
+                width: min(156px, calc(50vw - 18px));
                 padding: 9px;
                 font-size: 11px;
             }
@@ -109,7 +109,7 @@
         }
 
         @media (max-width: 700px) and (orientation: portrait) {
-            #hud { width: min(133px, calc(50vw - 18px)); }
+            #hud { width: min(156px, calc(50vw - 18px)); }
             #leaderboard { width: min(158px, calc(50vw - 18px)); }
             #chat-container {
                 bottom: calc(158px + env(safe-area-inset-bottom));
@@ -172,6 +172,9 @@
             <div>1타: <b id="damage-basic">10</b></div>
             <div>2타: <b id="damage-second">20</b></div>
             <div>3타: <b id="damage-heavy">35</b></div>
+            <div>사정거리: <b id="range-value">100</b></div>
+            <div>공격속도: <b id="attack-speed-value">100</b></div>
+            <div>이동속도: <b id="move-speed-value">100</b></div>
         </div>
     </div>
     <div id="leaderboard"><h3>RANKING</h3><div id="score-list"></div></div>
@@ -348,8 +351,29 @@ function formatDamage(value) {
     return String(Math.floor(value));
 }
 
+function formatPercentStat(multiplier) {
+    return String(Math.round((Number.isFinite(multiplier) ? multiplier : 1) * 100));
+}
+
 function normalizeStats(stats) {
     return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 }, stats || {});
+}
+
+function getEffectiveMoveMultiplier() {
+    const guardMultiplier = player.isGuarding ? (150 / 350) : 1;
+    return (Number.isFinite(player.stats.move) ? player.stats.move : 1) * guardMultiplier;
+}
+
+function updateCombatReadouts() {
+    const rangeValue = document.getElementById('range-value');
+    const attackSpeedValue = document.getElementById('attack-speed-value');
+    const moveSpeedValue = document.getElementById('move-speed-value');
+    if (!rangeValue || !attackSpeedValue || !moveSpeedValue) return;
+
+    player.stats = normalizeStats(player.stats);
+    rangeValue.textContent = formatPercentStat(player.stats.range);
+    attackSpeedValue.textContent = formatPercentStat(player.stats.speed);
+    moveSpeedValue.textContent = String(Math.round(getEffectiveMoveMultiplier() * 100));
 }
 
 function updateHUD() {
@@ -369,6 +393,7 @@ function updateHUD() {
     basicDamage.textContent = formatDamage(10 * dmgScale);
     secondDamage.textContent = formatDamage(20 * dmgScale);
     heavyDamage.textContent = formatDamage(35 * dmgScale);
+    updateCombatReadouts();
 }
 
 function updateCooldownButton(id, remaining, duration) {
@@ -419,6 +444,7 @@ function update(dt) {
     if(player.dodgeCooldown > 0) player.dodgeCooldown -= dt;
     if(player.wireCooldown > 0) player.wireCooldown -= dt;
     updateCooldownUI();
+    updateCombatReadouts();
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
@@ -498,6 +524,8 @@ window.addEventListener('contextmenu', e => e.preventDefault());
 
 function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats } = p;
+    const attackRange = 85 * (stats ? stats.range : 1.0);
+    const weaponLength = Math.max(28, attackRange - 35);
     if(wire && wire.active) { ctx.save(); ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.moveTo(x, y); ctx.lineTo(wire.tx, wire.ty); ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); }
     if(isGuarding) { const isPerfect = (guardActiveTimer < 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
     ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - 65);
@@ -505,8 +533,8 @@ function drawCharacter(p, color) {
     ctx.fillStyle = isStunned ? "#9b59b6" : (hp > 30 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-60, (hp/100)*50, 6);
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
     ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
-    ctx.save(); let sRot = 0.8; if(isAttacking) { if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5); } else if(isGuarding) sRot = 0.2; ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10); ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7"; ctx.fillRect(35,18,60,10); ctx.restore(); ctx.restore(); ctx.restore();
-    if(isAttacking && attackPhase === 2) { ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.beginPath(); const ba = aAngle || angle; let sA = ba-2.0, eA = ba+0.5; let counter = false; if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; } const visualRange = 75 * (stats ? stats.range : 1.0); ctx.arc(0,0,visualRange,sA,eA,counter); ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.stroke(); ctx.restore(); }
+    ctx.save(); let sRot = 0.8; if(isAttacking) { if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5); } else if(isGuarding) sRot = 0.2; ctx.rotate(sRot); ctx.fillStyle = "#ffdbac"; ctx.fillRect(15,18,20,10); ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7"; ctx.fillRect(35,18,weaponLength,10); ctx.restore(); ctx.restore(); ctx.restore();
+    if(isAttacking && attackPhase === 2) { ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.beginPath(); const ba = aAngle || angle; let sA = ba-2.0, eA = ba+0.5; let counter = false; if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; } ctx.arc(0,0,attackRange,sA,eA,counter); ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.stroke(); ctx.restore(); }
 }
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
