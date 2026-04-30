@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2D 헌터 로그라이크 아레나</title>
+    <title>2D ?뚰꽣 濡쒓렇?쇱씠???꾨젅??/title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; touch-action: none; }
@@ -51,6 +51,20 @@
         #nickname-input:focus { border-color: #f1c40f; box-shadow: 0 0 0 2px rgba(241,196,15,0.2); }
         #nickname-input::placeholder { color: rgba(255,255,255,0.55); }
         #nickname-error { min-height: 18px; color: #e74c3c; font-size: 12px; margin-bottom: 10px; }
+        #overlay-start #nickname-input,
+        #overlay-start #nickname-error,
+        #overlay-start > button[onclick="startGame()"] { display: none !important; }
+        .auth-panel { display: flex; flex-direction: column; align-items: center; width: min(320px, calc(100vw - 32px)); }
+        .auth-panel.hidden { display: none; }
+        .auth-field { width: min(260px, calc(100vw - 40px)); margin: 8px 0; padding: 12px 14px; border: 1px solid #555; border-radius: 8px; background: rgba(255,255,255,0.12); color: white; outline: none; font-size: 16px; text-align: center; box-sizing: border-box; }
+        .auth-field:focus { border-color: #f1c40f; box-shadow: 0 0 0 2px rgba(241,196,15,0.2); }
+        .auth-field::placeholder { color: rgba(255,255,255,0.55); }
+        .start-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .start-btn { min-width: 120px; padding: 14px 22px; border: none; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 16px; color: white; }
+        #btn-login { background: #2ecc71; }
+        #btn-signin { background: #e67e22; }
+        #btn-register { background: #e74c3c; }
+        #btn-back-login { background: #2c3e50; }
 
         @media (max-width: 700px), (max-height: 500px) {
             #hud {
@@ -169,38 +183,55 @@
         <div id="hp-row"><span>HP</span><span id="hp-text">100/100</span></div>
         <div id="hp-bar"><div id="hp-fill"></div></div>
         <div id="damage-readout">
-            <div>1타: <b id="damage-basic">10</b></div>
-            <div>2타: <b id="damage-second">20</b></div>
-            <div>3타: <b id="damage-heavy">35</b></div>
-            <div>사거리: <b id="range-value">100</b></div>
-            <div>공격속도: <b id="attack-speed-value">100</b></div>
-            <div>이동속도: <b id="move-speed-value">100</b></div>
+            <div>1?: <b id="damage-basic">10</b></div>
+            <div>2?: <b id="damage-second">20</b></div>
+            <div>3?: <b id="damage-heavy">35</b></div>
+            <div>?ш굅由? <b id="range-value">100</b></div>
+            <div>怨듦꺽?띾룄: <b id="attack-speed-value">100</b></div>
+            <div>?대룞?띾룄: <b id="move-speed-value">100</b></div>
         </div>
     </div>
     <div id="leaderboard"><h3>RANKING</h3><div id="score-list"></div></div>
-    <div id="chat-container"><div id="chat-messages"></div><div id="chat-input-container"><input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="50"></div></div>
+    <div id="chat-container"><div id="chat-messages"></div><div id="chat-input-container"><input type="text" id="chat-input" placeholder="硫붿떆吏 ?낅젰..." maxlength="50"></div></div>
     <div id="joy-container"><div id="joy-stick"></div></div>
     <div class="action-buttons">
-        <div class="btn" id="btn-wire">그랩</div><div class="btn" id="btn-dodge">회피</div>
-        <div class="btn" id="btn-guard">가드</div><div class="btn" id="btn-attack">공격</div>
+        <div class="btn" id="btn-wire">WIRE</div><div class="btn" id="btn-dodge">DODGE</div>
+        <div class="btn" id="btn-guard">GUARD</div><div class="btn" id="btn-attack">ATTACK</div>
     </div>
     
     <div id="overlay-start" class="overlay">
         <h1>HUNTER ARENA: LEVEL UP</h1>
-        <input id="nickname-input" type="text" maxlength="10" placeholder="닉네임 2~10자" autocomplete="off">
-        <div id="nickname-error"></div>
-        <button onclick="startGame()" style="padding: 15px 40px; background: #e74c3c; color: white; border: none; border-radius: 30px; cursor: pointer; font-weight: bold; font-size: 18px;">참전하기</button>
+        <div id="login-panel" class="auth-panel">
+            <input id="login-id" class="auth-field" type="text" maxlength="20" placeholder="ID" autocomplete="username">
+            <input id="login-password" class="auth-field" type="password" maxlength="32" placeholder="Password" autocomplete="current-password">
+            <div id="login-error" class="nickname-error"></div>
+            <div class="start-actions">
+                <button id="btn-login" class="start-btn" type="button">LOGIN</button>
+                <button id="btn-signin" class="start-btn" type="button">SIGN IN</button>
+            </div>
+        </div>
+        <div id="register-panel" class="auth-panel hidden">
+            <input id="register-id" class="auth-field" type="text" maxlength="20" placeholder="ID" autocomplete="username">
+            <input id="register-nickname" class="auth-field" type="text" maxlength="10" placeholder="Nickname 2~10" autocomplete="nickname">
+            <input id="register-password" class="auth-field" type="password" maxlength="32" placeholder="Password" autocomplete="new-password">
+            <input id="register-password-confirm" class="auth-field" type="password" maxlength="32" placeholder="Confirm Password" autocomplete="new-password">
+            <div id="register-error" class="nickname-error"></div>
+            <div class="start-actions">
+                <button id="btn-register" class="start-btn" type="button">REGISTER</button>
+                <button id="btn-back-login" class="start-btn" type="button">LOGIN</button>
+            </div>
+        </div>
     </div>
 
     <div id="overlay-upgrade" class="overlay hidden">
         <h1 style="color:#f1c40f; text-shadow: 0 0 10px #f1c40f; margin-bottom: 5px;">LEVEL UP!</h1>
-        <p>능력치를 선택하여 더욱 강력해지세요.</p>
-        <div id="upgrade-timer">남은 시간: 9초</div>
+        <p>?λ젰移섎? ?좏깮?섏뿬 ?붿슧 媛뺣젰?댁??몄슂.</p>
+        <div id="upgrade-timer">?⑥? ?쒓컙: 9珥?/div>
         <div id="upgrade-cards">
-            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">⚔️</div><h4>공격력 강화</h4><p>모든 공격의 데미지가 <br><b>20%</b> 상승합니다.</p></div>
-            <div class="card" onclick="selectUpgrade('range')"><div class="icon">📏</div><h4>사거리 강화</h4><p>공격의 리치와 범위가 <br><b>15%</b> 상승합니다.</p></div>
-            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">⚡</div><h4>공격 속도 강화</h4><p>공격 속도가 <br><b>25%</b> 상승합니다.</p></div>
-            <div class="card" onclick="selectUpgrade('move')"><div class="icon">👟</div><h4>이동 속도 강화</h4><p>이동 속도가 <br><b>10%</b> 상승합니다.</p></div>
+            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">?뷂툘</div><h4>怨듦꺽??媛뺥솕</h4><p>紐⑤뱺 怨듦꺽???곕?吏媛 <br><b>20%</b> ?곸듅?⑸땲??</p></div>
+            <div class="card" onclick="selectUpgrade('range')"><div class="icon">?뱩</div><h4>?ш굅由?媛뺥솕</h4><p>怨듦꺽??由ъ튂? 踰붿쐞媛 <br><b>15%</b> ?곸듅?⑸땲??</p></div>
+            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">??/div><h4>怨듦꺽 ?띾룄 媛뺥솕</h4><p>怨듦꺽 ?띾룄媛 <br><b>25%</b> ?곸듅?⑸땲??</p></div>
+            <div class="card" onclick="selectUpgrade('move')"><div class="icon">?몷</div><h4>?대룞 ?띾룄 媛뺥솕</h4><p>?대룞 ?띾룄媛 <br><b>10%</b> ?곸듅?⑸땲??</p></div>
         </div>
     </div>
 
@@ -259,11 +290,11 @@ function showUpgradeUI() {
     Object.keys(keys).forEach(k => keys[k] = false);
     upgradeTimeLeft = 9;
     const timerEl = document.getElementById('upgrade-timer');
-    timerEl.innerText = `남은 시간: ${upgradeTimeLeft}초`;
+    timerEl.innerText = '?⑥? ?쒓컙: ' + upgradeTimeLeft + '珥?';
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
     upgradeTimerInterval = setInterval(() => {
         upgradeTimeLeft--;
-        timerEl.innerText = `남은 시간: ${upgradeTimeLeft}초`;
+        timerEl.innerText = '?⑥? ?쒓컙: ' + upgradeTimeLeft + '珥?';
         if (upgradeTimeLeft <= 0) { clearInterval(upgradeTimerInterval); selectUpgrade('dmg'); }
     }, 1000);
 }
@@ -311,7 +342,7 @@ function updateLeaderboard() {
     table.className = 'score-table';
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['닉네임', '킬', '데스'].forEach(text => {
+    ['NAME', 'KILLS', 'DEATHS'].forEach(text => {
         const th = document.createElement('th');
         th.textContent = text;
         headerRow.appendChild(th);
@@ -565,7 +596,7 @@ function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
     for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
-    if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("패배했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
+    if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?⑤같?덉뒿?덈떎! 3珥???遺?쒗빀?덈떎.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }
 const joyContainer = document.getElementById('joy-container'), joyStick = document.getElementById('joy-stick');
@@ -607,20 +638,125 @@ let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - l
 function normalizeNameInput(value) {
     return String(value || '').trim().replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 10);
 }
-function startGame() {
-    const nicknameInput = document.getElementById('nickname-input');
-    const errorEl = document.getElementById('nickname-error');
-    const nickname = normalizeNameInput(nicknameInput ? nicknameInput.value : '');
-    if (nickname && nickname.length < 2) {
-        if (errorEl) errorEl.textContent = '닉네임은 2자 이상이어야 합니다.';
-        return;
+function normalizeAccountId(value) {
+    return String(value || '').trim().replace(/\s+/g, '').replace(/[,]/g, '').replace(/[^\p{L}\p{N}_.-]/gu, '').slice(0, 20);
+}
+function normalizeAccountPassword(value) {
+    return String(value || '').trim().replace(/[\r\n,]/g, '').slice(0, 32);
+}
+function setAuthMode(mode) {
+    const loginPanel = document.getElementById('login-panel');
+    const registerPanel = document.getElementById('register-panel');
+    if (loginPanel) loginPanel.classList.toggle('hidden', mode !== 'login');
+    if (registerPanel) registerPanel.classList.toggle('hidden', mode !== 'register');
+}
+function setAuthError(target, message) {
+    const errorEl = document.getElementById(target + '-error');
+    if (errorEl) errorEl.textContent = message || '';
+}
+async function postAuth(path, payload) {
+    const response = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+        throw new Error(data.error || '요청을 처리하지 못했습니다.');
     }
-    if (errorEl) errorEl.textContent = '';
+    return data;
+}
+function enterGame(nickname, accountId) {
+    if (accountId) localStorage.setItem('mh_last_login_id', accountId);
     if (nickname) socket.emit('setName', nickname);
     document.getElementById('overlay-start').classList.add('hidden');
     gameState = 'PLAYING';
     requestAnimationFrame(loop);
 }
+async function handleLogin() {
+    const id = normalizeAccountId(document.getElementById('login-id')?.value);
+    const password = normalizeAccountPassword(document.getElementById('login-password')?.value);
+    try {
+        setAuthError('login', '');
+        const result = await postAuth('/api/auth/login', { id, password });
+        enterGame(result.nickname, result.id);
+    } catch (error) {
+        setAuthError('login', error.message);
+    }
+}
+async function handleRegister() {
+    const id = normalizeAccountId(document.getElementById('register-id')?.value);
+    const nickname = normalizeNameInput(document.getElementById('register-nickname')?.value);
+    const password = normalizeAccountPassword(document.getElementById('register-password')?.value);
+    const confirmPassword = normalizeAccountPassword(document.getElementById('register-password-confirm')?.value);
+    try {
+        setAuthError('register', '');
+        const result = await postAuth('/api/auth/register', { id, nickname, password, confirmPassword });
+        setAuthMode('login');
+        const loginId = document.getElementById('login-id');
+        const loginPassword = document.getElementById('login-password');
+        if (loginId) loginId.value = result.id;
+        if (loginPassword) loginPassword.value = '';
+        enterGame(result.nickname, result.id);
+    } catch (error) {
+        setAuthError('register', error.message);
+    }
+}
+function startGame() {
+    handleLogin();
+}
+const savedLoginId = normalizeAccountId(localStorage.getItem('mh_last_login_id') || '');
+if (savedLoginId) {
+    const loginId = document.getElementById('login-id');
+    if (loginId) loginId.value = savedLoginId;
+}
+setAuthMode('login');
+document.getElementById('btn-login')?.addEventListener('click', handleLogin);
+document.getElementById('btn-signin')?.addEventListener('click', () => {
+    setAuthMode('register');
+    setAuthError('register', '');
+});
+document.getElementById('btn-register')?.addEventListener('click', handleRegister);
+document.getElementById('btn-back-login')?.addEventListener('click', () => {
+    setAuthMode('login');
+    setAuthError('login', '');
+});
+document.getElementById('login-id')?.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        handleLogin();
+    }
+});
+document.getElementById('login-password')?.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        handleLogin();
+    }
+});
+document.getElementById('register-id')?.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        handleRegister();
+    }
+});
+document.getElementById('register-nickname')?.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        handleRegister();
+    }
+});
+document.getElementById('register-password')?.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        handleRegister();
+    }
+});
+document.getElementById('register-password-confirm')?.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        handleRegister();
+    }
+});
 </script>
 </body>
 </html>

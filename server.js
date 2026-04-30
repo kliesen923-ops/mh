@@ -2,14 +2,17 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
 const path = require('path');
 
+app.use(express.json());
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'mh.html'));
 });
 
+const ACCOUNT_FILE = path.join(__dirname, 'account.txt');
 let players = {};
 let attackSequences = {};
 let attackHitTargets = new Map();
@@ -19,6 +22,84 @@ const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
+
+function ensureAccountFile() {
+    if (!fs.existsSync(ACCOUNT_FILE)) {
+        fs.writeFileSync(ACCOUNT_FILE, '', 'utf8');
+    }
+}
+
+function sanitizeAccountId(value) {
+    return String(value || '')
+        .trim()
+        .replace(/\s+/g, '')
+        .replace(/[,]/g, '')
+        .replace(/[^\p{L}\p{N}_.-]/gu, '')
+        .slice(0, 20);
+}
+
+function sanitizeAccountPassword(value) {
+    return String(value || '')
+        .trim()
+        .replace(/[\r\n,]/g, '')
+        .slice(0, 32);
+}
+
+function loadAccounts() {
+    ensureAccountFile();
+    const raw = fs.readFileSync(ACCOUNT_FILE, 'utf8').trim();
+    if (!raw) return [];
+    return raw.split(/\r?\n/).map((line) => {
+        const [id, nickname, password] = line.split(',');
+        return { id: id || '', nickname: nickname || '', password: password || '' };
+    }).filter((account) => account.id && account.nickname && account.password);
+}
+
+function saveAccounts(accounts) {
+    const body = accounts.map((account) => [account.id, account.nickname, account.password].join(',')).join('\n');
+    fs.writeFileSync(ACCOUNT_FILE, body ? `${body}\n` : '', 'utf8');
+}
+
+function findAccountById(id) {
+    return loadAccounts().find((account) => account.id === id);
+}
+
+app.post('/api/auth/register', (req, res) => {
+    const id = sanitizeAccountId(req.body && req.body.id);
+    const nickname = sanitizeName(req.body && req.body.nickname, '');
+    const password = sanitizeAccountPassword(req.body && req.body.password);
+    const confirmPassword = sanitizeAccountPassword(req.body && req.body.confirmPassword);
+
+    if (!id || id.length < 2) return res.status(400).json({ ok: false, error: '아이디는 2자 이상이어야 합니다.' });
+    if (!nickname || nickname.length < 2) return res.status(400).json({ ok: false, error: '닉네임은 2자 이상이어야 합니다.' });
+    if (!password) return res.status(400).json({ ok: false, error: '비밀번호를 입력하세요.' });
+    if (password !== confirmPassword) return res.status(400).json({ ok: false, error: '비밀번호 확인이 일치하지 않습니다.' });
+
+    const accounts = loadAccounts();
+    if (accounts.some((account) => account.id === id)) {
+        return res.status(409).json({ ok: false, error: '이미 사용 중인 아이디입니다.' });
+    }
+    if (accounts.some((account) => account.nickname === nickname)) {
+        return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
+    }
+
+    accounts.push({ id, nickname, password });
+    saveAccounts(accounts);
+    return res.json({ ok: true, id, nickname });
+});
+
+app.post('/api/auth/login', (req, res) => {
+    const id = sanitizeAccountId(req.body && req.body.id);
+    const password = sanitizeAccountPassword(req.body && req.body.password);
+    if (!id || !password) return res.status(400).json({ ok: false, error: '아이디와 비밀번호를 입력하세요.' });
+
+    const account = findAccountById(id);
+    if (!account || account.password !== password) {
+        return res.status(401).json({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+    }
+
+    return res.json({ ok: true, id: account.id, nickname: account.nickname });
+});
 
 function getAngleDiff(a1, a2) {
     let diff = a1 - a2;
