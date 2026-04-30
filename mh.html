@@ -225,20 +225,20 @@
 
     <div id="overlay-upgrade" class="overlay hidden">
         <h1 style="color:#f1c40f; text-shadow: 0 0 10px #f1c40f; margin-bottom: 5px;">LEVEL UP!</h1>
-        <p>?λ젰移섎? ?좏깮?섏뿬 ?붿슧 媛뺣젰?댁??몄슂.</p>
-        <div id="upgrade-timer">?⑥? ?쒓컙: 9珥?/div>
+        <p>Choose one upgrade to strengthen your hunter.</p>
+        <div id="upgrade-timer">Upgrade time: 9s</div>
         <div id="upgrade-cards">
-            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">?뷂툘</div><h4>怨듦꺽??媛뺥솕</h4><p>紐⑤뱺 怨듦꺽???곕?吏媛 <br><b>20%</b> ?곸듅?⑸땲??</p></div>
-            <div class="card" onclick="selectUpgrade('range')"><div class="icon">?뱩</div><h4>?ш굅由?媛뺥솕</h4><p>怨듦꺽??由ъ튂? 踰붿쐞媛 <br><b>15%</b> ?곸듅?⑸땲??</p></div>
-            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">??/div><h4>怨듦꺽 ?띾룄 媛뺥솕</h4><p>怨듦꺽 ?띾룄媛 <br><b>25%</b> ?곸듅?⑸땲??</p></div>
-            <div class="card" onclick="selectUpgrade('move')"><div class="icon">?몷</div><h4>?대룞 ?띾룄 媛뺥솕</h4><p>?대룞 ?띾룄媛 <br><b>10%</b> ?곸듅?⑸땲??</p></div>
+            <div class="card" onclick="selectUpgrade('dmg')"><div class="icon">DMG</div><h4>Attack Power</h4><p>All attacks deal <br><b>20%</b> more damage.</p></div>
+            <div class="card" onclick="selectUpgrade('range')"><div class="icon">RNG</div><h4>Range Boost</h4><p>Attack reach increases by <br><b>15%</b>.</p></div>
+            <div class="card" onclick="selectUpgrade('speed')"><div class="icon">SPD</div><h4>Attack Speed</h4><p>Attack speed increases by <br><b>25%</b>.</p></div>
+            <div class="card" onclick="selectUpgrade('move')"><div class="icon">MOV</div><h4>Move Speed</h4><p>Move speed increases by <br><b>10%</b>.</p></div>
         </div>
     </div>
 
     <canvas id="canvas"></canvas>
 
 <script>
-const socket = io();
+const socket = window.io ? io() : { on() {}, emit() {}, id: null };
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 const VIEW_Y_SCALE = 0.7;
 
@@ -290,11 +290,11 @@ function showUpgradeUI() {
     Object.keys(keys).forEach(k => keys[k] = false);
     upgradeTimeLeft = 9;
     const timerEl = document.getElementById('upgrade-timer');
-    timerEl.innerText = '?⑥? ?쒓컙: ' + upgradeTimeLeft + '珥?';
+    timerEl.innerText = 'Upgrade time: ' + upgradeTimeLeft + 's';
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
     upgradeTimerInterval = setInterval(() => {
         upgradeTimeLeft--;
-        timerEl.innerText = '?⑥? ?쒓컙: ' + upgradeTimeLeft + '珥?';
+        timerEl.innerText = 'Upgrade time: ' + upgradeTimeLeft + 's';
         if (upgradeTimeLeft <= 0) { clearInterval(upgradeTimerInterval); selectUpgrade('dmg'); }
     }, 1000);
 }
