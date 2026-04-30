@@ -1052,8 +1052,7 @@ function drawCombatEffects() {
 }
 
 function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
-    const length = Math.max(20, Math.hypot(tipX - originX, tipY - originY));
-    const crystalScale = 0.78 + Math.min(0.3, progress * 0.16);
+    const crystalScale = 0.92;
     ctx.save();
     ctx.translate(tipX, tipY);
     ctx.rotate(angle);
@@ -1065,9 +1064,9 @@ function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(-10, -4);
-    ctx.lineTo(-20, 0);
-    ctx.lineTo(-10, 4);
+    ctx.lineTo(-11, -4);
+    ctx.lineTo(-18, 0);
+    ctx.lineTo(-11, 4);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -1075,7 +1074,7 @@ function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
     ctx.beginPath();
     ctx.moveTo(-2, 0);
     ctx.lineTo(-16, -2.4);
-    ctx.lineTo(-length * 0.7, 0);
+    ctx.lineTo(-34, 0);
     ctx.lineTo(-16, 2.4);
     ctx.closePath();
     ctx.fill();
@@ -1083,9 +1082,9 @@ function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
     ctx.fillStyle = 'rgba(195, 245, 255, 0.95)';
     ctx.beginPath();
     ctx.moveTo(-6, 0);
-    ctx.lineTo(-11, -1.6);
-    ctx.lineTo(-15, 0);
-    ctx.lineTo(-11, 1.6);
+    ctx.lineTo(-10, -1.4);
+    ctx.lineTo(-14, 0);
+    ctx.lineTo(-10, 1.4);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
