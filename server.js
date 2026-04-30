@@ -91,50 +91,12 @@ async function initDatabase() {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     `);
-
-    const { rows } = await dbPool.query('SELECT COUNT(*)::int AS count FROM accounts');
-    if ((rows[0] && rows[0].count) > 0) return;
-
-    const legacyFile = path.join(__dirname, 'account.txt');
-    if (!fs.existsSync(legacyFile)) return;
-    const raw = fs.readFileSync(legacyFile, 'utf8').trim();
-    if (!raw) return;
-
-    for (const line of raw.split(/\r?\n/)) {
-        const [id, nickname, password, kills, deaths] = line.split(',');
-        const accountId = sanitizeAccountId(id);
-        const safeNickname = sanitizeName(nickname, '');
-        const safePassword = sanitizeAccountPassword(password);
-        if (!accountId || !safeNickname || !safePassword) continue;
-        await dbPool.query(
-            `INSERT INTO accounts (id, nickname, password_hash, kills, deaths)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (id) DO NOTHING`,
-            [accountId, safeNickname, hashPassword(safePassword), Number.parseInt(kills, 10) || 0, Number.parseInt(deaths, 10) || 0]
-        );
-    }
 }
 
 function getAccountById(id) {
     const accountId = sanitizeAccountId(id);
     if (!accountId) return Promise.resolve(null);
-    if (!dbPool) {
-        const legacyFile = path.join(__dirname, 'account.txt');
-        if (!fs.existsSync(legacyFile)) return Promise.resolve(null);
-        const raw = fs.readFileSync(legacyFile, 'utf8').trim();
-        if (!raw) return Promise.resolve(null);
-        const legacy = raw.split(/\r?\n/).map((line) => {
-            const [rowId, nickname, password, kills, deaths] = line.split(',');
-            return {
-                id: rowId || '',
-                nickname: nickname || '',
-                password_hash: password || '',
-                kills: Number.parseInt(kills, 10) || 0,
-                deaths: Number.parseInt(deaths, 10) || 0,
-            };
-        }).find((account) => account.id === accountId);
-        return Promise.resolve(legacy || null);
-    }
+    if (!dbPool) return Promise.resolve(null);
     return dbPool.query(
         'SELECT id, nickname, password_hash, kills, deaths FROM accounts WHERE id = $1',
         [accountId]
@@ -387,7 +349,7 @@ function sanitizeAction(p, actionData) {
 }
 
 io.on('connection', (socket) => {
-    console.log('???쟿??곷선 ?臾믩꺗:', socket.id);
+    console.log('새 플레이어 연결:', socket.id);
 
     players[socket.id] = {
         id: socket.id,
