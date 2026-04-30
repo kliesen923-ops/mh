@@ -87,11 +87,11 @@
         #btn-back-login { background: #2c3e50; }
         #btn-weapon-confirm, #btn-skill-confirm { background: #2ecc71; }
         #btn-weapon-back, #btn-skill-back { background: #2c3e50; }
-        .weapon-panel { display: flex; flex-direction: column; align-items: center; width: min(560px, calc(100vw - 24px)); }
+        .weapon-panel { display: flex; flex-direction: column; align-items: center; width: min(720px, calc(100vw - 24px)); }
         .weapon-panel.hidden { display: none; }
-        .weapon-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 18px 0 16px; }
+        .weapon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 18px 0 16px; }
         .weapon-card {
-            min-height: 190px;
+            min-height: 200px;
             border: 2px solid rgba(255,255,255,0.18);
             border-radius: 12px;
             background: rgba(255,255,255,0.06);
@@ -300,7 +300,7 @@
         </div>
         <div id="weapon-panel" class="weapon-panel hidden">
             <h2 style="margin: 0; color: #f1c40f;">무기군 선택</h2>
-            <div id="weapon-note">한손검 또는 망치를 선택하세요.</div>
+            <div id="weapon-note">한손검, 망치, 창 중 하나를 선택하세요.</div>
             <div class="weapon-grid">
                 <div class="weapon-card selected" data-weapon="sword" role="button" tabindex="0">
                     <div class="weapon-icon" aria-hidden="true">
@@ -325,6 +325,18 @@
                     </div>
                     <h4>망치</h4>
                     <p>압도적인 한 방을 내지만<br>공격속도와 사거리가 크게 떨어집니다.</p>
+                </div>
+                <div class="weapon-card" data-weapon="spear" role="button" tabindex="0">
+                    <div class="weapon-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M4 18L18 4" />
+                            <path d="M15 4h5v5" />
+                            <path d="M3 19l4-1 1-4" />
+                            <path d="M9 13l3 3" />
+                        </svg>
+                    </div>
+                    <h4>창</h4>
+                    <p>휘두르기 없이 길게 찌릅니다.<br>사거리가 길고 선이 좁습니다.</p>
                 </div>
             </div>
             <div class="start-actions">
@@ -430,6 +442,12 @@ const VIEW_Y_SCALE = 0.7;
 const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 } },
     hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 } },
+    spear: { label: '창', stats: { dmg: 1.24, range: 1.18, speed: 0.9, move: 0.96 } },
+};
+const ATTACK_PROFILES = {
+    sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
+    hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
+    spear: { reach: 102, arc: Math.PI * 0.14, lineWidth: 12 },
 };
 const SKILL_PRESETS = {
     wire: { label: '땡겨', cooldown: 1.0 },
@@ -631,7 +649,7 @@ function normalizeStats(stats) {
 }
 
 function normalizeWeapon(weapon) {
-    return weapon === 'hammer' ? 'hammer' : 'sword';
+    return weapon === 'hammer' ? 'hammer' : (weapon === 'spear' ? 'spear' : 'sword');
 }
 
 function createBaseStatsForWeapon(weapon) {
@@ -640,6 +658,10 @@ function createBaseStatsForWeapon(weapon) {
 
 function getWeaponLabel(weapon) {
     return WEAPON_PRESETS[normalizeWeapon(weapon)].label;
+}
+
+function getWeaponAttackProfile(weapon) {
+    return ATTACK_PROFILES[normalizeWeapon(weapon)] || ATTACK_PROFILES.sword;
 }
 
 function getEffectiveMoveMultiplier() {
@@ -782,7 +804,7 @@ function updateAttack(dt) {
     if(player.attackPhase === 1 && player.attackTimer <= 0) {
         player.attackPhase = 2; player.attackTimer = 0.08 / player.stats.speed;
         socket.emit('playerAction', { attackPhase: 2 });
-        const attackRange = 85 * player.stats.range;
+        const attackRange = getWeaponAttackProfile(player.weapon).reach * player.stats.range;
         Object.keys(allPlayers).forEach(id => {
             if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
         });
@@ -793,11 +815,18 @@ function updateAttack(dt) {
 function isTargetInAttackArc(target, range) {
     const dx = target.x - player.x;
     const dy = target.y - player.y;
+    const profile = getWeaponAttackProfile(player.weapon);
     if (Math.hypot(dx, dy) > range) return false;
+    const attackAngle = player.aAngle || player.angle;
+    if (normalizeWeapon(player.weapon) === 'spear') {
+        const endX = player.x + Math.cos(attackAngle) * range;
+        const endY = player.y + Math.sin(attackAngle) * range;
+        return distToSegment({ x: player.x, y: player.y }, { x: endX, y: endY }, target) <= profile.lineWidth;
+    }
     if (player.comboStep === 3) return true;
     const targetAngle = Math.atan2(dy, dx);
-    const diff = getAngleDiff(player.aAngle || player.angle, targetAngle);
-    return diff <= Math.PI * 0.65;
+    const diff = getAngleDiff(attackAngle, targetAngle);
+    return diff <= profile.arc;
 }
 
 function getAngleDiff(a1, a2) {
@@ -969,8 +998,9 @@ window.addEventListener('contextmenu', e => e.preventDefault());
 function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats } = p;
     const weapon = normalizeWeapon(p.weapon);
-    const attackRange = 85 * (stats ? stats.range : 1.0);
-    const weaponLength = Math.max(28, attackRange - 35);
+    const profile = getWeaponAttackProfile(weapon);
+    const attackRange = profile.reach * (stats ? stats.range : 1.0);
+    const weaponLength = Math.max(28, attackRange - 28);
     if(wire && wire.active) {
         const wireProgress = wire.progress ?? 1;
         const tipX = x + (wire.tx - x) * wireProgress;
@@ -1006,12 +1036,56 @@ function drawCharacter(p, color) {
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35 + handleLength - 2, 12, headSize, 26);
         ctx.fillRect(35 + handleLength + headSize - 4, 11, 5, 28);
+    } else if (weapon === 'spear') {
+        const shaftLength = Math.max(30, weaponLength);
+        const tipLength = Math.max(16, Math.min(28, shaftLength * 0.18));
+        ctx.fillStyle = "#7b5a3a";
+        ctx.fillRect(35, 20, shaftLength, 6);
+        ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
+        ctx.beginPath();
+        ctx.moveTo(35 + shaftLength, 23);
+        ctx.lineTo(35 + shaftLength + tipLength, 15);
+        ctx.lineTo(35 + shaftLength + tipLength, 31);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(35 + shaftLength - 3, 21, 4, 4);
     } else {
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35,18,weaponLength,10);
     }
     ctx.restore(); ctx.restore(); ctx.restore();
-    if(isAttacking && attackPhase === 2) { ctx.save(); ctx.translate(x, y); ctx.scale(1, VIEW_Y_SCALE); ctx.beginPath(); const ba = aAngle || angle; let sA = ba-2.0, eA = ba+0.5; let counter = false; if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; } ctx.arc(0,0,attackRange,sA,eA,counter); ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.stroke(); ctx.restore(); }
+    if(isAttacking && attackPhase === 2) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(1, VIEW_Y_SCALE);
+        const ba = aAngle || angle;
+        if (weapon === 'spear') {
+            const tipX = Math.cos(ba) * attackRange;
+            const tipY = Math.sin(ba) * attackRange;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(tipX, tipY);
+            ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.85)":"rgba(255,255,255,0.85)";
+            ctx.lineWidth = profile.lineWidth;
+            ctx.lineCap = "round";
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
+            ctx.fillStyle = comboStep===3?"rgba(255,200,0,0.95)":"rgba(255,255,255,0.9)";
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            let sA = ba-2.0, eA = ba+0.5; let counter = false;
+            if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; }
+            ctx.arc(0,0,attackRange,sA,eA,counter);
+            ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)";
+            ctx.lineWidth = 20;
+            ctx.lineCap = "round";
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
 }
 
 function drawCombatEffects() {
@@ -1036,6 +1110,18 @@ function drawCombatEffects() {
             }
             ctx.beginPath();
             ctx.arc(0, 0, 10 + (1 - t) * 8, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (effect.weapon === 'spear') {
+            const burst = 26 + (1 - t) * 22;
+            ctx.strokeStyle = 'rgba(255, 240, 180, 0.95)';
+            ctx.fillStyle = 'rgba(241, 196, 15, 0.55)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(effect.angle) * burst, Math.sin(effect.angle) * burst);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(Math.cos(effect.angle) * burst, Math.sin(effect.angle) * burst, 6, 0, Math.PI * 2);
             ctx.fill();
         } else if (effect.weapon === 'ash') {
             const burst = 18 + (1 - t) * 24;
@@ -1243,7 +1329,7 @@ function setAuthError(target, message) {
 }
 function setWeaponError(message) {
     const errorEl = document.getElementById('weapon-note');
-    if (errorEl) errorEl.textContent = message || '한손검 또는 망치를 선택하세요.';
+    if (errorEl) errorEl.textContent = message || '한손검, 망치, 창 중 하나를 선택하세요.';
 }
 function setSkillError(message) {
     const errorEl = document.getElementById('skill-note');

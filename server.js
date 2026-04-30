@@ -31,6 +31,11 @@ const ATTACK_ARC = Math.PI * 0.65;
 const WIRE_COOLDOWN_MS = 900;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
+const ATTACK_PROFILES = {
+    sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
+    hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
+    spear: { reach: 102, arc: Math.PI * 0.14, lineWidth: 12 },
+};
 const dbPool = Pool && process.env.DATABASE_URL ? new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
@@ -55,6 +60,7 @@ function sanitizeAccountPassword(value) {
 function sanitizeWeapon(value) {
     const weapon = String(value || '').trim().toLowerCase();
     if (weapon === 'hammer') return 'hammer';
+    if (weapon === 'spear') return 'spear';
     return 'sword';
 }
 
@@ -104,10 +110,37 @@ function getAccountById(id) {
 }
 
 function createBaseStatsForWeapon(weapon) {
-    if (sanitizeWeapon(weapon) === 'hammer') {
+    const nextWeapon = sanitizeWeapon(weapon);
+    if (nextWeapon === 'hammer') {
         return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 };
     }
+    if (nextWeapon === 'spear') {
+        return { dmg: 1.24, range: 1.18, speed: 0.9, move: 0.96 };
+    }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
+}
+
+function getWeaponAttackProfile(weapon) {
+    return ATTACK_PROFILES[sanitizeWeapon(weapon)] || ATTACK_PROFILES.sword;
+}
+
+function isTargetInWeaponAttack(attacker, target) {
+    if (!attacker || !target) return false;
+    const profile = getWeaponAttackProfile(attacker.weapon);
+    const attackAngle = Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle;
+    const dx = target.x - attacker.x;
+    const dy = target.y - attacker.y;
+    const distance = Math.hypot(dx, dy);
+    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1);
+    if (distance > attackRange) return false;
+    if (sanitizeWeapon(attacker.weapon) === 'spear') {
+        const endX = attacker.x + Math.cos(attackAngle) * attackRange;
+        const endY = attacker.y + Math.sin(attackAngle) * attackRange;
+        return distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) <= profile.lineWidth;
+    }
+    if (attacker.comboStep === 3) return true;
+    const targetAngle = Math.atan2(dy, dx);
+    return getAngleDiff(attackAngle, targetAngle) <= profile.arc;
 }
 
 async function updateAccountScore(accountId, field, delta) {
@@ -547,15 +580,8 @@ io.on('connection', (socket) => {
         const target = players[targetId];
         if (attacker && target && target.hp > 0 && !target.isUpgrading) {
             const now = Date.now();
-            const attackRange = 85 * attacker.stats.range;
-            const dx = target.x - attacker.x;
-            const dy = target.y - attacker.y;
-            const distance = Math.hypot(dx, dy);
-            const targetAngle = Math.atan2(dy, dx);
-            const attackAngle = Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle;
-            const inArc = getAngleDiff(attackAngle, targetAngle) <= ATTACK_ARC;
-            const hasValidAngle = attacker.comboStep === 3 || inArc;
-            const canHit = attacker.isAttacking && attacker.attackPhase === 2 && distance <= attackRange && hasValidAngle;
+            const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1);
+            const canHit = attacker.isAttacking && attacker.attackPhase === 2 && isTargetInWeaponAttack(attacker, target);
             if (!canHit) return;
             if (hasHitTargetThisAttack(socket.id, targetId)) return;
 
@@ -567,7 +593,7 @@ io.on('connection', (socket) => {
             io.emit('combatEffect', {
                 x: target.x,
                 y: target.y,
-                angle: attackAngle,
+                angle: Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle,
                 weapon: attacker.weapon || 'sword',
             });
             target.hp -= damage;
