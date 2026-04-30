@@ -23,6 +23,13 @@ const SKILL_PRESETS = {
     ash: { label: '애쉬궁', cooldown: 2.0 },
     gear: { label: '입체기동', cooldown: 3.0 },
 };
+const ULTIMATE_PRESETS = {
+    sword: { cooldown: 11.0, duration: 1.2 },
+    hammer: { cooldown: 13.0, duration: 0.7 },
+    spear: { cooldown: 15.0, duration: 2.2 },
+    bow: { cooldown: 14.0, duration: 0.8 },
+    dual: { cooldown: 14.0, duration: 4.0 },
+};
 const DUAL_RUSH_WINDUP_SEC = 0.18;
 const DUAL_RUSH_SLASH_INTERVAL_SEC = 0.025;
 const DUAL_RUSH_SLASH_COUNT = 10;
@@ -39,6 +46,7 @@ let selectedSkill = 'wire';
 let combatEffects = [];
 let ashProjectiles = [];
 let bowProjectiles = [];
+let dragonProjectiles = [];
 let healingCrosses = [];
 let healingTexts = [];
 let giantPotions = [];
@@ -65,6 +73,18 @@ function createDefaultGearRush() {
     };
 }
 
+function createDefaultUltimate() {
+    return {
+        active: false,
+        type: '',
+        startAt: 0,
+        endsAt: 0,
+        cooldownEndsAt: 0,
+        radius: 0,
+        extra: 0,
+    };
+}
+
 const player = {
     x: 400, y: 300, hp: 100, maxHp: 100, angle: 0, level: 1,
     weapon: 'sword',
@@ -82,6 +102,7 @@ const player = {
     giantEndsAt: 0,
     giantRecoveryEndsAt: 0,
     gearRush: createDefaultGearRush(),
+    ultimate: createDefaultUltimate(),
     skill: 'wire'
 };
 
@@ -96,7 +117,7 @@ window.addEventListener('resize', resize); resize();
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), data[myId].ultimate || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -106,7 +127,13 @@ socket.on('playerMoved', (p) => {
         if(p.id === myId && player.isStunned) { player.x = p.x; player.y = p.y; }
     } 
 });
-socket.on('playerActionUpdate', (data) => { if(allPlayers[data.id]) Object.assign(allPlayers[data.id], data.action); });
+socket.on('playerActionUpdate', (data) => {
+    if (!data || !data.action) return;
+    if (allPlayers[data.id]) Object.assign(allPlayers[data.id], data.action);
+    if (data.id === myId && data.action.ultimate) {
+        player.ultimate = Object.assign(createDefaultUltimate(), data.action.ultimate || {});
+    }
+});
 socket.on('playerStunned', (data) => {
     if(allPlayers[data.id]) {
         allPlayers[data.id].isStunned = data.stunned;
@@ -164,7 +191,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), data[myId].ultimate || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -173,7 +200,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), p.gearRush || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), p.gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), p.ultimate || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -252,6 +279,21 @@ socket.on('bowProjectile', (effect) => {
     const existingIndex = bowProjectiles.findIndex((p) => p.id === projectile.id);
     if (existingIndex >= 0) bowProjectiles[existingIndex] = projectile;
     else bowProjectiles.push(projectile);
+});
+socket.on('dragonProjectile', (effect) => {
+    if (!effect) return;
+    dragonProjectiles.push({
+        id: String(effect.projectileId || `${effect.originId || 'dragon'}:${Date.now()}`),
+        originId: String(effect.originId || ''),
+        startX: Number(effect.startX) || 0,
+        startY: Number(effect.startY) || 0,
+        endX: Number(effect.endX) || 0,
+        endY: Number(effect.endY) || 0,
+        angle: Number(effect.angle) || 0,
+        progress: 0,
+        duration: Math.max(220, Number(effect.duration) || 600),
+        reflected: Boolean(effect.reflected),
+    });
 });
 socket.on('bowProjectileResolved', (effect) => {
     if (!effect) return;
@@ -345,6 +387,16 @@ function getWeaponAttackProfile(weapon) {
     return ATTACK_PROFILES[normalizeWeapon(weapon)] || ATTACK_PROFILES.sword;
 }
 
+function getUltimateState(sourcePlayer) {
+    return Object.assign(createDefaultUltimate(), sourcePlayer && sourcePlayer.ultimate ? sourcePlayer.ultimate : {});
+}
+
+function getUltimateSpeedMultiplier(sourcePlayer) {
+    const ultimate = getUltimateState(sourcePlayer);
+    if (ultimate.active && ultimate.type === 'dual') return 1.9;
+    return 1;
+}
+
 function getEffectiveMoveMultiplier() {
     const guardMultiplier = player.isGuarding ? 0.5 : 1;
     return (Number.isFinite(player.stats.move) ? player.stats.move : 1) * guardMultiplier;
@@ -358,14 +410,18 @@ function getEffectiveAttackRange(weapon, stats, sourcePlayer) {
     const profile = getWeaponAttackProfile(weapon);
     const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;
     const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
-    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale);
+    const ultimate = getUltimateState(sourcePlayer);
+    const ultimateRangeMult = ultimate.active && ultimate.type === 'dual' ? 1.45 : 1;
+    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale) * ultimateRangeMult;
 }
 
 function getVisualAttackRange(weapon, stats, sourcePlayer) {
     const profile = getWeaponAttackProfile(weapon);
     const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;
     const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
-    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale);
+    const ultimate = getUltimateState(sourcePlayer);
+    const ultimateRangeMult = ultimate.active && ultimate.type === 'dual' ? 1.45 : 1;
+    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale) * ultimateRangeMult;
 }
 
 function getBowProjectileBonus(sourcePlayer) {
@@ -504,6 +560,13 @@ function updateBowProjectiles(dt) {
                 return false;
             }
         }
+        return effect.progress < 1;
+    });
+}
+
+function updateDragonProjectiles(dt) {
+    dragonProjectiles = dragonProjectiles.filter((effect) => {
+        effect.progress = Math.min(1, (effect.progress || 0) + dt / Math.max(0.001, (effect.duration || 0.6) / 1000));
         return effect.progress < 1;
     });
 }
@@ -675,6 +738,7 @@ function update(dt) {
     updateCombatEffects(dt);
     updateAshProjectiles(dt);
     updateBowProjectiles(dt);
+    updateDragonProjectiles(dt);
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
@@ -708,24 +772,25 @@ function update(dt) {
 
 function updateAttack(dt) {
     player.attackTimer -= dt;
+    const speedMult = getUltimateSpeedMultiplier(player);
     if(player.attackPhase === 1 && player.attackTimer <= 0) {
         player.attackPhase = 2;
         if (normalizeWeapon(player.weapon) === 'bow') {
-            player.attackTimer = 0.05 / player.stats.speed;
+            player.attackTimer = 0.05 / (player.stats.speed * speedMult);
             socket.emit('playerAction', { attackPhase: 2 });
             if (!player.bowShotFired) {
                 startBowShot();
                 player.bowShotFired = true;
             }
         } else {
-            player.attackTimer = 0.08 / player.stats.speed;
+            player.attackTimer = 0.08 / (player.stats.speed * speedMult);
             socket.emit('playerAction', { attackPhase: 2 });
             const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
             Object.keys(allPlayers).forEach(id => {
                 if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
             });
         }
-    } else if(player.attackPhase === 2 && player.attackTimer <= 0) { player.attackPhase = 3; player.attackTimer = 0.15 / player.stats.speed; socket.emit('playerAction', { attackPhase: 3 }); }
+    } else if(player.attackPhase === 2 && player.attackTimer <= 0) { player.attackPhase = 3; player.attackTimer = 0.15 / (player.stats.speed * speedMult); socket.emit('playerAction', { attackPhase: 3 }); }
     else if(player.attackPhase === 3 && player.attackTimer <= 0) { endAttack(); }
 }
 
@@ -771,6 +836,31 @@ function beginAttack() {
     player.aAngle = player.angle;
     player.bowShotFired = false;
     socket.emit('playerAction', { isAttacking: true, comboStep: player.comboStep, attackPhase: 1, aAngle: player.aAngle });
+}
+function canUseUltimate() {
+    return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned;
+}
+function getUltimateCooldownRemaining(sourcePlayer) {
+    const ultimate = getUltimateState(sourcePlayer);
+    return Math.max(0, (ultimate.cooldownEndsAt || 0) - Date.now());
+}
+function useUltimate() {
+    if (!canUseUltimate()) return;
+    const weapon = normalizeWeapon(player.weapon);
+    const config = ULTIMATE_PRESETS[weapon];
+    if (!config) return;
+    if (getUltimateCooldownRemaining(player) > 0) return;
+    player.ultimate = {
+        active: true,
+        type: weapon,
+        startAt: Date.now(),
+        endsAt: Date.now() + Math.round(config.duration * 1000),
+        cooldownEndsAt: Date.now() + Math.round(config.cooldown * 1000),
+        radius: weapon === 'spear' ? 180 : 0,
+        extra: 0,
+    };
+    updateHUD();
+    socket.emit('useUltimate', { weapon });
 }
 function isAttackHeld() { return attackHoldSources.size > 0; }
 function endAttack() {
@@ -1064,7 +1154,8 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Enter') { if (!isChatting) { isChatting = true; document.getElementById('chat-container').classList.add('active'); document.getElementById('chat-input-container').style.display = 'block'; Object.keys(keys).forEach(k => keys[k] = false); setTimeout(() => document.getElementById('chat-input').focus(), 10); e.preventDefault(); } return; }
     if (player.hp <= 0 || player.isStunned) return;
     keys[e.code] = true; if(e.code === 'Space') startDodge(); if(e.code === 'ShiftLeft') startGuard();
-    if(e.code === 'KeyR' || e.code === 'KeyF') beginAttack();
+    if(e.code === 'KeyR') useUltimate();
+    if(e.code === 'KeyF') beginAttack();
 });
 document.getElementById('chat-input').addEventListener('keydown', e => { if (e.code === 'Enter') { if (e.target.value.trim()) socket.emit('chatMessage', e.target.value); e.target.value = ''; e.target.blur(); isChatting = false; document.getElementById('chat-container').classList.remove('active'); document.getElementById('chat-input-container').style.display = 'none'; e.preventDefault(); e.stopPropagation(); } });
 window.addEventListener('keyup', e => { keys[e.code] = false; if(e.code === 'ShiftLeft') releaseGuard(); });
@@ -1081,6 +1172,7 @@ function drawCharacter(p, color) {
     const visualAttackRange = getVisualAttackRange(weapon, stats, p);
     const weaponLength = Math.max(28, visualAttackRange - 28);
     const bodyScale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
+    const ultimate = getUltimateState(p);
     const nameOffset = 65 * bodyScale;
     const hpOffset = 60 * bodyScale;
     const stunOffset = 82 * bodyScale;
@@ -1104,6 +1196,21 @@ function drawCharacter(p, color) {
             ctx.stroke();
             drawWireHand(tipX, tipY, handAngle, wireProgress);
         }
+        ctx.restore();
+    }
+    if (ultimate.active) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(bodyScale, bodyScale * VIEW_Y_SCALE);
+        const pulse = 1 + Math.sin((Date.now() - (ultimate.startAt || 0)) / 80) * 0.04;
+        ctx.globalAlpha = 0.35;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = ultimate.type === 'dual' ? 'rgba(255, 40, 40, 0.9)' : 'rgba(255, 220, 120, 0.9)';
+        ctx.strokeStyle = ultimate.type === 'dual' ? 'rgba(255, 60, 60, 0.95)' : 'rgba(255, 230, 150, 0.95)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, 34 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
     }
     if(isGuarding) { const isPerfect = (guardActiveTimer < JUST_GUARD_WINDOW_SEC); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
@@ -1398,6 +1505,65 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(0, 0, 5 + (1 - t) * 4, 0, Math.PI * 2);
             ctx.fill();
+        } else if (effect.weapon === 'dragon') {
+            const beamLen = 78 + (1 - t) * 28;
+            ctx.strokeStyle = 'rgba(70, 220, 255, 0.95)';
+            ctx.fillStyle = 'rgba(30, 150, 255, 0.9)';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.rotate(effect.angle);
+            ctx.moveTo(-beamLen, -12);
+            ctx.quadraticCurveTo(-beamLen * 0.55, -30, -beamLen * 0.1, -14);
+            ctx.quadraticCurveTo(beamLen * 0.18, -36, beamLen * 0.52, -10);
+            ctx.quadraticCurveTo(beamLen * 0.78, -18, beamLen, 0);
+            ctx.quadraticCurveTo(beamLen * 0.78, 18, beamLen * 0.52, 10);
+            ctx.quadraticCurveTo(beamLen * 0.18, 36, -beamLen * 0.1, 14);
+            ctx.quadraticCurveTo(-beamLen * 0.55, 30, -beamLen, 12);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else if (effect.weapon === 'ult-sword') {
+            const slashLen = 58 + (1 - t) * 18;
+            ctx.lineWidth = 4.6;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 3; i++) {
+                ctx.save();
+                ctx.rotate(effect.angle + (i - 1) * 0.65);
+                ctx.strokeStyle = i === 1 ? 'rgba(255, 255, 255, 0.96)' : 'rgba(255, 210, 120, 0.88)';
+                ctx.beginPath();
+                ctx.moveTo(-slashLen * 0.9, -slashLen * 0.08);
+                ctx.lineTo(slashLen * 0.9, slashLen * 0.08);
+                ctx.stroke();
+                ctx.restore();
+            }
+        } else if (effect.weapon === 'ult-hammer') {
+            const burst = 32 + (1 - t) * 22;
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.95)';
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.48)';
+            ctx.lineWidth = 4.5;
+            for (let i = 0; i < 8; i++) {
+                const a = (Math.PI * 2 / 8) * i + effect.angle;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
+                ctx.lineTo(Math.cos(a) * burst, Math.sin(a) * burst);
+                ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.arc(0, 0, 12 + (1 - t) * 6, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (effect.weapon === 'spear-ult') {
+            const ring = 36 + (1 - t) * 26;
+            ctx.strokeStyle = 'rgba(255, 245, 180, 0.9)';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(0, 0, ring, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, ring + 14, 0, Math.PI * 2);
+            ctx.stroke();
         } else if (effect.weapon === 'ash') {
             const burst = 18 + (1 - t) * 24;
             ctx.strokeStyle = 'rgba(120, 210, 255, 0.95)';
@@ -1450,6 +1616,41 @@ function drawBowProjectiles() {
         const tipX = effect.startX + (effect.endX - effect.startX) * p;
         const tipY = effect.startY + (effect.endY - effect.startY) * p;
         drawBowArrow(effect.startX, effect.startY, tipX, tipY, effect.angle, p, effect.reflected);
+    });
+}
+
+function drawDragonProjectiles() {
+    dragonProjectiles.forEach((effect) => {
+        const p = Math.max(0, Math.min(1, effect.progress || 0));
+        const x = effect.startX + (effect.endX - effect.startX) * p;
+        const y = effect.startY + (effect.endY - effect.startY) * p;
+        const len = 110 + (1 - p) * 70;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(effect.angle);
+        ctx.scale(1, VIEW_Y_SCALE);
+        ctx.globalAlpha = 0.95 - p * 0.25;
+        ctx.shadowColor = effect.reflected ? 'rgba(255, 120, 120, 0.9)' : 'rgba(70, 220, 255, 0.95)';
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = effect.reflected ? 'rgba(255, 90, 90, 0.92)' : 'rgba(35, 170, 255, 0.92)';
+        ctx.strokeStyle = effect.reflected ? 'rgba(255, 220, 210, 0.95)' : 'rgba(190, 250, 255, 0.96)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-len * 0.95, 0);
+        ctx.quadraticCurveTo(-len * 0.5, -26, -len * 0.12, -8);
+        ctx.quadraticCurveTo(len * 0.18, -30, len * 0.42, -8);
+        ctx.quadraticCurveTo(len * 0.6, -20, len * 0.98, 0);
+        ctx.quadraticCurveTo(len * 0.6, 18, len * 0.42, 8);
+        ctx.quadraticCurveTo(len * 0.18, 30, -len * 0.12, 8);
+        ctx.quadraticCurveTo(-len * 0.5, 26, -len * 0.95, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(-len * 0.35, 0, 14, 0, Math.PI * 2);
+        ctx.fillStyle = effect.reflected ? 'rgba(255, 180, 180, 0.95)' : 'rgba(210, 255, 255, 0.95)';
+        ctx.fill();
+        ctx.restore();
     });
 }
 
@@ -1727,6 +1928,7 @@ function draw() {
     drawCombatEffects();
     drawAshProjectiles();
     drawBowProjectiles();
+    drawDragonProjectiles();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }

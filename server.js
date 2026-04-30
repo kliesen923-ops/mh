@@ -199,7 +199,9 @@ function getAttackMultiplier(player) {
 function getAttackRangeMultiplier(player) {
     const weapon = sanitizeWeapon(player && player.weapon);
     if (weapon === 'bow') return 1;
-    return Math.max(1, Number.isFinite(player && player.giantScale) ? player.giantScale : 1);
+    const giantScale = Math.max(1, Number.isFinite(player && player.giantScale) ? player.giantScale : 1);
+    const ultimate = player && player.ultimate && player.ultimate.active && player.ultimate.type === 'dual' ? 1.45 : 1;
+    return giantScale * ultimate;
 }
 
 function createProjectileId(prefix) {
@@ -226,6 +228,249 @@ function createDefaultGearRush() {
         lastSlashAt: 0,
         startResolved: false,
     };
+}
+
+function createDefaultUltimate() {
+    return {
+        active: false,
+        type: '',
+        startAt: 0,
+        endsAt: 0,
+        cooldownEndsAt: 0,
+        radius: 0,
+        extra: 0,
+    };
+}
+
+function getUltimateConfig(weapon) {
+    const nextWeapon = sanitizeWeapon(weapon);
+    if (nextWeapon === 'hammer') return { cooldownMs: 13000, durationMs: 700 };
+    if (nextWeapon === 'spear') return { cooldownMs: 15000, durationMs: 2200 };
+    if (nextWeapon === 'bow') return { cooldownMs: 14000, durationMs: 800 };
+    if (nextWeapon === 'dual') return { cooldownMs: 14000, durationMs: 4000 };
+    return { cooldownMs: 11000, durationMs: 1200 };
+}
+
+function clearUltimateState(player) {
+    if (!player) return;
+    player.ultimate = createDefaultUltimate();
+}
+
+function broadcastUltimateState(playerId) {
+    const current = players[playerId];
+    if (!current) return;
+    io.emit('playerActionUpdate', { id: playerId, action: { ultimate: current.ultimate } });
+}
+
+function applySwordUltimate(playerId) {
+    const attacker = players[playerId];
+    if (!attacker) return;
+    const now = Date.now();
+    const config = getUltimateConfig(attacker.weapon);
+    attacker.ultimate = {
+        active: true,
+        type: 'sword',
+        startAt: now,
+        endsAt: now + config.durationMs,
+        cooldownEndsAt: now + config.cooldownMs,
+        radius: 126,
+        extra: 0,
+    };
+    broadcastUltimateState(playerId);
+    const slashCount = 8;
+    const slashInterval = Math.max(80, Math.floor(config.durationMs / slashCount));
+    for (let i = 0; i < slashCount; i++) {
+        setTimeout(() => {
+            const current = players[playerId];
+            if (!current || !current.ultimate || !current.ultimate.active || current.ultimate.type !== 'sword') return;
+            const key = `${playerId}:ult-sword:${now}:${i}`;
+            const slashAngle = current.angle + (-0.9 + i * 0.28);
+            io.emit('combatEffect', {
+                x: current.x,
+                y: current.y,
+                angle: slashAngle,
+                weapon: 'ult-sword',
+            });
+            for (const [targetId, target] of Object.entries(players)) {
+                if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+                const dx = target.x - current.x;
+                const dy = target.y - current.y;
+                if (Math.hypot(dx, dy) > 126) continue;
+                if (hasHitTargetForKey(key, targetId)) continue;
+                const damage = Math.floor((8 + (i % 3)) * (current.stats && Number.isFinite(current.stats.dmg) ? current.stats.dmg : 1) * getAttackMultiplier(current));
+                target.hp -= damage;
+                io.emit('combatEffect', { x: target.x, y: target.y, angle: slashAngle, weapon: 'ult-sword' });
+                if (target.hp <= 0) resolveKill(playerId, targetId);
+            }
+            io.emit('statsUpdate', players);
+        }, i * slashInterval);
+    }
+    setTimeout(() => {
+        if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'sword') {
+            clearUltimateState(players[playerId]);
+            broadcastUltimateState(playerId);
+        }
+    }, config.durationMs);
+}
+
+function applyHammerUltimate(playerId) {
+    const attacker = players[playerId];
+    if (!attacker) return;
+    const now = Date.now();
+    const config = getUltimateConfig(attacker.weapon);
+    attacker.ultimate = {
+        active: true,
+        type: 'hammer',
+        startAt: now,
+        endsAt: now + config.durationMs,
+        cooldownEndsAt: now + config.cooldownMs,
+        radius: 0,
+        extra: 0,
+    };
+    broadcastUltimateState(playerId);
+    const profile = getWeaponAttackProfile(attacker.weapon);
+    const coneRange = Math.max(118, profile.reach * 1.7);
+    const coneArc = Math.PI * 0.7;
+    const attackAngle = attacker.aAngle || attacker.angle;
+    io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attackAngle, weapon: 'ult-hammer' });
+    for (const [targetId, target] of Object.entries(players)) {
+        if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+        const dx = target.x - attacker.x;
+        const dy = target.y - attacker.y;
+        if (Math.hypot(dx, dy) > coneRange) continue;
+        if (getAngleDiff(attackAngle, Math.atan2(dy, dx)) > coneArc) continue;
+        const damage = Math.floor(28 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+        target.hp -= damage;
+        const stunMs = 350;
+        target.isStunned = true;
+        io.emit('combatEffect', { x: target.x, y: target.y, angle: attackAngle, weapon: 'ult-hammer' });
+        io.emit('playerStunned', { id: targetId, stunned: true, stunEndsAt: now + stunMs, stunMs });
+        setTimeout(() => {
+            if (players[targetId]) {
+                players[targetId].isStunned = false;
+                io.emit('playerStunned', { id: targetId, stunned: false, stunEndsAt: 0 });
+            }
+        }, stunMs);
+        if (target.hp <= 0) resolveKill(playerId, targetId);
+    }
+    io.emit('statsUpdate', players);
+    setTimeout(() => {
+        if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'hammer') {
+            clearUltimateState(players[playerId]);
+            broadcastUltimateState(playerId);
+        }
+    }, config.durationMs);
+}
+
+function applySpearUltimate(playerId) {
+    const attacker = players[playerId];
+    if (!attacker) return;
+    const now = Date.now();
+    const config = getUltimateConfig(attacker.weapon);
+    attacker.ultimate = {
+        active: true,
+        type: 'spear',
+        startAt: now,
+        endsAt: now + config.durationMs,
+        cooldownEndsAt: now + config.cooldownMs,
+        radius: 180,
+        extra: 0,
+    };
+    broadcastUltimateState(playerId);
+    io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attacker.angle, weapon: 'spear-ult' });
+    for (const [targetId, target] of Object.entries(players)) {
+        if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+        const dx = target.x - attacker.x;
+        const dy = target.y - attacker.y;
+        if (Math.hypot(dx, dy) > attacker.ultimate.radius) continue;
+        const damage = Math.floor(18 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+        target.hp -= damage;
+        io.emit('combatEffect', { x: target.x, y: target.y, angle: Math.atan2(dy, dx), weapon: 'spear-ult' });
+        if (target.hp <= 0) resolveKill(playerId, targetId);
+    }
+    io.emit('statsUpdate', players);
+    setTimeout(() => {
+        if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'spear') {
+            clearUltimateState(players[playerId]);
+            broadcastUltimateState(playerId);
+        }
+    }, config.durationMs);
+}
+
+function applyBowUltimate(playerId) {
+    const attacker = players[playerId];
+    if (!attacker) return;
+    const now = Date.now();
+    const config = getUltimateConfig(attacker.weapon);
+    attacker.ultimate = {
+        active: true,
+        type: 'bow',
+        startAt: now,
+        endsAt: now + config.durationMs,
+        cooldownEndsAt: now + config.cooldownMs,
+        radius: 0,
+        extra: 0,
+    };
+    broadcastUltimateState(playerId);
+    const profile = getWeaponAttackProfile(attacker.weapon);
+    const attackRange = Math.max(300, profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * 1.1);
+    const angle = attacker.aAngle || attacker.angle;
+    const endX = attacker.x + Math.cos(angle) * attackRange;
+    const endY = attacker.y + Math.sin(angle) * attackRange;
+    const projectileId = createProjectileId('dragon');
+    io.emit('dragonProjectile', {
+        projectileId,
+        originId: playerId,
+        startX: attacker.x,
+        startY: attacker.y,
+        endX,
+        endY,
+        angle,
+        duration: config.durationMs,
+        reflected: false,
+    });
+    const hitKey = `${playerId}:ult-bow:${now}`;
+    for (const [targetId, target] of Object.entries(players)) {
+        if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+        if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > 42) continue;
+        if (hasHitTargetForKey(hitKey, targetId)) continue;
+        const damage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+        target.hp -= damage;
+        io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon' });
+        if (target.hp <= 0) resolveKill(playerId, targetId);
+    }
+    io.emit('statsUpdate', players);
+    setTimeout(() => {
+        if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'bow') {
+            clearUltimateState(players[playerId]);
+            broadcastUltimateState(playerId);
+        }
+    }, config.durationMs);
+}
+
+function applyDualUltimate(playerId) {
+    const attacker = players[playerId];
+    if (!attacker) return;
+    const now = Date.now();
+    const config = getUltimateConfig(attacker.weapon);
+    attacker.ultimate = {
+        active: true,
+        type: 'dual',
+        startAt: now,
+        endsAt: now + config.durationMs,
+        cooldownEndsAt: now + config.cooldownMs,
+        radius: 0,
+        extra: 0,
+    };
+    broadcastUltimateState(playerId);
+    io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attacker.angle, weapon: 'dual' });
+    io.emit('statsUpdate', players);
+    setTimeout(() => {
+        if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'dual') {
+            clearUltimateState(players[playerId]);
+            broadcastUltimateState(playerId);
+        }
+    }, config.durationMs);
 }
 
 function emitHealingCrossUpdate() {
@@ -400,6 +645,57 @@ function getKillLevelGain(victimLevel) {
     return Math.max(1, Math.ceil(level * 0.5));
 }
 
+function resolveKill(attackerId, targetId) {
+    const attacker = players[attackerId];
+    const target = players[targetId];
+    if (!attacker || !target) return;
+    target.hp = 0;
+    target.deaths++;
+    attacker.kills++;
+    updateAccountScore(attacker.accountId, 'kills', 1);
+    updateAccountScore(target.accountId, 'deaths', 1);
+    const levelsGained = getKillLevelGain(target.level);
+    attacker.level += levelsGained;
+    attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
+    attacker.isUpgrading = true;
+    attacker.pendingUpgrades += levelsGained;
+    target.level = 1;
+    target.stats = createBaseStatsForWeapon(target.weapon);
+    target.upgradeCounts = createUpgradeCounts();
+    target.pendingUpgrades = 0;
+    target.isUpgrading = false;
+    target.isSelectingLoadout = true;
+    clearUltimateState(target);
+    target.gearRush = createDefaultGearRush();
+    target.giantActive = false;
+    target.giantScale = 1;
+    target.giantAttackMult = 1;
+    target.giantEndsAt = 0;
+    target.giantRecoveryEndsAt = 0;
+    target.giantRecoveryArmed = false;
+    io.emit('playerDied', { victimId: targetId, attackerId });
+    if (levelsGained > 0) io.to(attackerId).emit('levelUp', { newLevel: attacker.level, count: levelsGained });
+    setTimeout(() => {
+        if (players[targetId]) {
+            players[targetId].hp = getMaxHpFromStats(players[targetId].stats);
+            players[targetId].x = 100 + Math.random() * 800;
+            players[targetId].y = 100 + Math.random() * 500;
+            players[targetId].isStunned = false;
+            players[targetId].isGuarding = false;
+            players[targetId].isSelectingLoadout = true;
+            players[targetId].gearRush = createDefaultGearRush();
+            clearUltimateState(players[targetId]);
+            players[targetId].giantActive = false;
+            players[targetId].giantScale = 1;
+            players[targetId].giantAttackMult = 1;
+            players[targetId].giantEndsAt = 0;
+            players[targetId].giantRecoveryEndsAt = 0;
+            players[targetId].giantRecoveryArmed = false;
+            io.emit('playerRespawn', players[targetId]);
+        }
+    }, 3000);
+}
+
 function applyBowImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
@@ -418,6 +714,32 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
     let damage = Math.floor(11 * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
+    if (shouldReflectFromSpearUltimate(finalTarget, startX, startY) && !reflected) {
+        const reflectedId = createProjectileId('bowr');
+        const reflectedPayload = {
+            projectileId: reflectedId,
+            startX: finalTarget.x,
+            startY: finalTarget.y,
+            endX: finalAttacker.x,
+            endY: finalAttacker.y,
+            angle: Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x),
+            maxDistance: Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y)),
+        };
+        io.emit('bowProjectileResolved', { projectileId });
+        io.emit('bowProjectile', {
+            projectileId: reflectedId,
+            originId: targetId,
+            startX: reflectedPayload.startX,
+            startY: reflectedPayload.startY,
+            endX: reflectedPayload.endX,
+            endY: reflectedPayload.endY,
+            angle: reflectedPayload.angle,
+            reflected: true,
+            duration: Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))),
+        });
+        setTimeout(() => applyBowImpact(targetId, attackerId, reflectedPayload, true), Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))));
+        return;
+    }
     if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS && !reflected) {
         const reflectedId = createProjectileId('bowr');
         const reflectedPayload = {
@@ -587,6 +909,30 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
 
+    if (shouldReflectFromSpearUltimate(finalTarget, finalAttacker.x, finalAttacker.y) && !reflected) {
+        const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
+        const reflectedPayload = {
+            targetId: attackerId,
+            progress: 0,
+            tx: finalAttacker.x,
+            ty: finalAttacker.y,
+            maxDistance: reflectDistance,
+            kind: 'ash',
+            reflectedFrom: targetId,
+        };
+        io.emit('combatEffect', {
+            x: finalTarget.x,
+            y: finalTarget.y,
+            angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
+            weapon: 'ash',
+        });
+        emitAshProjectile(targetId, attackerId, finalTarget.x, finalTarget.y, finalAttacker.x, finalAttacker.y, true);
+        setTimeout(() => {
+            applyAshImpact(targetId, attackerId, reflectedPayload, true);
+        }, Math.max(140, Math.min(700, Math.round(reflectDistance * 1.15))));
+        return;
+    }
+
     if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS) {
         const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
         const reflectedPayload = {
@@ -630,6 +976,13 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
             io.emit('playerStunned', { id: targetId, stunned: false, stunEndsAt: 0 });
         }
     }, stunMs);
+}
+
+function shouldReflectFromSpearUltimate(finalTarget, projectileStartX, projectileStartY) {
+    if (!finalTarget || !finalTarget.ultimate || !finalTarget.ultimate.active || finalTarget.ultimate.type !== 'spear') return false;
+    if (Date.now() >= Number(finalTarget.ultimate.endsAt || 0)) return false;
+    const radius = Math.max(120, Number(finalTarget.ultimate.radius) || 180);
+    return Math.hypot(projectileStartX - finalTarget.x, projectileStartY - finalTarget.y) > radius;
 }
 
 function resetAttackHits(playerId) {
@@ -784,6 +1137,7 @@ io.on('connection', (socket) => {
         giantRecoveryEndsAt: 0,
         giantRecoveryArmed: false,
         gearRush: createDefaultGearRush(),
+        ultimate: createDefaultUltimate(),
         wire: { active: false, tx: 0, ty: 0 },
         stats: createBaseStatsForWeapon('sword'),
         skill: 'wire',
@@ -821,6 +1175,7 @@ io.on('connection', (socket) => {
         p.weapon = nextWeapon;
         p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
         p.hp = getMaxHpFromStats(p.stats);
+        clearUltimateState(p);
         io.emit('statsUpdate', players);
     });
 
@@ -835,6 +1190,24 @@ io.on('connection', (socket) => {
         const p = players[socket.id];
         if (!p) return;
         p.isSelectingLoadout = false;
+        io.emit('statsUpdate', players);
+    });
+
+    socket.on('useUltimate', () => {
+        const p = players[socket.id];
+        if (!p || p.hp <= 0 || p.isStunned || p.isSelectingLoadout || p.isUpgrading) return;
+        const weapon = sanitizeWeapon(p.weapon);
+        const config = getUltimateConfig(weapon);
+        const now = Date.now();
+        const currentCooldown = Number.isFinite(p.ultimate && p.ultimate.cooldownEndsAt) ? p.ultimate.cooldownEndsAt : 0;
+        if (currentCooldown > now) return;
+        if (weapon === 'sword') applySwordUltimate(socket.id);
+        else if (weapon === 'hammer') applyHammerUltimate(socket.id);
+        else if (weapon === 'spear') applySpearUltimate(socket.id);
+        else if (weapon === 'bow') applyBowUltimate(socket.id);
+        else if (weapon === 'dual') applyDualUltimate(socket.id);
+        else return;
+        p.ultimate.cooldownEndsAt = now + config.cooldownMs;
         io.emit('statsUpdate', players);
     });
 
@@ -1041,6 +1414,7 @@ io.on('connection', (socket) => {
                 target.isUpgrading = false;
                 target.isSelectingLoadout = true;
                 target.gearRush = createDefaultGearRush();
+                clearUltimateState(target);
                 target.giantActive = false;
                 target.giantScale = 1;
                 target.giantAttackMult = 1;
@@ -1058,6 +1432,7 @@ io.on('connection', (socket) => {
                         players[targetId].isGuarding = false;
                         players[targetId].isSelectingLoadout = true;
                         players[targetId].gearRush = createDefaultGearRush();
+                        clearUltimateState(players[targetId]);
                         players[targetId].giantActive = false;
                         players[targetId].giantScale = 1;
                         players[targetId].giantAttackMult = 1;
@@ -1132,6 +1507,7 @@ io.on('connection', (socket) => {
                 target.isUpgrading = false;
                 target.isSelectingLoadout = true;
                 target.gearRush = createDefaultGearRush();
+                clearUltimateState(target);
                 target.giantActive = false;
                 target.giantScale = 1;
                 target.giantAttackMult = 1;
@@ -1149,6 +1525,7 @@ io.on('connection', (socket) => {
                         players[targetId].isGuarding = false;
                         players[targetId].isSelectingLoadout = true;
                         players[targetId].gearRush = createDefaultGearRush();
+                        clearUltimateState(players[targetId]);
                         players[targetId].giantActive = false;
                         players[targetId].giantScale = 1;
                         players[targetId].giantAttackMult = 1;
