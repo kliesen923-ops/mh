@@ -16,6 +16,7 @@
             <div id="damage-heavy-row"><span id="damage-heavy-label">3타</span>: <b id="damage-heavy">35</b></div>
             <div><span id="range-label">사거리</span>: <b id="range-value">100</b></div>
             <div>이동속도: <b id="move-speed-value">100</b></div>
+            <div>회피거리: <b id="dodge-distance-value">100</b></div>
             <div>공격속도: <b id="attack-speed-value">100</b></div>
         </div>
     </div>
@@ -148,6 +149,7 @@
         <div id="upgrade-timer">업그레이드 시간: 9초</div>
         <div id="upgrade-cards">
             <div class="card" onclick="selectUpgrade('dmg')">
+                <div class="upgrade-level-badge" data-upgrade-level="dmg">Lv.1</div>
                 <div class="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                         <path d="M5 19L19 5" />
@@ -159,6 +161,7 @@
                 <p>모든 공격의 피해가 <br><b>20%</b> 증가합니다.</p>
             </div>
             <div class="card" id="upgrade-range-card" onclick="selectUpgrade('range')">
+                <div class="upgrade-level-badge" data-upgrade-level="range">Lv.1</div>
                 <div class="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                         <path d="M4 14c4-6 12-6 16 0" />
@@ -170,6 +173,7 @@
                 <p id="upgrade-range-desc">공격의 도달 범위가 <br><b>15%</b> 증가합니다.</p>
             </div>
             <div class="card" onclick="selectUpgrade('speed')">
+                <div class="upgrade-level-badge" data-upgrade-level="speed">Lv.1</div>
                 <div class="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                         <path d="M13 2L4 14h6l-1 8 11-13h-6l-1-7z" />
@@ -179,6 +183,7 @@
                 <p>공격 속도가 <br><b>25%</b> 증가합니다.</p>
             </div>
             <div class="card" onclick="selectUpgrade('move')">
+                <div class="upgrade-level-badge" data-upgrade-level="move">Lv.1</div>
                 <div class="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                         <path d="M4 14l6-6" />
@@ -191,6 +196,7 @@
                 <p>이동 속도가 <br><b>10%</b> 증가합니다.</p>
             </div>
             <div class="card" onclick="selectUpgrade('dodge')">
+                <div class="upgrade-level-badge" data-upgrade-level="dodge">Lv.1</div>
                 <div class="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                         <path d="M5 7h7" />

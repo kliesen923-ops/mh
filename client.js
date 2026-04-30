@@ -95,6 +95,10 @@ function showUpgradeUI() {
     const upgradeOverlay = document.getElementById('overlay-upgrade');
     upgradeOverlay.classList.remove('hidden');
     upgradeOverlay.querySelector('h1').innerText = `LEVEL ${player.level} UP!`;
+    document.querySelectorAll('[data-upgrade-level]').forEach((node) => {
+        const type = node.getAttribute('data-upgrade-level');
+        node.textContent = getUpgradeLevelLabel(type);
+    });
     const rangeCard = document.getElementById('upgrade-range-card');
     const rangeTitle = document.getElementById('upgrade-range-title');
     const rangeDesc = document.getElementById('upgrade-range-desc');
@@ -295,10 +299,28 @@ function getEffectiveMoveMultiplier() {
     return (Number.isFinite(player.stats.move) ? player.stats.move : 1) * guardMultiplier;
 }
 
+function getUpgradeLevelFromMultiplier(multiplier, step) {
+    const value = Number.isFinite(multiplier) ? multiplier : 1;
+    const increment = Number.isFinite(step) && step > 0 ? step : 1;
+    return Math.max(1, 1 + Math.round(((value - 1) / increment) + 1e-6));
+}
+
+function getUpgradeLevelLabel(type) {
+    const stats = normalizeStats(player.stats);
+    if (type === 'dmg') return `Lv.${getUpgradeLevelFromMultiplier(stats.dmg, 0.2)}`;
+    if (type === 'range') return `Lv.${getUpgradeLevelFromMultiplier(stats.range, 0.15)}`;
+    if (type === 'speed') return `Lv.${getUpgradeLevelFromMultiplier(stats.speed, 0.25)}`;
+    if (type === 'move') return `Lv.${getUpgradeLevelFromMultiplier(stats.move, 0.1)}`;
+    if (type === 'dodge') return `Lv.${getUpgradeLevelFromMultiplier(stats.dodge, 0.15)}`;
+    if (type === 'projectile') return `Lv.${getUpgradeLevelFromMultiplier(stats.projectile, 0.2)}`;
+    return 'Lv.1';
+}
+
 function updateCombatReadouts() {
     const rangeValue = document.getElementById('range-value');
     const attackSpeedValue = document.getElementById('attack-speed-value');
     const moveSpeedValue = document.getElementById('move-speed-value');
+    const dodgeDistanceValue = document.getElementById('dodge-distance-value');
     const basicLabel = document.getElementById('damage-basic-label');
     const secondLabel = document.getElementById('damage-second-label');
     const heavyLabel = document.getElementById('damage-heavy-label');
@@ -306,7 +328,7 @@ function updateCombatReadouts() {
     const secondRow = document.getElementById('damage-second-row');
     const heavyRow = document.getElementById('damage-heavy-row');
     const rangeLabel = document.getElementById('range-label');
-    if (!rangeValue || !attackSpeedValue || !moveSpeedValue || !basicLabel || !secondLabel || !heavyLabel || !basicRow || !secondRow || !heavyRow || !rangeLabel) return;
+    if (!rangeValue || !attackSpeedValue || !moveSpeedValue || !dodgeDistanceValue || !basicLabel || !secondLabel || !heavyLabel || !basicRow || !secondRow || !heavyRow || !rangeLabel) return;
 
     player.stats = normalizeStats(player.stats);
     const isBow = normalizeWeapon(player.weapon) === 'bow';
@@ -325,6 +347,7 @@ function updateCombatReadouts() {
     }
     attackSpeedValue.textContent = formatPercentStat(player.stats.speed);
     moveSpeedValue.textContent = String(Math.round(getEffectiveMoveMultiplier() * 100));
+    dodgeDistanceValue.textContent = formatPercentStat(player.stats.dodge);
 }
 
 function updateHUD() {
