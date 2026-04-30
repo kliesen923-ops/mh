@@ -117,15 +117,15 @@ function getAccountById(id) {
 function createBaseStatsForWeapon(weapon) {
     const nextWeapon = sanitizeWeapon(weapon);
     if (nextWeapon === 'hammer') {
-        return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, hp: 115 };
+        return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, hp: 115 };
     }
     if (nextWeapon === 'spear') {
-        return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, hp: 95 };
+        return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, hp: 95 };
     }
     if (nextWeapon === 'bow') {
-        return { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, hp: 90 };
+        return { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, dodge: 1.0, hp: 90 };
     }
-    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 };
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 };
 }
 
 function getWeaponAttackProfile(weapon) {
@@ -425,7 +425,7 @@ function hasHitTargetThisAttack(playerId, targetId) {
 }
 
 function createDefaultStats() {
-    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 };
+    return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 };
 }
 
 function normalizeStats(stats) {
@@ -600,6 +600,7 @@ io.on('connection', (socket) => {
         else if (type === 'range') p.stats.range += 0.15;
         else if (type === 'speed') p.stats.speed += 0.25;
         else if (type === 'move') p.stats.move += 0.1;
+        else if (type === 'dodge') p.stats.dodge += 0.15;
         p.pendingUpgrades--;
         if (p.pendingUpgrades <= 0) {
             p.pendingUpgrades = 0;

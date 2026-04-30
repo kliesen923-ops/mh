@@ -3,10 +3,10 @@ const socket = window.io ? io() : { on() {}, emit() {}, id: null };
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 const VIEW_Y_SCALE = 0.7;
 const WEAPON_PRESETS = {
-    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 } },
-    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, hp: 115 } },
-    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, hp: 95 } },
-    bow: { label: '활', stats: { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, hp: 90 } },
+    sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 } },
+    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, hp: 115 } },
+    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, hp: 95 } },
+    bow: { label: '활', stats: { dmg: 1.05, range: 1.52, speed: 1.02, move: 0.98, dodge: 1.0, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
@@ -45,7 +45,7 @@ const player = {
     isDodging: false, dTimer: 0, dDX: 0, dDY: 0, dodgeCooldown: 0,
     wire: { active: false, kind: 'wire', tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
-    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 },
+    stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 },
     skill: 'wire'
 };
 
@@ -250,7 +250,7 @@ function formatPercentStat(multiplier) {
 }
 
 function normalizeStats(stats) {
-    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, hp: 100 }, stats || {});
+    return Object.assign({ dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, hp: 100 }, stats || {});
 }
 
 function normalizeWeapon(weapon) {
@@ -393,7 +393,9 @@ function update(dt) {
     if(player.moveDir.x !== 0 || player.moveDir.y !== 0) { mx = player.moveDir.x; my = player.moveDir.y; }
 
     if(player.isDodging) {
-        player.x += player.dDX * 800 * dt; player.y += player.dDY * 800 * dt;
+        player.stats = normalizeStats(player.stats);
+        const dodgeMultiplier = Number.isFinite(player.stats.dodge) ? player.stats.dodge : 1;
+        player.x += player.dDX * 800 * dodgeMultiplier * dt; player.y += player.dDY * 800 * dodgeMultiplier * dt;
         player.dTimer -= dt; if(player.dTimer <= 0) { player.isDodging = false; socket.emit('playerAction', { isDodging: false }); }
     } else if(player.isAttacking) {
         if (normalizeWeapon(player.weapon) !== 'bow') {
@@ -505,7 +507,7 @@ function getAngleDiff(a1, a2) {
 function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
 function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
 function releaseGuardForAction() { if (player.isGuarding) releaseGuard(); }
-function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) { releaseGuardForAction(); return; } releaseGuardForAction(); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
+function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
 function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
 function beginAttack() {
     releaseGuardForAction();
