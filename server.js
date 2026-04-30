@@ -84,6 +84,18 @@ function saveAccounts(accounts) {
     fs.writeFileSync(ACCOUNT_FILE, body ? `${body}\n` : '', 'utf8');
 }
 
+function appendAccount(account) {
+    ensureAccountFile();
+    const line = [
+        account.id,
+        account.nickname,
+        account.password,
+        Number.isFinite(account.kills) ? account.kills : 0,
+        Number.isFinite(account.deaths) ? account.deaths : 0,
+    ].join(',');
+    fs.appendFileSync(ACCOUNT_FILE, `${line}\n`, 'utf8');
+}
+
 function findAccountById(id) {
     return loadAccounts().find((account) => account.id === id);
 }
@@ -129,8 +141,7 @@ app.post('/api/auth/register', (req, res) => {
         return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
     }
 
-    accounts.push({ id, nickname, password, kills: 0, deaths: 0 });
-    saveAccounts(accounts);
+    appendAccount({ id, nickname, password, kills: 0, deaths: 0 });
     return res.json({ ok: true, id, nickname });
 });
 
