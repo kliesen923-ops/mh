@@ -56,20 +56,13 @@ function loadAccounts() {
     const raw = fs.readFileSync(ACCOUNT_FILE, 'utf8').trim();
     if (!raw) return [];
     return raw.split(/\r?\n/).map((line) => {
-        const [id, nickname, password, weapon] = line.split(',');
-        const hasWeapon = typeof weapon === 'string' && weapon.trim() !== '';
-        return {
-            id: id || '',
-            nickname: nickname || '',
-            password: password || '',
-            weapon: hasWeapon ? sanitizeWeapon(weapon) : '',
-            hasWeapon,
-        };
+        const [id, nickname, password] = line.split(',');
+        return { id: id || '', nickname: nickname || '', password: password || '' };
     }).filter((account) => account.id && account.nickname && account.password);
 }
 
 function saveAccounts(accounts) {
-    const body = accounts.map((account) => [account.id, account.nickname, account.password, account.weapon ? sanitizeWeapon(account.weapon) : ''].join(',')).join('\n');
+    const body = accounts.map((account) => [account.id, account.nickname, account.password].join(',')).join('\n');
     fs.writeFileSync(ACCOUNT_FILE, body ? `${body}\n` : '', 'utf8');
 }
 
@@ -105,7 +98,7 @@ app.post('/api/auth/register', (req, res) => {
 
     accounts.push({ id, nickname, password, weapon: '' });
     saveAccounts(accounts);
-    return res.json({ ok: true, id, nickname, weapon: '' });
+    return res.json({ ok: true, id, nickname });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -118,23 +111,7 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(401).json({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
 
-    return res.json({ ok: true, id: account.id, nickname: account.nickname, weapon: account.hasWeapon ? account.weapon : '' });
-});
-
-app.post('/api/auth/set-weapon', (req, res) => {
-    const id = sanitizeAccountId(req.body && req.body.id);
-    const weapon = sanitizeWeapon(req.body && req.body.weapon);
-    if (!id) return res.status(400).json({ ok: false, error: '아이디가 필요합니다.' });
-    if (!weapon) return res.status(400).json({ ok: false, error: '무기군을 선택해 주세요.' });
-
-    const accounts = loadAccounts();
-    const account = accounts.find((entry) => entry.id === id);
-    if (!account) return res.status(404).json({ ok: false, error: '계정을 찾을 수 없습니다.' });
-
-    account.weapon = weapon;
-    account.hasWeapon = true;
-    saveAccounts(accounts);
-    return res.json({ ok: true, weapon });
+    return res.json({ ok: true, id: account.id, nickname: account.nickname });
 });
 
 function getAngleDiff(a1, a2) {

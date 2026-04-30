@@ -879,7 +879,7 @@ function showWeaponPanel(auth) {
     const registerPanel = document.getElementById('register-panel');
     if (loginPanel) loginPanel.classList.add('hidden');
     if (registerPanel) registerPanel.classList.add('hidden');
-    setWeaponSelection(auth.weapon || localStorage.getItem(`mh_last_weapon_${auth.id}`) || 'sword');
+    setWeaponSelection('sword');
 }
 function hideWeaponPanel() {
     const weaponPanel = document.getElementById('weapon-panel');
@@ -897,21 +897,8 @@ async function postAuth(path, payload) {
     }
     return data;
 }
-async function saveWeaponChoice(accountId, weapon) {
-    const response = await fetch('/api/auth/set-weapon', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: accountId, weapon }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) {
-        throw new Error(data.error || '무기 저장에 실패했습니다.');
-    }
-    return data.weapon;
-}
 function enterGame(nickname, accountId, weapon) {
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
-    if (accountId && weapon) localStorage.setItem(`mh_last_weapon_${accountId}`, weapon);
     if (nickname) socket.emit('setName', nickname);
     if (weapon) {
         player.weapon = normalizeWeapon(weapon);
@@ -930,11 +917,7 @@ async function handleLogin() {
     try {
         setAuthError('login', '');
         const result = await postAuth('/api/auth/login', { id, password });
-        if (result.weapon) {
-            enterGame(result.nickname, result.id, result.weapon);
-        } else {
-            showWeaponPanel(result);
-        }
+        showWeaponPanel(result);
     } catch (error) {
         setAuthError('login', error.message);
     }
@@ -993,15 +976,9 @@ document.getElementById('btn-weapon-back')?.addEventListener('click', () => {
 });
 document.getElementById('btn-weapon-confirm')?.addEventListener('click', async () => {
     if (!pendingAuth) return;
-    try {
-        setWeaponError('');
-        const weapon = normalizeWeapon(selectedWeapon);
-        await saveWeaponChoice(pendingAuth.id, weapon);
-        enterGame(pendingAuth.nickname, pendingAuth.id, weapon);
-        pendingAuth = null;
-    } catch (error) {
-        setWeaponError(error.message);
-    }
+    setWeaponError('');
+    enterGame(pendingAuth.nickname, pendingAuth.id, normalizeWeapon(selectedWeapon));
+    pendingAuth = null;
 });
 document.getElementById('login-id')?.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
