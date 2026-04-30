@@ -1,6 +1,8 @@
 ﻿
 const socket = window.io ? io() : { on() {}, emit() {}, id: null };
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+const GAME_WIDTH = 1280;
+const GAME_HEIGHT = 640;
 const VIEW_Y_SCALE = 0.7;
 const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
@@ -50,12 +52,8 @@ const player = {
 };
 
 function resize() {
-    const width = Math.max(320, Math.floor(Math.min(window.innerWidth, window.innerHeight * 2)));
-    const height = Math.max(160, Math.floor(width / 2));
-    canvas.width = width;
-    canvas.height = height;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
 }
 window.addEventListener('resize', resize); resize();
 
@@ -1190,8 +1188,13 @@ let joyId = null;
 let aimMode = 'none';
 function setMouseAimFromPoint(clientX, clientY) {
     if (joyId !== null || isChatting || isUpgrading || player.hp <= 0 || player.isStunned) return;
-    const dx = clientX - player.x;
-    const dy = clientY - player.y;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / canvas.width;
+    const scaleY = rect.height / canvas.height;
+    const worldX = (clientX - rect.left) / Math.max(0.0001, scaleX);
+    const worldY = (clientY - rect.top) / Math.max(0.0001, scaleY);
+    const dx = worldX - player.x;
+    const dy = worldY - player.y;
     if (dx === 0 && dy === 0) return;
     player.angle = Math.atan2(dy, dx);
     aimMode = 'mouse';
