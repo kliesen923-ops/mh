@@ -160,7 +160,7 @@ function isTargetInWeaponAttack(attacker, target) {
     const dx = target.x - attacker.x;
     const dy = target.y - attacker.y;
     const distance = Math.hypot(dx, dy);
-    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackMultiplier(attacker);
+    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
     if (distance > attackRange) return false;
     if (sanitizeWeapon(attacker.weapon) === 'spear') {
         const endX = attacker.x + Math.cos(attackAngle) * attackRange;
@@ -194,6 +194,12 @@ function getMaxHpFromStats(stats) {
 
 function getAttackMultiplier(player) {
     return Math.max(1, Number.isFinite(player && player.giantAttackMult) ? player.giantAttackMult : 1);
+}
+
+function getAttackRangeMultiplier(player) {
+    const weapon = sanitizeWeapon(player && player.weapon);
+    if (weapon === 'bow') return 1;
+    return Math.max(1, Number.isFinite(player && player.giantScale) ? player.giantScale : 1);
 }
 
 function createProjectileId(prefix) {
@@ -387,7 +393,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
     const endX = Number.isFinite(payload.endX) ? payload.endX : finalTarget.x;
     const endY = Number.isFinite(payload.endY) ? payload.endY : finalTarget.y;
     const projectileId = String(payload.projectileId || createProjectileId('bow'));
-    const attackRange = getWeaponAttackProfile(finalAttacker.weapon).reach * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.range) ? finalAttacker.stats.range : 1) * getAttackMultiplier(finalAttacker);
+    const attackRange = getWeaponAttackProfile(finalAttacker.weapon).reach * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.range) ? finalAttacker.stats.range : 1) * getAttackRangeMultiplier(finalAttacker);
     if (Math.hypot(finalTarget.x - endX, finalTarget.y - endY) > 26) return;
 
     const angle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
@@ -966,7 +972,7 @@ io.on('connection', (socket) => {
         if (attacker && sanitizeWeapon(attacker.weapon) === 'bow') return;
         if (attacker && target && target.hp > 0 && !target.isUpgrading && !target.isSelectingLoadout) {
             const now = Date.now();
-            const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackMultiplier(attacker);
+            const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
             const canHit = attacker.isAttacking && attacker.attackPhase === 2 && isTargetInWeaponAttack(attacker, target);
             if (!canHit) return;
             if (hasHitTargetThisAttack(socket.id, targetId)) return;

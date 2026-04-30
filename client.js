@@ -336,8 +336,19 @@ function getAttackMultiplier() {
 function getEffectiveAttackRange(weapon, stats, sourcePlayer) {
     const profile = getWeaponAttackProfile(weapon);
     const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;
-    const giantMult = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantAttackMult) ? sourcePlayer.giantAttackMult : 1);
-    return profile.reach * statRange * giantMult;
+    const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
+    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale);
+}
+
+function getVisualAttackRange(weapon, stats, sourcePlayer) {
+    const profile = getWeaponAttackProfile(weapon);
+    const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;
+    const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
+    return profile.reach * statRange * giantScale;
+}
+
+function getBowProjectileBonus(sourcePlayer) {
+    return normalizeWeapon(sourcePlayer && sourcePlayer.weapon) === 'bow' && Number.isFinite(sourcePlayer && sourcePlayer.giantScale) && sourcePlayer.giantScale > 1 ? 2 : 0;
 }
 
 function getVisualScale() {
@@ -608,7 +619,7 @@ function updateAttack(dt) {
         } else {
             player.attackTimer = 0.08 / player.stats.speed;
             socket.emit('playerAction', { attackPhase: 2 });
-            const attackRange = getWeaponAttackProfile(player.weapon).reach * player.stats.range * getAttackMultiplier();
+            const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
             Object.keys(allPlayers).forEach(id => {
                 if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
             });
@@ -672,7 +683,8 @@ function startBowShot() {
     const angle = player.aAngle || player.angle;
     const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
     const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
-    const totalShots = Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)));
+    const giantBonus = getBowProjectileBonus(player);
+    const totalShots = Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)) + giantBonus);
     const spreadStep = Math.min(0.24, Math.max(0.05, 0.05 + (totalShots - 1) * 0.035));
     const centerOffset = (totalShots - 1) / 2;
     for (let i = 0; i < totalShots; i++) {
@@ -913,8 +925,9 @@ function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
     const profile = getWeaponAttackProfile(weapon);
-    const attackRange = profile.reach * (stats ? stats.range : 1.0) * getAttackMultiplier(p);
-    const weaponLength = Math.max(28, attackRange - 28);
+    const attackRange = getEffectiveAttackRange(weapon, stats, p);
+    const visualAttackRange = getVisualAttackRange(weapon, stats, p);
+    const weaponLength = Math.max(28, visualAttackRange - 28);
     const bodyScale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
     const nameOffset = 65 * bodyScale;
     const hpOffset = 60 * bodyScale;
@@ -1131,7 +1144,7 @@ function drawCharacter(p, color) {
         } else if (weapon === 'bow') {
             ctx.strokeStyle = "rgba(255, 230, 170, 0.95)";
             ctx.lineWidth = 2.4;
-            const bowReach = Math.max(28, attackRange * 0.32);
+            const bowReach = Math.max(28, visualAttackRange * 0.32);
             ctx.beginPath();
             ctx.moveTo(12, 0);
             ctx.lineTo(12 + bowReach, 0);
