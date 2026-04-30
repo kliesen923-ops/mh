@@ -123,7 +123,7 @@ function createBaseStatsForWeapon(weapon) {
         return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, projectile: 1.0, hp: 95 };
     }
     if (nextWeapon === 'bow') {
-        return { dmg: 1.05, range: 1.0, speed: 1.02, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 };
+        return { dmg: 1.2, range: 1.0, speed: 0.84, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 };
     }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
 }
@@ -193,7 +193,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
     const angle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
-    let damage = Math.floor(9 * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
+    let damage = Math.floor(11 * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
     if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS && !reflected) {
         const reflectedId = createProjectileId('bowr');
         const reflectedPayload = {

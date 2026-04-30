@@ -6,7 +6,7 @@ const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
     hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, projectile: 1.0, hp: 115 } },
     spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, projectile: 1.0, hp: 95 } },
-    bow: { label: '활', stats: { dmg: 1.05, range: 1.0, speed: 1.02, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 } },
+    bow: { label: '활', stats: { dmg: 1.2, range: 1.0, speed: 0.84, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
@@ -336,7 +336,7 @@ function updateHUD() {
     player.stats = normalizeStats(player.stats);
     const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
     const isBow = normalizeWeapon(player.weapon) === 'bow';
-    basicDamage.textContent = formatDamage((isBow ? 9 : 10) * dmgScale);
+    basicDamage.textContent = formatDamage((isBow ? 11 : 10) * dmgScale);
     secondDamage.textContent = formatDamage(20 * dmgScale);
     heavyDamage.textContent = formatDamage(35 * dmgScale);
     updateCombatReadouts();
