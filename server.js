@@ -34,7 +34,7 @@ const MAX_NAME_LENGTH = 10;
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
-    spear: { reach: 102, arc: Math.PI * 0.14, lineWidth: 12 },
+    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 10 },
 };
 const dbPool = Pool && process.env.DATABASE_URL ? new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -115,7 +115,7 @@ function createBaseStatsForWeapon(weapon) {
         return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88 };
     }
     if (nextWeapon === 'spear') {
-        return { dmg: 1.24, range: 1.18, speed: 0.9, move: 0.96 };
+        return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96 };
     }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0 };
 }
