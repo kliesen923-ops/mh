@@ -833,10 +833,9 @@ function startAshArrow() {
     releaseGuardForAction();
     if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0) return;
     player.wireCooldown = SKILL_PRESETS.ash.cooldown;
-    const rawTx = player.x + Math.cos(player.angle) * 620;
-    const rawTy = player.y + Math.sin(player.angle) * 620;
-    const tx = Math.max(18, Math.min(canvas.width - 18, rawTx));
-    const ty = Math.max(18, Math.min(canvas.height - 18, rawTy));
+    const edge = getRayCanvasEdge(player.x, player.y, player.angle);
+    const tx = edge.x;
+    const ty = edge.y;
     player.wire.active = true;
     player.wire.kind = 'ash';
     player.wire.tx = tx;
@@ -844,6 +843,33 @@ function startAshArrow() {
     player.wire.progress = 0;
     player.wire.maxDistance = Math.max(1, Math.hypot(tx - player.x, ty - player.y));
     socket.emit('playerAction', { wire: { active: true, kind: 'ash', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
+}
+
+function getRayCanvasEdge(originX, originY, angle) {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const candidates = [];
+    const pushCandidate = (t) => {
+        if (!Number.isFinite(t) || t <= 0) return;
+        const x = originX + dx * t;
+        const y = originY + dy * t;
+        if (x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height) {
+            candidates.push({ t, x, y });
+        }
+    };
+    if (Math.abs(dx) > 1e-6) {
+        pushCandidate((0 - originX) / dx);
+        pushCandidate((canvas.width - originX) / dx);
+    }
+    if (Math.abs(dy) > 1e-6) {
+        pushCandidate((0 - originY) / dy);
+        pushCandidate((canvas.height - originY) / dy);
+    }
+    if (!candidates.length) {
+        return { x: originX, y: originY };
+    }
+    candidates.sort((a, b) => a.t - b.t);
+    return candidates[candidates.length - 1];
 }
 
 function findSecondaryHitTarget(tipX, tipY, prevTipX, prevTipY, kind) {
