@@ -1,0 +1,53 @@
+const MAX_MOVE_SPEED = 1500;
+const MOVE_TOLERANCE = 80;
+const ATTACK_ARC = Math.PI * 0.65;
+const WIRE_COOLDOWN_MS = 900;
+const WIRE_STUN_MS = 1000;
+const GUARD_DURATION_MS = 500;
+const JUST_GUARD_WINDOW_MS = 100;
+const MAX_CHAT_LENGTH = 50;
+const MAX_NAME_LENGTH = 10;
+const GAME_WIDTH = 1280;
+const GAME_HEIGHT = 640;
+const ATTACK_PROFILES = {
+    sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
+    hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
+    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 24 },
+    dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
+    bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
+};
+const HEAL_CROSS_SPAWN_DELAY_MS = 18000;
+const HEAL_CROSS_LIFETIME_MS = 12000;
+const HEAL_CROSS_BOUNDS = { xMin: 120, xMax: 1160, yMin: 110, yMax: 530 };
+const HEAL_CROSS_PICKUP_RADIUS = 34;
+const GIANT_POTION_SPAWN_DELAY_MS = 28000;
+const GIANT_POTION_LIFETIME_MS = 14000;
+const GIANT_POTION_BOUNDS = { xMin: 120, xMax: 1160, yMin: 110, yMax: 530 };
+const GIANT_POTION_PICKUP_RADIUS = 36;
+const GIANT_POTION_DURATION_MS = 9000;
+const GIANT_POTION_RECOVERY_STUN_MS = 1000;
+
+module.exports = {
+    MAX_MOVE_SPEED,
+    MOVE_TOLERANCE,
+    ATTACK_ARC,
+    WIRE_COOLDOWN_MS,
+    WIRE_STUN_MS,
+    GUARD_DURATION_MS,
+    JUST_GUARD_WINDOW_MS,
+    MAX_CHAT_LENGTH,
+    MAX_NAME_LENGTH,
+    GAME_WIDTH,
+    GAME_HEIGHT,
+    ATTACK_PROFILES,
+    HEAL_CROSS_SPAWN_DELAY_MS,
+    HEAL_CROSS_LIFETIME_MS,
+    HEAL_CROSS_BOUNDS,
+    HEAL_CROSS_PICKUP_RADIUS,
+    GIANT_POTION_SPAWN_DELAY_MS,
+    GIANT_POTION_LIFETIME_MS,
+    GIANT_POTION_BOUNDS,
+    GIANT_POTION_PICKUP_RADIUS,
+    GIANT_POTION_DURATION_MS,
+    GIANT_POTION_RECOVERY_STUN_MS,
+};
