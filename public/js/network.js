@@ -55,7 +55,7 @@ function showUpgradeUI() {
     }
     
     Object.keys(keys).forEach(k => keys[k] = false);
-    upgradeTimeLeft = 9;
+    upgradeTimeLeft = UPGRADE_PICK_SECONDS;
     const timerEl = document.getElementById('upgrade-timer');
     timerEl.innerText = '업그레이드 시간: ' + upgradeTimeLeft + '초';
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);

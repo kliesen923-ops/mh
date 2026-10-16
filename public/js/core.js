@@ -40,7 +40,8 @@ const GUARD_DURATION_SEC = 0.5;
 const JUST_GUARD_WINDOW_SEC = 0.1;
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
-let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
+const UPGRADE_PICK_SECONDS = 6;
+let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = UPGRADE_PICK_SECONDS;
 let pendingAuth = null;
 let currentSession = null;
 const isLocalAuthBypass = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
