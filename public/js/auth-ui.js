@@ -130,6 +130,7 @@ function enterGame(nickname, accountId, weapon, skill) {
     requestAnimationFrame(loop);
 }
 async function handleLogin() {
+    requestGameFullscreen();
     const id = normalizeAccountId(document.getElementById('login-id')?.value);
     const password = normalizeAccountPassword(document.getElementById('login-password')?.value);
     try {
@@ -146,6 +147,7 @@ async function handleLogin() {
     }
 }
 async function handleRegister() {
+    requestGameFullscreen();
     const id = normalizeAccountId(document.getElementById('register-id')?.value);
     const nickname = normalizeNameInput(document.getElementById('register-nickname')?.value);
     const password = normalizeAccountPassword(document.getElementById('register-password')?.value);
@@ -175,6 +177,7 @@ setAuthMode('login');
 updateSkillButtonLabel();
 document.getElementById('btn-login')?.addEventListener('click', handleLogin);
 document.getElementById('btn-signup')?.addEventListener('click', () => {
+    requestGameFullscreen();
     setAuthMode('register');
     setAuthError('register', '');
 });

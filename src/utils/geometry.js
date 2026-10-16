@@ -1,5 +1,12 @@
 const { GAME_WIDTH, GAME_HEIGHT } = require('../config');
 
+function randomWorldPoint(margin = 150) {
+    return {
+        x: margin + Math.random() * (GAME_WIDTH - margin * 2),
+        y: margin + Math.random() * (GAME_HEIGHT - margin * 2),
+    };
+}
+
 function getAngleDiff(a1, a2) {
     let diff = a1 - a2;
     while (diff < -Math.PI) diff += Math.PI * 2;
@@ -43,6 +50,7 @@ function createProjectileId(prefix) {
 }
 
 module.exports = {
+    randomWorldPoint,
     getAngleDiff,
     distToSegment,
     getRayWorldEdge,

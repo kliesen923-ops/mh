@@ -28,12 +28,23 @@ function updateBowProjectiles(dt) {
         const prevTipX = effect.startX + (effect.endX - effect.startX) * prevProgress;
         const prevTipY = effect.startY + (effect.endY - effect.startY) * prevProgress;
         if (effect.originId === myId && !effect.hitSent) {
-            const hitId = findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect);
-            if (hitId) {
+            const hit = findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect);
+            if (hit && hit.mobId) {
+                effect.hitSent = true;
+                socket.emit('bowArrowHitMob', {
+                    projectileId: effect.id,
+                    mobId: hit.mobId,
+                    endX: tipX,
+                    endY: tipY,
+                    angle: effect.angle,
+                });
+                return false;
+            }
+            if (hit) {
                 effect.hitSent = true;
                 socket.emit('bowArrowHit', {
                     projectileId: effect.id,
-                    targetId: hitId,
+                    targetId: hit.id,
                     startX: effect.startX,
                     startY: effect.startY,
                     endX: tipX,
@@ -150,10 +161,44 @@ function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
         const distance = distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target);
         if (distance > 26) continue;
         const score = Math.hypot(target.x - effect.startX, target.y - effect.startY);
-        candidates.push({ id, target, score });
+        candidates.push({ id, score });
     }
+    mobs.forEach((mob) => {
+        const radius = getMobRadius(mob);
+        if (distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, mob) > radius + 8) return;
+        candidates.push({ mobId: mob.id, score: Math.hypot(mob.x - effect.startX, mob.y - effect.startY) });
+    });
     candidates.sort((a, b) => a.score - b.score);
-    return candidates.length ? candidates[0].id : null;
+    return candidates.length ? candidates[0] : null;
+}
+
+function getMobRadius(mob) {
+    const tier = mobTiers[mob.tier];
+    return tier && Number.isFinite(tier.radius) ? tier.radius : 16;
+}
+
+// Nearest point on the mob's body to `from`, so weapon reach counts the mob's size.
+function getMobNearestPoint(mob, from) {
+    const distance = Math.hypot(mob.x - from.x, mob.y - from.y) || 1;
+    const inset = Math.min(getMobRadius(mob), distance);
+    return {
+        x: mob.x - ((mob.x - from.x) / distance) * inset,
+        y: mob.y - ((mob.y - from.y) / distance) * inset,
+    };
+}
+
+// Mob positions arrive ~20 times a second; ease toward them for smooth movement.
+function updateMobVisuals(dt) {
+    const blend = Math.min(1, dt * 14);
+    mobs.forEach((mob) => {
+        mob.x += (mob.tx - mob.x) * blend;
+        mob.y += (mob.ty - mob.y) * blend;
+        if (mob.flash > 0) mob.flash -= dt;
+    });
+    mobDeathEffects = mobDeathEffects.filter((effect) => {
+        effect.life -= dt;
+        return effect.life > 0;
+    });
 }
 
 function selectUpgrade(type) {
@@ -215,8 +260,8 @@ function update(dt) {
         }
     }
 
-    player.x = Math.max(25, Math.min(canvas.width - 25, player.x));
-    player.y = Math.max(25, Math.min(canvas.height - 25, player.y));
+    player.x = Math.max(25, Math.min(WORLD_WIDTH - 25, player.x));
+    player.y = Math.max(25, Math.min(WORLD_HEIGHT - 25, player.y));
     if (player.isGuarding) { player.guardActiveTimer += dt; if (player.guardActiveTimer >= GUARD_DURATION_SEC) releaseGuard(); }
     
     updateCombatReadouts();
@@ -273,6 +318,9 @@ function updateAttack(dt) {
             const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
             Object.keys(allPlayers).forEach(id => {
                 if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
+            });
+            mobs.forEach((mob) => {
+                if (isTargetInAttackArc(getMobNearestPoint(mob, player), attackRange)) socket.emit('mobHit', mob.id);
             });
         }
     } else if(player.attackPhase === 2 && player.attackTimer <= 0) { player.attackPhase = 3; player.attackTimer = 0.15 / (player.stats.speed * speedMult); socket.emit('playerAction', { attackPhase: 3 }); }
@@ -432,8 +480,8 @@ function startGearRush() {
     player.wireCooldown = getSkillCooldown('gear');
     const angle = player.angle;
     const dashDistance = 320;
-    const tx = Math.max(25, Math.min(canvas.width - 25, player.x + Math.cos(angle) * dashDistance));
-    const ty = Math.max(25, Math.min(canvas.height - 25, player.y + Math.sin(angle) * dashDistance));
+    const tx = Math.max(25, Math.min(WORLD_WIDTH - 25, player.x + Math.cos(angle) * dashDistance));
+    const ty = Math.max(25, Math.min(WORLD_HEIGHT - 25, player.y + Math.sin(angle) * dashDistance));
     player.gearRush = {
         active: true,
         startX: player.x,
@@ -458,8 +506,8 @@ function startWireGrab() {
     player.wireCooldown = getSkillCooldown('wire');
     const rawTx = player.x + Math.cos(player.angle) * 500;
     const rawTy = player.y + Math.sin(player.angle) * 500;
-    const tx = Math.max(25, Math.min(canvas.width - 25, rawTx));
-    const ty = Math.max(25, Math.min(canvas.height - 25, rawTy));
+    const tx = Math.max(25, Math.min(WORLD_WIDTH - 25, rawTx));
+    const ty = Math.max(25, Math.min(WORLD_HEIGHT - 25, rawTy));
     player.wire.active = true;
     player.wire.kind = 'wire';
     player.wire.tx = tx;
@@ -496,25 +544,30 @@ function startAshArrow() {
     socket.emit('playerAction', { wire: { active: true, kind: 'ash', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
 }
 
+// Where a ray from the origin leaves the visible part of the world.
 function getRayCanvasEdge(originX, originY, angle) {
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
+    const left = camera.x;
+    const top = camera.y;
+    const right = camera.x + canvas.width;
+    const bottom = camera.y + canvas.height;
     const candidates = [];
     const pushCandidate = (t) => {
         if (!Number.isFinite(t) || t <= 0) return;
         const x = originX + dx * t;
         const y = originY + dy * t;
-        if (x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height) {
+        if (x >= left && x <= right && y >= top && y <= bottom) {
             candidates.push({ t, x, y });
         }
     };
     if (Math.abs(dx) > 1e-6) {
-        pushCandidate((0 - originX) / dx);
-        pushCandidate((canvas.width - originX) / dx);
+        pushCandidate((left - originX) / dx);
+        pushCandidate((right - originX) / dx);
     }
     if (Math.abs(dy) > 1e-6) {
-        pushCandidate((0 - originY) / dy);
-        pushCandidate((canvas.height - originY) / dy);
+        pushCandidate((top - originY) / dy);
+        pushCandidate((bottom - originY) / dy);
     }
     if (!candidates.length) {
         return { x: originX, y: originY };

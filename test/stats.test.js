@@ -7,7 +7,6 @@ const {
     getAttackRangeMultiplier,
     isTargetInWeaponAttack,
     getUltimateConfig,
-    getKillLevelGain,
 } = require('../src/game/stats');
 const { sanitizeAction } = require('../src/game/action');
 
@@ -56,11 +55,6 @@ test('ultimate cooldowns per weapon', () => {
     assert.deepEqual(getUltimateConfig('spear'), { cooldownMs: 15000, durationMs: 2200 });
 });
 
-test('kill level gain is half the victim level, rounded up, at least 1', () => {
-    assert.equal(getKillLevelGain(1), 1);
-    assert.equal(getKillLevelGain(5), 3);
-    assert.equal(getKillLevelGain(undefined), 1);
-});
 
 test('sanitizeAction keeps only valid fields and clamps wire distance', () => {
     const player = { x: 0, y: 0, wire: { tx: 0, ty: 0 } };

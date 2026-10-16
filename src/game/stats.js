@@ -107,11 +107,6 @@ function clearUltimateState(player) {
     player.ultimate = createDefaultUltimate();
 }
 
-function getKillLevelGain(victimLevel) {
-    const level = Math.max(1, Math.floor(Number.isFinite(victimLevel) ? victimLevel : 1));
-    return Math.max(1, Math.ceil(level * 0.5));
-}
-
 function createDefaultStats() {
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
 }
@@ -134,5 +129,4 @@ module.exports = {
     createDefaultUltimate,
     getUltimateConfig,
     clearUltimateState,
-    getKillLevelGain,
 };

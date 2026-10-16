@@ -8,6 +8,7 @@ const {
 } = require('./stats');
 const { hasHitTargetForKey } = require('./hits');
 const { resolveKill } = require('./combat');
+const { hitMobs } = require('./mobs');
 
 const { players } = state;
 
@@ -57,6 +58,8 @@ function applySwordUltimate(playerId) {
                 state.io.emit('combatEffect', { x: target.x, y: target.y, angle: slashAngle, weapon: 'ult-sword' });
                 if (target.hp <= 0) resolveKill(playerId, targetId);
             }
+            const mobDamage = Math.floor((8 + (i % 3)) * (current.stats && Number.isFinite(current.stats.dmg) ? current.stats.dmg : 1) * getAttackMultiplier(current));
+            hitMobs(playerId, (mob) => Math.hypot(mob.x - current.x, mob.y - current.y) <= 126 + mob.radius, mobDamage, slashAngle, key);
             state.io.emit('statsUpdate', players);
         }, i * slashInterval);
     }
@@ -108,6 +111,12 @@ function applyHammerUltimate(playerId) {
         }, stunMs);
         if (target.hp <= 0) resolveKill(playerId, targetId);
     }
+    const hammerMobDamage = Math.floor(28 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+    hitMobs(playerId, (mob) => {
+        const dx = mob.x - attacker.x;
+        const dy = mob.y - attacker.y;
+        return Math.hypot(dx, dy) <= coneRange + mob.radius && getAngleDiff(attackAngle, Math.atan2(dy, dx)) <= coneArc;
+    }, hammerMobDamage, attackAngle);
     state.io.emit('statsUpdate', players);
     setTimeout(() => {
         if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'hammer') {
@@ -143,6 +152,8 @@ function applySpearUltimate(playerId) {
         state.io.emit('combatEffect', { x: target.x, y: target.y, angle: Math.atan2(dy, dx), weapon: 'spear-ult' });
         if (target.hp <= 0) resolveKill(playerId, targetId);
     }
+    const spearMobDamage = Math.floor(18 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+    hitMobs(playerId, (mob) => Math.hypot(mob.x - attacker.x, mob.y - attacker.y) <= attacker.ultimate.radius + mob.radius, spearMobDamage, attacker.angle);
     state.io.emit('statsUpdate', players);
     setTimeout(() => {
         if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'spear') {
@@ -194,6 +205,8 @@ function applyBowUltimate(playerId) {
         state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon' });
         if (target.hp <= 0) resolveKill(playerId, targetId);
     }
+    const dragonMobDamage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+    hitMobs(playerId, (mob) => distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, mob) <= 54 + mob.radius, dragonMobDamage, angle, hitKey);
     state.io.emit('statsUpdate', players);
     setTimeout(() => {
         if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'bow') {

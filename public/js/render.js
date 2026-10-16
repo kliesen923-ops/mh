@@ -670,7 +670,7 @@ function drawHealingTexts() {
         ctx.textBaseline = 'middle';
         ctx.lineWidth = 4;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-        ctx.fillStyle = '#46e06a';
+        ctx.fillStyle = effect.color || '#46e06a';
         const x = target.x;
         const y = target.y - 78 - rise;
         ctx.strokeText(effect.text, x, y);
@@ -796,17 +796,145 @@ function drawWireHand(tipX, tipY, angle, progress) {
     ctx.fill();
     ctx.restore();
 }
+function updateCamera() {
+    camera.x = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, player.x - canvas.width / 2));
+    camera.y = Math.max(0, Math.min(WORLD_HEIGHT - canvas.height, player.y - canvas.height / 2));
+}
+
+function drawWorldBackground() {
+    const left = camera.x;
+    const top = camera.y;
+    const right = camera.x + canvas.width;
+    const bottom = camera.y + canvas.height;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#333";
+    for (let x = Math.floor(left / 80) * 80; x <= right; x += 80) { ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); }
+    ctx.strokeStyle = "#262626";
+    for (let y = Math.floor(top / 56) * 56; y <= bottom; y += 56) { ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(231, 76, 60, 0.7)";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, WORLD_WIDTH - 6, WORLD_HEIGHT - 6);
+}
+
+function drawXpOrbs() {
+    const now = Date.now();
+    xpOrbs.forEach((orb) => {
+        const size = 6 + Math.min(6, orb.value);
+        const bob = Math.sin(now / 250 + orb.x) * 3;
+        ctx.save();
+        ctx.translate(orb.x, orb.y + bob);
+        ctx.shadowColor = '#5ad8ff';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#5ad8ff';
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size * 0.7, 0);
+        ctx.lineTo(0, size);
+        ctx.lineTo(-size * 0.7, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.beginPath();
+        ctx.moveTo(0, -size * 0.6);
+        ctx.lineTo(size * 0.3, 0);
+        ctx.lineTo(0, size * 0.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    });
+}
+
+function drawMobs() {
+    const now = Date.now();
+    mobs.forEach((mob) => {
+        const tier = mobTiers[mob.tier] || { color: '#2ecc71', radius: 16 };
+        const r = tier.radius || 16;
+        const wobble = 1 + Math.sin(now / 140 + mob.seed) * 0.06;
+        ctx.save();
+        ctx.translate(mob.x, mob.y);
+        ctx.globalAlpha = mob.mine ? 1 : 0.6;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath(); ctx.ellipse(0, r * 0.75, r * 0.95, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.scale(wobble, (2 - wobble) * 0.9);
+        ctx.fillStyle = mob.flash > 0 ? '#ffffff' : tier.color;
+        ctx.strokeStyle = mob.tier === mobTiers.length - 1 ? '#f1c40f' : 'rgba(0, 0, 0, 0.55)';
+        ctx.lineWidth = mob.tier === mobTiers.length - 1 ? 3 : 2;
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        const target = mob.mine ? player : null;
+        const look = target ? Math.atan2(target.y - mob.y, target.x - mob.x) : 0;
+        const ex = Math.cos(look) * r * 0.25;
+        const ey = Math.sin(look) * r * 0.25;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(-r * 0.32 + ex, -r * 0.15 + ey, r * 0.24, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex, -r * 0.15 + ey, r * 0.24, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = mob.tier >= 4 ? '#c0392b' : '#111';
+        ctx.beginPath(); ctx.arc(-r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        if (mob.hpPct < 100) {
+            const w = r * 2;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(mob.x - w / 2, mob.y - r - 10, w, 4);
+            ctx.fillStyle = tier.color === '#2c2c2c' ? '#f1c40f' : tier.color;
+            ctx.fillRect(mob.x - w / 2, mob.y - r - 10, w * Math.max(0, mob.hpPct) / 100, 4);
+        }
+    });
+    mobDeathEffects.forEach((effect) => {
+        const p = Math.max(0, effect.life / effect.maxLife);
+        ctx.save();
+        ctx.globalAlpha = p;
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(effect.x, effect.y, effect.radius * (1 + (1 - p) * 1.4), 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+    });
+}
+
+function drawMinimap() {
+    const w = 180;
+    const h = 90;
+    const x = (canvas.width - w) / 2;
+    const y = 104;
+    const sx = w / WORLD_WIDTH;
+    const sy = h / WORLD_HEIGHT;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.strokeRect(x + camera.x * sx, y + camera.y * sy, canvas.width * sx, canvas.height * sy);
+    ctx.fillStyle = '#5ad8ff';
+    xpOrbs.forEach((orb) => ctx.fillRect(x + orb.x * sx - 1, y + orb.y * sy - 1, 2, 2));
+    Object.values(allPlayers).forEach((p) => {
+        if (p.hp <= 0 || p.isSelectingLoadout) return;
+        const isMe = p.id === myId;
+        const px = isMe ? player.x : p.x;
+        const py = isMe ? player.y : p.y;
+        ctx.fillStyle = isMe ? '#e67e22' : '#3498db';
+        ctx.beginPath(); ctx.arc(x + px * sx, y + py * sy, isMe ? 3.5 : 3, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+}
+
 function draw() {
-    ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
-    for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    updateCamera();
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+    drawWorldBackground();
+    drawXpOrbs();
     drawHealingCrosses();
     drawGiantPotions();
+    drawMobs();
     Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
     drawHealingTexts();
     drawCombatEffects();
     drawAshProjectiles();
     drawBowProjectiles();
     drawDragonProjectiles();
+    ctx.restore();
+    if (gameState === 'PLAYING') drawMinimap();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }
