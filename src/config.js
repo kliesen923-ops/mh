@@ -11,6 +11,8 @@ const MAX_NAME_LENGTH = 10;
 const GAME_WIDTH = 3840;
 const GAME_HEIGHT = 1920;
 const WORLD_MARGIN = 25;
+// Longest straight line inside the 1280x640 viewport; arrows fly to the screen edge.
+const BOW_MAX_DISTANCE = 1450;
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
@@ -69,6 +71,7 @@ module.exports = {
     GAME_WIDTH,
     GAME_HEIGHT,
     WORLD_MARGIN,
+    BOW_MAX_DISTANCE,
     ATTACK_PROFILES,
     HEAL_CROSS_SPAWN_DELAY_MS,
     HEAL_CROSS_LIFETIME_MS,

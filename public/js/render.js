@@ -239,20 +239,7 @@ function drawCharacter(p, color) {
             ctx.fillStyle = comboStep===3?"rgba(255,200,0,0.95)":"rgba(255,255,255,0.9)";
             ctx.fill();
         } else if (weapon === 'bow') {
-            ctx.strokeStyle = "rgba(255, 230, 170, 0.95)";
-            ctx.lineWidth = 2.4;
-            const bowReach = Math.max(28, visualAttackRange * 0.32);
-            ctx.beginPath();
-            ctx.moveTo(12, 0);
-            ctx.lineTo(12 + bowReach, 0);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(12 + bowReach, 0);
-            ctx.lineTo(12 + bowReach - 8, -3);
-            ctx.lineTo(12 + bowReach - 8, 3);
-            ctx.closePath();
-            ctx.fillStyle = "rgba(255, 220, 120, 0.95)";
-            ctx.fill();
+            // The arrow projectile itself shows the shot.
         } else {
             ctx.beginPath();
             let sA = ba-2.0, eA = ba+0.5; let counter = false;

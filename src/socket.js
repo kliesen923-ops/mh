@@ -10,6 +10,7 @@ const {
     GAME_HEIGHT,
     WORLD_MARGIN,
     MOB_TIERS,
+    BOW_MAX_DISTANCE,
 } = require('./config');
 const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
@@ -375,8 +376,7 @@ function registerSocketHandlers(io) {
             const endX = Number.isFinite(payload.endX) ? payload.endX : mob.x;
             const endY = Number.isFinite(payload.endY) ? payload.endY : mob.y;
             if (Math.hypot(mob.x - endX, mob.y - endY) > mob.radius + 40) return;
-            const range = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
-            if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > range + mob.radius + 120) return;
+            if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > BOW_MAX_DISTANCE + mob.radius + 120) return;
             const hitKey = `${socket.id}:bowmob:${String(payload.projectileId || '').slice(0, 80)}`;
             if (hasHitTargetForKey(hitKey, `mob:${mob.id}`)) return;
             const damage = Math.floor(11 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
