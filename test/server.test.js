@@ -4,6 +4,9 @@ const { once } = require('node:events');
 const { io: connectClient } = require('socket.io-client');
 const { createServer } = require('../src/app');
 const state = require('../src/game/state');
+const { spawnMob, tickMobs, getMobsForOwner, clearAllMobs } = require('../src/game/mobs');
+const { scatterXp, clearXpOrbs, getXpOrbList } = require('../src/game/xpOrbs');
+const { grantXp } = require('../src/game/progression');
 
 let server;
 let baseUrl;
@@ -65,7 +68,7 @@ test('auth endpoints validate input before touching the database', async () => {
     assert.equal((await res.json()).ok, false);
 });
 
-test('melee hit damages and a lethal hit kills, levels up and respawns', async () => {
+test('melee hit damages and a lethal hit kills, scatters XP and respawns', async () => {
     const attackerClient = await connect();
     const targetClient = await connect();
     const attacker = await readyPlayer(attackerClient);
@@ -91,16 +94,23 @@ test('melee hit damages and a lethal hit kills, levels up and respawns', async (
     assert.equal(target.hp, 90);
 
     target.hp = 5;
+    Object.assign(target, { level: 4, xp: 2, totalXp: 30 });
     const died = once(targetClient, 'playerDied');
-    const levelUp = once(attackerClient, 'levelUp');
+    const orbsDropped = once(attackerClient, 'xpOrbs');
     await swing();
     const [death] = await died;
     assert.deepEqual(death, { victimId: targetClient.id, attackerId: attackerClient.id });
-    assert.deepEqual((await levelUp)[0], { newLevel: 2, count: 1 });
+    const [orbs] = await orbsDropped;
+    assert.equal(orbs.reduce((sum, orb) => sum + orb.value, 0), 30);
+    for (const orb of orbs) {
+        const distance = Math.hypot(orb.x - 350, orb.y - 300);
+        assert.ok(distance >= 89 && distance <= 261, `orb scattered ${distance}px away`);
+    }
     assert.equal(attacker.kills, 1);
     assert.equal(target.deaths, 1);
     assert.equal(target.isSelectingLoadout, true);
-    assert.equal(attacker.isUpgrading, true);
+    assert.deepEqual([target.level, target.xp, target.totalXp], [1, 0, 0]);
+    clearXpOrbs();
 
     const [respawned] = await once(targetClient, 'playerRespawn');
     assert.equal(respawned.id, targetClient.id);
@@ -141,4 +151,110 @@ test('disconnect removes the player for everyone', async () => {
     leaver.close();
     assert.equal((await gone)[0], leaverId);
     assert.equal(state.players[leaverId], undefined);
+});
+
+test('mobs chase only their owner and are reported to nearby players', async () => {
+    clearAllMobs();
+    const ownerClient = await connect();
+    const owner = await readyPlayer(ownerClient);
+    Object.assign(owner, { x: 2000, y: 1000, hp: 100 });
+
+    const mob = spawnMob(ownerClient.id, { x: 2300, y: 1000, tier: 0 });
+    const snapshot = once(ownerClient, 'mobs');
+    tickMobs(Date.now(), { spawn: false });
+    const [mobsSeen] = await snapshot;
+    const entry = mobsSeen.find(([id]) => id === mob.id);
+    assert.ok(entry, 'owner sees their mob');
+    assert.equal(entry[5], 1, 'flagged as the owner\'s mob');
+    assert.ok(mob.x < 2300, 'mob moved toward the owner');
+    clearAllMobs();
+});
+
+test('mobs deal contact damage, and killing one grants XP', async () => {
+    clearAllMobs();
+    const ownerClient = await connect();
+    const owner = await readyPlayer(ownerClient);
+    Object.assign(owner, { x: 1000, y: 1000, hp: 100, angle: 0, weapon: 'sword', isGuarding: false, isDodging: false });
+
+    const biter = spawnMob(ownerClient.id, { x: 1010, y: 1000, tier: 0 });
+    const bitten = once(ownerClient, 'mobDamage');
+    tickMobs(Date.now(), { spawn: false });
+    const [{ amount }] = await bitten;
+    assert.equal(amount, biter.damage);
+    assert.equal(owner.hp, 100 - biter.damage);
+
+    owner.hp = 100;
+    const xpBefore = owner.totalXp;
+    const killed = once(ownerClient, 'mobKilled');
+    biter.hp = 1;
+    ownerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    ownerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+    ownerClient.emit('mobHit', biter.id);
+    const [kill] = await killed;
+    assert.equal(kill.id, biter.id);
+    assert.equal(kill.killerId, ownerClient.id);
+    assert.equal(owner.totalXp, xpBefore + biter.xp);
+    assert.equal(getMobsForOwner(ownerClient.id).length, 0);
+});
+
+test('stronger mob tiers appear as the owner levels up', () => {
+    const { pickMobTier, getMaxMobTier } = require('../src/game/mobs');
+    assert.equal(getMaxMobTier(1), 0);
+    assert.equal(getMaxMobTier(4), 1);
+    assert.equal(getMaxMobTier(100), 5);
+    assert.equal(pickMobTier(10, 0.9), 3);
+    assert.equal(pickMobTier(10, 0.2), 2);
+    assert.equal(pickMobTier(10, 0.05), 1);
+    assert.equal(pickMobTier(1, 0.05), 0);
+});
+
+test('XP levels players up and pauses their mobs during the upgrade pick', async () => {
+    clearAllMobs();
+    const client = await connect();
+    const p = await readyPlayer(client);
+    Object.assign(p, { x: 1500, y: 800, hp: 100, level: 1, xp: 0, totalXp: 0, pendingUpgrades: 0 });
+
+    const leveled = once(client, 'levelUp');
+    grantXp(client.id, 7 + 10 + 1);
+    assert.deepEqual((await leveled)[0], { newLevel: 3, count: 2 });
+    assert.equal(p.xp, 1);
+    assert.equal(p.isUpgrading, true);
+
+    const mob = spawnMob(client.id, { x: 1700, y: 800, tier: 0 });
+    tickMobs(Date.now(), { spawn: false });
+    assert.equal(mob.x, 1700, 'mob frozen while upgrading');
+    p.isUpgrading = false;
+    clearAllMobs();
+});
+
+test('scattered XP orbs are collected by walking over them', async () => {
+    clearXpOrbs();
+    const client = await connect();
+    const p = await readyPlayer(client);
+    Object.assign(p, { x: 600, y: 600, hp: 100, level: 1, xp: 0, totalXp: 0 });
+    const orbs = scatterXp(3000, 1500, 9);
+    assert.equal(orbs.reduce((sum, orb) => sum + orb.value, 0), 9);
+
+    for (const orb of orbs) {
+        p.x = orb.x;
+        p.y = orb.y;
+        tickMobs(Date.now(), { spawn: false });
+    }
+    assert.equal(getXpOrbList().length, 0);
+    assert.equal(p.totalXp, 9);
+});
+
+test('dying to your own mobs counts as a death with no killer', async () => {
+    clearAllMobs();
+    const client = await connect();
+    const p = await readyPlayer(client);
+    Object.assign(p, { x: 900, y: 900, hp: 2, isDodging: false, isGuarding: false, isUpgrading: false });
+    spawnMob(client.id, { x: 905, y: 900, tier: 0 });
+
+    const died = once(client, 'playerDied');
+    tickMobs(Date.now(), { spawn: false });
+    assert.deepEqual((await died)[0], { victimId: client.id, attackerId: null });
+    tickMobs(Date.now(), { spawn: false });
+    assert.equal(getMobsForOwner(client.id).length, 0, 'mobs vanish when their owner dies');
+    clearXpOrbs();
 });

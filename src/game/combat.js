@@ -1,6 +1,6 @@
 const state = require('./state');
 const { JUST_GUARD_WINDOW_MS } = require('../config');
-const { getAngleDiff, createProjectileId } = require('../utils/geometry');
+const { getAngleDiff, createProjectileId, randomWorldPoint } = require('../utils/geometry');
 const { updateAccountScore } = require('../db');
 const {
     createBaseStatsForWeapon,
@@ -10,26 +10,27 @@ const {
     createUpgradeCounts,
     createDefaultGearRush,
     clearUltimateState,
-    getKillLevelGain,
 } = require('./stats');
+const { resetProgression } = require('./progression');
+const { scatterXp } = require('./xpOrbs');
 
 const { players } = state;
 
+// attackerId is null when the victim was killed by their own mobs.
 function resolveKill(attackerId, targetId) {
-    const attacker = players[attackerId];
+    const attacker = attackerId ? players[attackerId] : null;
     const target = players[targetId];
-    if (!attacker || !target) return;
+    if (!target || (attackerId && !attacker)) return;
     target.hp = 0;
     target.deaths++;
-    attacker.kills++;
-    updateAccountScore(attacker.accountId, 'kills', 1);
     updateAccountScore(target.accountId, 'deaths', 1);
-    const levelsGained = getKillLevelGain(target.level);
-    attacker.level += levelsGained;
-    attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
-    attacker.isUpgrading = true;
-    attacker.pendingUpgrades += levelsGained;
-    target.level = 1;
+    if (attacker) {
+        attacker.kills++;
+        updateAccountScore(attacker.accountId, 'kills', 1);
+        attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
+    }
+    scatterXp(target.x, target.y, target.totalXp);
+    resetProgression(target);
     target.stats = createBaseStatsForWeapon(target.weapon);
     target.upgradeCounts = createUpgradeCounts();
     target.pendingUpgrades = 0;
@@ -43,13 +44,13 @@ function resolveKill(attackerId, targetId) {
     target.giantEndsAt = 0;
     target.giantRecoveryEndsAt = 0;
     target.giantRecoveryArmed = false;
-    state.io.emit('playerDied', { victimId: targetId, attackerId });
-    if (levelsGained > 0) state.io.to(attackerId).emit('levelUp', { newLevel: attacker.level, count: levelsGained });
+    state.io.emit('playerDied', { victimId: targetId, attackerId: attackerId || null });
     setTimeout(() => {
         if (players[targetId]) {
+            const spawn = randomWorldPoint();
             players[targetId].hp = getMaxHpFromStats(players[targetId].stats);
-            players[targetId].x = 100 + Math.random() * 800;
-            players[targetId].y = 100 + Math.random() * 500;
+            players[targetId].x = spawn.x;
+            players[targetId].y = spawn.y;
             players[targetId].isStunned = false;
             players[targetId].isGuarding = false;
             players[targetId].isSelectingLoadout = true;
@@ -149,35 +150,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         weapon: 'bow',
     });
     finalTarget.hp -= damage;
-    if (finalTarget.hp <= 0) {
-        finalTarget.hp = 0;
-        finalTarget.deaths++;
-        finalAttacker.kills++;
-        updateAccountScore(finalAttacker.accountId, 'kills', 1);
-        updateAccountScore(finalTarget.accountId, 'deaths', 1);
-        const levelsGained = getKillLevelGain(finalTarget.level);
-        finalAttacker.level += levelsGained;
-        finalAttacker.hp = Math.min(getMaxHpFromStats(finalAttacker.stats), finalAttacker.hp + Math.floor(getMaxHpFromStats(finalAttacker.stats) * 0.5));
-        finalAttacker.isUpgrading = true;
-        finalAttacker.pendingUpgrades += levelsGained;
-        finalTarget.level = 1;
-        finalTarget.stats = createBaseStatsForWeapon(finalTarget.weapon);
-        finalTarget.upgradeCounts = createUpgradeCounts();
-        finalTarget.pendingUpgrades = 0;
-        finalTarget.isUpgrading = false;
-        state.io.emit('playerDied', { victimId: targetId, attackerId });
-        if (levelsGained > 0) state.io.to(attackerId).emit('levelUp', { newLevel: finalAttacker.level, count: levelsGained });
-        setTimeout(() => {
-            if (players[targetId]) {
-                players[targetId].hp = getMaxHpFromStats(players[targetId].stats);
-                players[targetId].x = 100 + Math.random() * 800;
-                players[targetId].y = 100 + Math.random() * 500;
-                players[targetId].isStunned = false;
-                players[targetId].isGuarding = false;
-                state.io.emit('playerRespawn', players[targetId]);
-            }
-        }, 3000);
-    }
+    if (finalTarget.hp <= 0) resolveKill(attackerId, targetId);
     state.io.emit('statsUpdate', players);
 }
 

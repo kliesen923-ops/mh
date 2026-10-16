@@ -6,9 +6,13 @@ const {
     WIRE_STUN_MS,
     JUST_GUARD_WINDOW_MS,
     MAX_CHAT_LENGTH,
+    GAME_WIDTH,
+    GAME_HEIGHT,
+    WORLD_MARGIN,
+    MOB_TIERS,
 } = require('./config');
 const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
-const { getAngleDiff, distToSegment, createProjectileId } = require('./utils/geometry');
+const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
 const { getAccountById } = require('./db');
 const {
     createBaseStatsForWeapon,
@@ -29,25 +33,30 @@ const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayer
 const { resolveKill, applyBowImpact, applyAshImpact } = require('./game/combat');
 const { ULTIMATE_HANDLERS } = require('./game/ultimates');
 const { getHealingCrossList, getGiantPotionList } = require('./game/pickups');
+const { createProgression } = require('./game/progression');
+const { getXpOrbList } = require('./game/xpOrbs');
+const { getMob, damageMob, hitMobs, clearMobsForOwner } = require('./game/mobs');
 
 const { players } = state;
 
 function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
         console.log('새 플레이어 연결:', socket.id);
+        const spawnPoint = randomWorldPoint();
 
         players[socket.id] = {
             id: socket.id,
             accountId: '',
             name: "Hunter_" + socket.id.substring(0, 4),
             weapon: 'sword',
-            x: 200 + Math.random() * 600,
-            y: 200 + Math.random() * 400,
+            x: spawnPoint.x,
+            y: spawnPoint.y,
             hp: getMaxHpFromStats(createBaseStatsForWeapon('sword')),
             angle: 0,
             kills: 0,
             deaths: 0,
             level: 1,
+            ...createProgression(),
             isAttacking: false,
             attackPhase: 0,
             comboStep: 0,
@@ -76,6 +85,8 @@ function registerSocketHandlers(io) {
         socket.emit('currentPlayers', players);
         socket.emit('healingCrossUpdate', getHealingCrossList());
         socket.emit('giantPotionUpdate', getGiantPotionList());
+        socket.emit('mobTiers', MOB_TIERS.map(({ name, color, radius }) => ({ name, color, radius })));
+        socket.emit('xpOrbs', getXpOrbList());
         socket.broadcast.emit('newPlayer', players[socket.id]);
 
         socket.on('setName', (name) => {
@@ -158,6 +169,8 @@ function registerSocketHandlers(io) {
                     p.x = nextX;
                     p.y = nextY;
                 }
+                p.x = Math.max(WORLD_MARGIN, Math.min(GAME_WIDTH - WORLD_MARGIN, p.x));
+                p.y = Math.max(WORLD_MARGIN, Math.min(GAME_HEIGHT - WORLD_MARGIN, p.y));
                 p.angle = nextAngle;
                 p.lastMoveAt = now;
                 socket.broadcast.emit('playerMoved', players[socket.id]);
@@ -328,6 +341,41 @@ function registerSocketHandlers(io) {
             }
         });
 
+        socket.on('mobHit', (mobId) => {
+            const attacker = players[socket.id];
+            const mob = getMob(mobId);
+            if (!attacker || !mob || attacker.hp <= 0 || sanitizeWeapon(attacker.weapon) === 'bow') return;
+            if (!attacker.isAttacking || attacker.attackPhase !== 2) return;
+            // Measure to the edge of the mob's body nearest the attacker.
+            const distance = Math.hypot(mob.x - attacker.x, mob.y - attacker.y) || 1;
+            const inset = Math.min(mob.radius, distance);
+            const nearestPoint = {
+                x: mob.x - ((mob.x - attacker.x) / distance) * inset,
+                y: mob.y - ((mob.y - attacker.y) / distance) * inset,
+            };
+            if (!isTargetInWeaponAttack(attacker, nearestPoint)) return;
+            if (hasHitTargetThisAttack(socket.id, `mob:${mob.id}`)) return;
+            const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
+            const damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
+            damageMob(mob.id, socket.id, damage, Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle);
+        });
+
+        socket.on('bowArrowHitMob', (payloadData) => {
+            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+            const attacker = players[socket.id];
+            const mob = getMob(payload.mobId);
+            if (!attacker || !mob || attacker.hp <= 0 || sanitizeWeapon(attacker.weapon) !== 'bow') return;
+            const endX = Number.isFinite(payload.endX) ? payload.endX : mob.x;
+            const endY = Number.isFinite(payload.endY) ? payload.endY : mob.y;
+            if (Math.hypot(mob.x - endX, mob.y - endY) > mob.radius + 40) return;
+            const range = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
+            if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > range + mob.radius + 120) return;
+            const hitKey = `${socket.id}:bowmob:${String(payload.projectileId || '').slice(0, 80)}`;
+            if (hasHitTargetForKey(hitKey, `mob:${mob.id}`)) return;
+            const damage = Math.floor(11 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
+            damageMob(mob.id, socket.id, damage, Number(payload.angle) || 0);
+        });
+
         socket.on('dualRushSlash', (payloadData) => {
             const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
             const attacker = players[socket.id];
@@ -374,6 +422,9 @@ function registerSocketHandlers(io) {
                 hitAny = true;
                 if (target.hp <= 0) resolveKill(socket.id, targetId);
             }
+            const mobDamage = Math.floor((6 + Math.min(5, Math.floor(slashIndex / 2))) * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
+            hitMobs(socket.id, (mob) => Math.hypot(mob.x - startX, mob.y - startY) <= attackRange + mob.radius
+                && distToSegment({ x: startX, y: startY }, { x: endX, y: endY }, mob) <= slashWidth + mob.radius, mobDamage, attackAngle, slashKey);
             if (hitAny) io.emit('statsUpdate', players);
         });
 
@@ -385,6 +436,7 @@ function registerSocketHandlers(io) {
         socket.on('disconnect', () => {
             delete players[socket.id];
             clearPlayerHits(socket.id);
+            clearMobsForOwner(socket.id);
             io.emit('playerDisconnected', socket.id);
         });
     });

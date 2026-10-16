@@ -6,8 +6,8 @@ function setMouseAimFromPoint(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width / canvas.width;
     const scaleY = rect.height / canvas.height;
-    const worldX = (clientX - rect.left) / Math.max(0.0001, scaleX);
-    const worldY = (clientY - rect.top) / Math.max(0.0001, scaleY);
+    const worldX = (clientX - rect.left) / Math.max(0.0001, scaleX) + camera.x;
+    const worldY = (clientY - rect.top) / Math.max(0.0001, scaleY) + camera.y;
     const dx = worldX - player.x;
     const dy = worldY - player.y;
     if (dx === 0 && dy === 0) return;
@@ -38,4 +38,4 @@ window.addEventListener('mouseleave', () => { if (aimMode === 'mouse') aimMode =
 const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) return; el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting && !isUpgrading) fn(e); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); el.addEventListener('pointercancel', end); } };
 bind('btn-attack', () => { attackHoldSources.add('button'); beginAttack(); }, () => { attackHoldSources.delete('button'); });
 bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire); bind('btn-ultimate', useUltimate);
-let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateCooldownUI(); draw(); }
+let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateMobVisuals(dt); updateCooldownUI(); draw(); }

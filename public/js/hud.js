@@ -163,6 +163,19 @@ function updateCombatReadouts() {
     dodgeDistanceValue.textContent = formatPercentStat(player.stats.dodge);
 }
 
+function updateXpBar() {
+    const me = allPlayers[myId];
+    const levelText = document.getElementById('level-text');
+    const xpText = document.getElementById('xp-text');
+    const xpFill = document.getElementById('xp-fill');
+    if (!me || !levelText || !xpText || !xpFill) return;
+    const xp = Math.max(0, Math.floor(me.xp || 0));
+    const xpToNext = Math.max(1, Math.floor(me.xpToNext || 1));
+    levelText.textContent = `Lv.${me.level || 1}`;
+    xpText.textContent = `${xp}/${xpToNext}`;
+    xpFill.style.width = `${Math.min(100, (xp / xpToNext) * 100)}%`;
+}
+
 function updateHUD() {
     const hpText = document.getElementById('hp-text');
     const hpFill = document.getElementById('hp-fill');
@@ -175,6 +188,7 @@ function updateHUD() {
     const hp = Math.max(0, Math.ceil(player.hp || 0));
     hpText.textContent = `${hp}/${maxHp}`;
     hpFill.style.width = `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`;
+    updateXpBar();
 
     player.stats = normalizeStats(player.stats);
     const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;

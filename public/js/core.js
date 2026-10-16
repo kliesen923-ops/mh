@@ -3,6 +3,10 @@ const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 640;
 const VIEW_Y_SCALE = 0.7;
+// The world is larger than the 1280x640 viewport; the camera follows the player.
+const WORLD_WIDTH = 3840;
+const WORLD_HEIGHT = 1920;
+const camera = { x: 0, y: 0 };
 const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
     hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, projectile: 1.0, hp: 115 } },
@@ -49,6 +53,10 @@ let dragonProjectiles = [];
 let healingCrosses = [];
 let healingTexts = [];
 let giantPotions = [];
+let mobs = new Map();
+let mobTiers = [];
+let mobDeathEffects = [];
+let xpOrbs = [];
 const keys = {};
 function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));

@@ -7,6 +7,8 @@ const { initDatabase } = require('./db');
 const authRoutes = require('./routes/auth');
 const { registerSocketHandlers } = require('./socket');
 const { startPickupLoops, stopPickupLoops } = require('./game/pickups');
+const { tickMobs } = require('./game/mobs');
+const { MOB_TICK_MS } = require('./config');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
@@ -33,7 +35,11 @@ function start(port = process.env.PORT || 3000) {
         console.error('Database init failed:', error);
     });
     const pickupIntervals = startPickupLoops();
-    server.httpServer.on('close', () => stopPickupLoops(pickupIntervals));
+    const mobInterval = setInterval(() => tickMobs(), MOB_TICK_MS);
+    server.httpServer.on('close', () => {
+        stopPickupLoops(pickupIntervals);
+        clearInterval(mobInterval);
+    });
     server.httpServer.listen(port, () => { console.log(`서버 실행 중: ${server.httpServer.address().port}`); });
     return server;
 }

@@ -104,7 +104,8 @@ socket.on('skillChanged', (data) => {
         updateSkillButtonLabel();
     }
 });
-socket.on('combatEffect', (effect) => {
+socket.on('combatEffect', pushCombatEffect);
+function pushCombatEffect(effect) {
     if (!effect) return;
     combatEffects.push({
         x: Number(effect.x) || 0,
@@ -114,6 +115,55 @@ socket.on('combatEffect', (effect) => {
         life: 0.22,
         maxLife: 0.22,
     });
+}
+socket.on('mobTiers', (data) => {
+    mobTiers = Array.isArray(data) ? data : [];
+});
+socket.on('mobs', (data) => {
+    const seen = new Set();
+    (Array.isArray(data) ? data : []).forEach(([id, x, y, tier, hpPct, mine]) => {
+        seen.add(id);
+        const mob = mobs.get(id);
+        if (mob) {
+            Object.assign(mob, { tx: x, ty: y, tier, hpPct, mine: mine === 1 });
+        } else {
+            mobs.set(id, { id, x, y, tx: x, ty: y, tier, hpPct, mine: mine === 1, flash: 0, seed: Math.random() * Math.PI * 2 });
+        }
+    });
+    for (const id of mobs.keys()) {
+        if (!seen.has(id)) mobs.delete(id);
+    }
+});
+socket.on('mobDamaged', (data) => {
+    if (!data) return;
+    const mob = mobs.get(data.id);
+    if (mob) mob.flash = 0.12;
+    pushCombatEffect(data);
+});
+socket.on('mobKilled', (data) => {
+    if (!data) return;
+    const mob = mobs.get(data.id);
+    const tier = mobTiers[data.tier];
+    mobDeathEffects.push({
+        x: mob ? mob.x : Number(data.x) || 0,
+        y: mob ? mob.y : Number(data.y) || 0,
+        color: tier ? tier.color : '#2ecc71',
+        radius: tier ? tier.radius : 16,
+        life: 0.35,
+        maxLife: 0.35,
+    });
+    mobs.delete(data.id);
+    if (data.killerId === myId && data.xp > 0) {
+        healingTexts.push({ playerId: myId, text: `+${data.xp} XP`, color: '#5ad8ff', life: 0.9, maxLife: 0.9 });
+    }
+});
+socket.on('mobDamage', (data) => {
+    const amount = Math.floor(Number(data && data.amount) || 0);
+    if (amount <= 0) return;
+    healingTexts.push({ playerId: myId, text: `-${amount}`, color: '#ff5a5a', life: 0.7, maxLife: 0.7 });
+});
+socket.on('xpOrbs', (data) => {
+    xpOrbs = Array.isArray(data) ? data : [];
 });
 socket.on('healingCrossUpdate', (data) => {
     healingCrosses = Array.isArray(data) ? data : [];
