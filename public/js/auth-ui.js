@@ -173,7 +173,7 @@ if (savedLoginId) {
 setAuthMode('login');
 updateSkillButtonLabel();
 document.getElementById('btn-login')?.addEventListener('click', handleLogin);
-document.getElementById('btn-signin')?.addEventListener('click', () => {
+document.getElementById('btn-signup')?.addEventListener('click', () => {
     setAuthMode('register');
     setAuthError('register', '');
 });
