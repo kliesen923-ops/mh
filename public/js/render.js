@@ -805,31 +805,42 @@ function drawWorldBackground() {
 
 function drawXpOrbs() {
     const now = Date.now();
+    const visible = (orb) => orb.x > camera.x - 30 && orb.x < camera.x + canvas.width + 30 && orb.y > camera.y - 30 && orb.y < camera.y + canvas.height + 30;
     xpOrbs.forEach((orb) => {
-        const size = 6 + Math.min(6, orb.value);
-        const bob = Math.sin(now / 250 + orb.x) * 3;
-        ctx.save();
-        ctx.translate(orb.x, orb.y + bob);
-        ctx.shadowColor = '#5ad8ff';
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = '#5ad8ff';
-        ctx.beginPath();
-        ctx.moveTo(0, -size);
-        ctx.lineTo(size * 0.7, 0);
-        ctx.lineTo(0, size);
-        ctx.lineTo(-size * 0.7, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.beginPath();
-        ctx.moveTo(0, -size * 0.6);
-        ctx.lineTo(size * 0.3, 0);
-        ctx.lineTo(0, size * 0.2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+        if (visible(orb)) drawXpGem(orb.x, orb.y + Math.sin(now / 250 + orb.x) * 3, orb.value, 1);
     });
+    collectingOrbs.forEach((orb) => {
+        const collector = orb.by === myId ? player : allPlayers[orb.by];
+        if (!collector) return;
+        const t = 1 - Math.max(0, orb.life / orb.maxLife);
+        const eased = t * t;
+        drawXpGem(orb.x + (collector.x - orb.x) * eased, orb.y + (collector.y - 20 - orb.y) * eased, orb.value, 1 - t * 0.6);
+    });
+}
+
+function drawXpGem(x, y, value, scale) {
+    const size = (6 + Math.min(6, value)) * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.shadowColor = '#5ad8ff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#5ad8ff';
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.7, 0);
+    ctx.lineTo(0, size);
+    ctx.lineTo(-size * 0.7, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.6);
+    ctx.lineTo(size * 0.3, 0);
+    ctx.lineTo(0, size * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 }
 
 function drawMobs() {

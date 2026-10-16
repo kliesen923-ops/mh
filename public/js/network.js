@@ -93,6 +93,10 @@ socket.on('playerRespawn', (p) => {
 socket.on('playerDisconnected', (id) => { delete allPlayers[id]; updateLeaderboard(); });
 socket.on('playerDied', (data) => {
     if (data && data.victimId === myId) {
+        if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
+        pendingUpgrades = 0;
+        isUpgrading = false;
+        document.getElementById('overlay-upgrade').classList.add('hidden');
         gameState = 'TITLE';
         showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
         setWeaponError('사망했습니다. 무기를 다시 선택하세요.');
@@ -153,9 +157,6 @@ socket.on('mobKilled', (data) => {
         maxLife: 0.35,
     });
     mobs.delete(data.id);
-    if (data.killerId === myId && data.xp > 0) {
-        healingTexts.push({ playerId: myId, text: `+${data.xp} XP`, color: '#5ad8ff', life: 0.9, maxLife: 0.9 });
-    }
 });
 socket.on('mobDamage', (data) => {
     const amount = Math.floor(Number(data && data.amount) || 0);
@@ -164,6 +165,23 @@ socket.on('mobDamage', (data) => {
 });
 socket.on('xpOrbs', (data) => {
     xpOrbs = Array.isArray(data) ? data : [];
+});
+socket.on('xpOrbsAdded', (data) => {
+    if (Array.isArray(data)) xpOrbs = xpOrbs.concat(data);
+});
+socket.on('xpOrbsRemoved', (data) => {
+    if (!Array.isArray(data) || data.length === 0) return;
+    const byId = new Map(data.map((entry) => [entry.id, entry]));
+    let myXp = 0;
+    xpOrbs = xpOrbs.filter((orb) => {
+        const entry = byId.get(orb.id);
+        if (!entry) return true;
+        // Picked-up orbs fly into whoever collected them.
+        if (entry.by) collectingOrbs.push({ x: orb.x, y: orb.y, value: orb.value, by: entry.by, life: 0.22, maxLife: 0.22 });
+        if (entry.by === myId) myXp += orb.value;
+        return false;
+    });
+    if (myXp > 0) healingTexts.push({ playerId: myId, text: `+${myXp} XP`, color: '#5ad8ff', life: 0.9, maxLife: 0.9 });
 });
 socket.on('healingCrossUpdate', (data) => {
     healingCrosses = Array.isArray(data) ? data : [];

@@ -199,6 +199,10 @@ function updateMobVisuals(dt) {
         effect.life -= dt;
         return effect.life > 0;
     });
+    collectingOrbs = collectingOrbs.filter((orb) => {
+        orb.life -= dt;
+        return orb.life > 0;
+    });
 }
 
 function selectUpgrade(type) {

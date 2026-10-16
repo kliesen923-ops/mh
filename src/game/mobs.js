@@ -12,10 +12,9 @@ const {
 } = require('../config');
 const { getAngleDiff } = require('../utils/geometry');
 const { hasHitTargetForKey } = require('./hits');
-const { grantXp } = require('./progression');
 const { getMaxMobTier, pickMobTier } = require('./tiers');
 const { getMaxHpFromStats } = require('./stats');
-const { updateXpOrbs } = require('./xpOrbs');
+const { updateXpOrbs, dropXpOrb } = require('./xpOrbs');
 const { markStatsDirty, flushStats } = require('./sync');
 
 const { players } = state;
@@ -103,7 +102,7 @@ function clearAllMobs() {
     lastSentCount.clear();
 }
 
-// Any player can damage any mob; the killer earns its XP.
+// Any player can damage any mob. A killed mob drops its XP as an orb anyone can pick up.
 function damageMob(mobId, attackerId, damage, angle) {
     const mob = getMob(mobId);
     const attacker = players[attackerId];
@@ -114,8 +113,8 @@ function damageMob(mobId, attackerId, damage, angle) {
         mobs.delete(mob.id);
         // Small heal per kill so long fights are survivable without pickups.
         if (attacker.hp > 0) attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + 1 + mob.tier);
-        grantXp(attackerId, mob.xp);
-        state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId, xp: mob.xp });
+        state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId });
+        dropXpOrb(mob.x, mob.y, mob.xp);
     } else {
         state.io.emit('mobDamaged', { id: mob.id, x: mob.x, y: mob.y, angle: Number.isFinite(angle) ? angle : 0, weapon: attacker.weapon || 'sword' });
     }

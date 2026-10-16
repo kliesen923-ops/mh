@@ -54,7 +54,6 @@ function resolveKill(attackerId, targetId) {
             players[targetId].y = spawn.y;
             players[targetId].isStunned = false;
             players[targetId].isGuarding = false;
-            players[targetId].isSelectingLoadout = true;
             players[targetId].gearRush = createDefaultGearRush();
             clearUltimateState(players[targetId]);
             players[targetId].giantActive = false;

@@ -190,7 +190,12 @@ function registerSocketHandlers(io) {
 
         socket.on('selectUpgrade', (type) => {
             const p = players[socket.id];
-            if (!p || !(p.pendingUpgrades > 0)) return;
+            if (!p) return;
+            if (!(p.pendingUpgrades > 0)) {
+                // Nothing to apply (e.g. the player died mid-pick); just let the client close the menu.
+                socket.emit('upgradeApplied');
+                return;
+            }
             p.stats = normalizeStats(p.stats);
             p.upgradeCounts = Object.assign(createUpgradeCounts(), p.upgradeCounts || {});
             if (type === 'dmg') p.stats.dmg += 0.2;

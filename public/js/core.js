@@ -58,6 +58,7 @@ let mobs = new Map();
 let mobTiers = [];
 let mobDeathEffects = [];
 let xpOrbs = [];
+let collectingOrbs = [];
 const keys = {};
 function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));

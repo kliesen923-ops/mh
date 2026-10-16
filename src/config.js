@@ -54,7 +54,9 @@ const STATS_FLUSH_MS = 150;
 const UPGRADE_SHIELD_MS = 3000;
 
 const XP_ORB_LIFETIME_MS = 60000;
-const XP_ORB_PICKUP_RADIUS = 48;
+// Orbs within this distance fly to the player and are collected.
+const XP_ORB_PICKUP_RADIUS = 80;
+const XP_ORB_MAX_TOTAL = 600;
 const XP_ORB_SCATTER_RADIUS = { min: 90, max: 260 };
 const XP_ORB_MAX_COUNT_PER_DEATH = 24;
 
@@ -96,6 +98,7 @@ module.exports = {
     UPGRADE_SHIELD_MS,
     XP_ORB_LIFETIME_MS,
     XP_ORB_PICKUP_RADIUS,
+    XP_ORB_MAX_TOTAL,
     XP_ORB_SCATTER_RADIUS,
     XP_ORB_MAX_COUNT_PER_DEATH,
 };
