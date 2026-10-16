@@ -4,7 +4,6 @@ const {
     GAME_HEIGHT,
     WORLD_MARGIN,
     MOB_TIERS,
-    MOB_LEVELS_PER_TIER,
     MOB_SPAWN_INTERVAL_MS,
     MOB_SPAWN_DISTANCE,
     MOB_MIN_SPAWN_DISTANCE,
@@ -14,6 +13,8 @@ const {
 const { getAngleDiff } = require('../utils/geometry');
 const { hasHitTargetForKey } = require('./hits');
 const { grantXp } = require('./progression');
+const { getMaxMobTier, pickMobTier } = require('./tiers');
+const { getMaxHpFromStats } = require('./stats');
 const { updateXpOrbs } = require('./xpOrbs');
 const { markStatsDirty, flushStats } = require('./sync');
 
@@ -25,20 +26,6 @@ let nextMobId = 1;
 let lastTickAt = 0;
 
 const PLAYER_BODY_RADIUS = 22;
-
-function getMaxMobTier(level) {
-    const current = Math.max(1, Math.floor(Number.isFinite(level) ? level : 1));
-    return Math.min(MOB_TIERS.length - 1, Math.floor((current - 1) / MOB_LEVELS_PER_TIER));
-}
-
-// Mostly the strongest unlocked tier, with some weaker ones mixed in.
-function pickMobTier(level, roll = Math.random()) {
-    const maxTier = getMaxMobTier(level);
-    let tier = maxTier;
-    if (roll < 0.1) tier -= 2;
-    else if (roll < 0.4) tier -= 1;
-    return Math.max(0, tier);
-}
 
 function getMaxMobsForLevel(level) {
     const current = Math.max(1, Math.floor(Number.isFinite(level) ? level : 1));
@@ -125,6 +112,8 @@ function damageMob(mobId, attackerId, damage, angle) {
     mob.hp -= amount;
     if (mob.hp <= 0) {
         mobs.delete(mob.id);
+        // Small heal per kill so long fights are survivable without pickups.
+        if (attacker.hp > 0) attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + 1 + mob.tier);
         grantXp(attackerId, mob.xp);
         state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId, xp: mob.xp });
     } else {

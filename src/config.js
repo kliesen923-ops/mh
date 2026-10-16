@@ -39,6 +39,8 @@ const MOB_TIERS = [
     { name: '검정', color: '#2c2c2c', hp: 280, speed: 120, damage: 22, xp: 25, radius: 23 },
 ];
 const MOB_LEVELS_PER_TIER = 3;
+// Chance of a spawn being the strongest unlocked tier, one below, or two below.
+const MOB_TIER_MIX = [0.6, 0.3, 0.1];
 const MOB_TICK_MS = 50;
 const MOB_SPAWN_INTERVAL_MS = 1100;
 const MOB_SPAWN_DISTANCE = { min: 700, max: 860 };
@@ -46,6 +48,8 @@ const MOB_MIN_SPAWN_DISTANCE = 450;
 const MOB_CONTACT_COOLDOWN_MS = 900;
 const MOB_VIEW_DISTANCE = 1000;
 const STATS_FLUSH_MS = 150;
+// Players can't be hit by other players for this long after a level-up menu opens.
+const UPGRADE_SHIELD_MS = 3000;
 
 const XP_ORB_LIFETIME_MS = 60000;
 const XP_ORB_PICKUP_RADIUS = 48;
@@ -78,6 +82,7 @@ module.exports = {
     GIANT_POTION_RECOVERY_STUN_MS,
     MOB_TIERS,
     MOB_LEVELS_PER_TIER,
+    MOB_TIER_MIX,
     MOB_TICK_MS,
     MOB_SPAWN_INTERVAL_MS,
     MOB_SPAWN_DISTANCE,
@@ -85,6 +90,7 @@ module.exports = {
     MOB_CONTACT_COOLDOWN_MS,
     MOB_VIEW_DISTANCE,
     STATS_FLUSH_MS,
+    UPGRADE_SHIELD_MS,
     XP_ORB_LIFETIME_MS,
     XP_ORB_PICKUP_RADIUS,
     XP_ORB_SCATTER_RADIUS,

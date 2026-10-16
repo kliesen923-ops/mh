@@ -194,6 +194,7 @@ test('mobs deal contact damage, and killing one grants XP', async () => {
     assert.equal(kill.id, biter.id);
     assert.equal(kill.killerId, ownerClient.id);
     assert.equal(owner.totalXp, xpBefore + biter.xp);
+    assert.equal(owner.hp, 100, 'already at full health');
     assert.equal(getMobsForOwner(ownerClient.id).length, 0);
 });
 
@@ -215,16 +216,62 @@ test('XP levels players up and pauses their mobs during the upgrade pick', async
     Object.assign(p, { x: 1500, y: 800, hp: 100, level: 1, xp: 0, totalXp: 0, pendingUpgrades: 0 });
 
     const leveled = once(client, 'levelUp');
-    grantXp(client.id, 7 + 10 + 1);
+    grantXp(client.id, 7 + 7 + 1);
     assert.deepEqual((await leveled)[0], { newLevel: 3, count: 2 });
     assert.equal(p.xp, 1);
     assert.equal(p.isUpgrading, true);
+    assert.equal(p.upgradeShield, true);
 
     const mob = spawnMob(client.id, { x: 1700, y: 800, tier: 0 });
     tickMobs(Date.now(), { spawn: false });
     assert.equal(mob.x, 1700, 'mob frozen while upgrading');
-    p.isUpgrading = false;
+
+    const firstPick = once(client, 'upgradeApplied');
+    client.emit('selectUpgrade', 'range');
+    await firstPick;
+    assert.ok(Math.abs(p.stats.range - 1.15) < 1e-9, 'range upgrade applies');
+    const hpBefore = p.hp;
+    const secondPick = once(client, 'upgradeApplied');
+    client.emit('selectUpgrade', 'hp');
+    await secondPick;
+    assert.equal(p.stats.hp, 120);
+    assert.equal(p.hp, Math.min(120, hpBefore + 20));
+    assert.equal(p.isUpgrading, false);
+    assert.equal(p.upgradeShield, false);
+    assert.deepEqual([p.upgradeCounts.range, p.upgradeCounts.hp], [1, 1]);
+
+    // No pending picks left: extra requests are ignored.
+    client.emit('selectUpgrade', 'dmg');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(p.stats.dmg, 1);
     clearAllMobs();
+});
+
+test('players can be hit again once the upgrade shield runs out', async () => {
+    const attackerClient = await connect();
+    const targetClient = await connect();
+    const attacker = await readyPlayer(attackerClient);
+    const target = await readyPlayer(targetClient);
+    Object.assign(attacker, { x: 2600, y: 1400, angle: 0, weapon: 'sword' });
+    Object.assign(target, { x: 2650, y: 1400, hp: 100, isUpgrading: true });
+
+    const swing = () => {
+        attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+        attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+        attackerClient.emit('playerHitTarget', targetClient.id);
+    };
+
+    target.upgradeShield = true;
+    swing();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(target.hp, 100, 'shielded right after the menu opens');
+
+    target.upgradeShield = false;
+    const hit = once(attackerClient, 'statsUpdate');
+    swing();
+    await hit;
+    assert.equal(target.hp, 90, 'hittable while still picking once the shield is gone');
+    target.isUpgrading = false;
 });
 
 test('scattered XP orbs are collected by walking over them', async () => {

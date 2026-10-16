@@ -102,7 +102,7 @@ const player = {
     wire: { active: false, kind: 'wire', tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
     stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 },
-    upgradeCounts: { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 },
+    upgradeCounts: { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 },
     giantScale: 1,
     giantAttackMult: 1,
     giantActive: false,

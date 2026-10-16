@@ -157,7 +157,7 @@ function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
     for (const id of Object.keys(allPlayers)) {
         if (id === myId) continue;
         const target = allPlayers[id];
-        if (!target || target.hp <= 0 || target.isUpgrading) continue;
+        if (!target || target.hp <= 0 || target.upgradeShield) continue;
         const distance = distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target);
         if (distance > 26) continue;
         const score = Math.hypot(target.x - effect.startX, target.y - effect.startY);

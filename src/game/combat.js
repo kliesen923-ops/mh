@@ -35,6 +35,7 @@ function resolveKill(attackerId, targetId) {
     target.upgradeCounts = createUpgradeCounts();
     target.pendingUpgrades = 0;
     target.isUpgrading = false;
+    target.upgradeShield = false;
     target.isSelectingLoadout = true;
     clearUltimateState(target);
     target.gearRush = createDefaultGearRush();
@@ -70,7 +71,7 @@ function resolveKill(attackerId, targetId) {
 function applyBowImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
+    if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
 
     const now = Date.now();
     const startX = Number.isFinite(payload.startX) ? payload.startX : finalAttacker.x;
@@ -170,7 +171,7 @@ function emitAshProjectile(originId, impactId, startX, startY, endX, endY, refle
 function applyAshImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout || finalTarget.isStunned) return;
+    if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout || finalTarget.isStunned) return;
 
     const now = Date.now();
     const wireProgress = Number.isFinite(payload.progress)

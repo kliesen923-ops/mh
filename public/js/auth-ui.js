@@ -113,7 +113,7 @@ function enterGame(nickname, accountId, weapon, skill) {
         player.stats = normalizeStats(createBaseStatsForWeapon(player.weapon));
         player.maxHp = getMaxHpFromStats(player.stats);
         player.hp = player.maxHp;
-        player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
+        player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 };
         player.gearRush = createDefaultGearRush();
         socket.emit('setWeapon', player.weapon);
     }
