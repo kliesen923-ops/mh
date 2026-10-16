@@ -24,7 +24,20 @@ function resolveKill(attackerId, targetId) {
     target.hp = 0;
     target.deaths++;
     updateAccountScore(target.accountId, 'deaths', 1);
+    // Sent before the stats reset so the victim's death screen shows this life's record.
+    state.io.to(targetId).emit('deathSummary', {
+        killerName: attacker ? attacker.name : null,
+        survivedMs: target.lifeStartedAt ? Math.max(0, Date.now() - target.lifeStartedAt) : 0,
+        level: target.level,
+        totalXp: target.totalXp || 0,
+        mobKills: target.lifeMobKills || 0,
+        playerKills: target.lifePlayerKills || 0,
+    });
+    target.lifeStartedAt = 0;
+    target.lifeMobKills = 0;
+    target.lifePlayerKills = 0;
     if (attacker) {
+        attacker.lifePlayerKills = (attacker.lifePlayerKills || 0) + 1;
         attacker.kills++;
         updateAccountScore(attacker.accountId, 'kills', 1);
         attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));

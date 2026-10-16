@@ -43,6 +43,7 @@ let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, a
 const UPGRADE_PICK_SECONDS = 6;
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = UPGRADE_PICK_SECONDS;
 let pendingAuth = null;
+let lastDeathSummary = null;
 let currentSession = null;
 const isLocalAuthBypass = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 let selectedWeapon = 'sword';

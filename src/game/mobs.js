@@ -111,6 +111,7 @@ function damageMob(mobId, attackerId, damage, angle) {
     mob.hp -= amount;
     if (mob.hp <= 0) {
         mobs.delete(mob.id);
+        attacker.lifeMobKills = (attacker.lifeMobKills || 0) + 1;
         // Small heal per kill so long fights are survivable without pickups.
         if (attacker.hp > 0) attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + 1 + mob.tier);
         state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId });

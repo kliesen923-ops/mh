@@ -98,9 +98,12 @@ socket.on('playerDied', (data) => {
         isUpgrading = false;
         document.getElementById('overlay-upgrade').classList.add('hidden');
         gameState = 'TITLE';
-        showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
-        setWeaponError('사망했습니다. 무기를 다시 선택하세요.');
+        showDeathScreen();
     }
+});
+socket.on('deathSummary', (data) => {
+    lastDeathSummary = data || null;
+    renderDeathSummary();
 });
 socket.on('skillChanged', (data) => {
     if (data && data.id === myId) {

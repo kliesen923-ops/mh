@@ -66,6 +66,9 @@ function registerSocketHandlers(io) {
             isStunned: false,
             isUpgrading: false,
             upgradeShield: false,
+            lifeStartedAt: 0,
+            lifeMobKills: 0,
+            lifePlayerKills: 0,
             pendingUpgrades: 0,
             isSelectingLoadout: true,
             upgradeCounts: createUpgradeCounts(),
@@ -131,6 +134,7 @@ function registerSocketHandlers(io) {
             const p = players[socket.id];
             if (!p) return;
             p.isSelectingLoadout = false;
+            if (!p.lifeStartedAt) p.lifeStartedAt = Date.now();
             io.emit('statsUpdate', players);
         });
 

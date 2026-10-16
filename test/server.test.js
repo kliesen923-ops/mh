@@ -339,3 +339,41 @@ test('picking a loadout before the respawn timer still leaves the player active'
     assert.equal(victim.isSelectingLoadout, false, 'respawn must not put the player back into loadout selection');
     clearXpOrbs();
 });
+
+test('the victim gets a record of the life that just ended', async () => {
+    clearAllMobs();
+    const killerClient = await connect();
+    const victimClient = await connect();
+    const killer = await readyPlayer(killerClient);
+    const victim = await readyPlayer(victimClient);
+    Object.assign(killer, { x: 400, y: 1700, angle: 0, weapon: 'sword', name: 'Killer' });
+    Object.assign(victim, { x: 450, y: 1700, hp: 100, level: 5, totalXp: 42, lifeStartedAt: Date.now() - 65000 });
+
+    // The victim kills one mob first.
+    const mob = spawnMob(victimClient.id, { x: 480, y: 1700, tier: 0 });
+    mob.hp = 1;
+    victim.angle = 0;
+    victimClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    victimClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+    const mobDown = once(victimClient, 'mobKilled');
+    victimClient.emit('mobHit', mob.id);
+    await mobDown;
+    victim.totalXp = 42;
+
+    victim.hp = 5;
+    const summary = once(victimClient, 'deathSummary');
+    killerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    killerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+    killerClient.emit('playerHitTarget', victimClient.id);
+    const [record] = await summary;
+    assert.equal(record.killerName, 'Killer');
+    assert.equal(record.level, 5);
+    assert.equal(record.totalXp, 42);
+    assert.equal(record.mobKills, 1);
+    assert.equal(record.playerKills, 0);
+    assert.ok(record.survivedMs >= 65000 && record.survivedMs < 70000, `survived ${record.survivedMs}ms`);
+    assert.equal(killer.lifePlayerKills, 1);
+    assert.deepEqual([victim.lifeStartedAt, victim.lifeMobKills], [0, 0], 'life stats reset for the next run');
+    clearXpOrbs();
+    clearAllMobs();
+});
