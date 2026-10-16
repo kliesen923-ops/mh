@@ -1,5 +1,5 @@
 function drawCharacter(p, color) {
-    const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, isUpgrading, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
+    const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, upgradeShield, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
     const profile = getWeaponAttackProfile(weapon);
     const attackRange = getEffectiveAttackRange(weapon, stats, p);
@@ -49,7 +49,7 @@ function drawCharacter(p, color) {
         ctx.restore();
     }
     if(isGuarding) { const isPerfect = (guardActiveTimer < JUST_GUARD_WINDOW_SEC); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
-    ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (isUpgrading) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - nameOffset);
+    ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (upgradeShield) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - nameOffset);
     const maxHp = getMaxHpFromStats(stats);
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-hpOffset, 50, 6);
@@ -239,20 +239,7 @@ function drawCharacter(p, color) {
             ctx.fillStyle = comboStep===3?"rgba(255,200,0,0.95)":"rgba(255,255,255,0.9)";
             ctx.fill();
         } else if (weapon === 'bow') {
-            ctx.strokeStyle = "rgba(255, 230, 170, 0.95)";
-            ctx.lineWidth = 2.4;
-            const bowReach = Math.max(28, visualAttackRange * 0.32);
-            ctx.beginPath();
-            ctx.moveTo(12, 0);
-            ctx.lineTo(12 + bowReach, 0);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(12 + bowReach, 0);
-            ctx.lineTo(12 + bowReach - 8, -3);
-            ctx.lineTo(12 + bowReach - 8, 3);
-            ctx.closePath();
-            ctx.fillStyle = "rgba(255, 220, 120, 0.95)";
-            ctx.fill();
+            // The arrow projectile itself shows the shot.
         } else {
             ctx.beginPath();
             let sA = ba-2.0, eA = ba+0.5; let counter = false;
@@ -818,31 +805,42 @@ function drawWorldBackground() {
 
 function drawXpOrbs() {
     const now = Date.now();
+    const visible = (orb) => orb.x > camera.x - 30 && orb.x < camera.x + canvas.width + 30 && orb.y > camera.y - 30 && orb.y < camera.y + canvas.height + 30;
     xpOrbs.forEach((orb) => {
-        const size = 6 + Math.min(6, orb.value);
-        const bob = Math.sin(now / 250 + orb.x) * 3;
-        ctx.save();
-        ctx.translate(orb.x, orb.y + bob);
-        ctx.shadowColor = '#5ad8ff';
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = '#5ad8ff';
-        ctx.beginPath();
-        ctx.moveTo(0, -size);
-        ctx.lineTo(size * 0.7, 0);
-        ctx.lineTo(0, size);
-        ctx.lineTo(-size * 0.7, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.beginPath();
-        ctx.moveTo(0, -size * 0.6);
-        ctx.lineTo(size * 0.3, 0);
-        ctx.lineTo(0, size * 0.2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+        if (visible(orb)) drawXpGem(orb.x, orb.y + Math.sin(now / 250 + orb.x) * 3, orb.value, 1);
     });
+    collectingOrbs.forEach((orb) => {
+        const collector = orb.by === myId ? player : allPlayers[orb.by];
+        if (!collector) return;
+        const t = 1 - Math.max(0, orb.life / orb.maxLife);
+        const eased = t * t;
+        drawXpGem(orb.x + (collector.x - orb.x) * eased, orb.y + (collector.y - 20 - orb.y) * eased, orb.value, 1 - t * 0.6);
+    });
+}
+
+function drawXpGem(x, y, value, scale) {
+    const size = (6 + Math.min(6, value)) * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.shadowColor = '#5ad8ff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#5ad8ff';
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.7, 0);
+    ctx.lineTo(0, size);
+    ctx.lineTo(-size * 0.7, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.6);
+    ctx.lineTo(size * 0.3, 0);
+    ctx.lineTo(0, size * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 }
 
 function drawMobs() {

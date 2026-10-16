@@ -10,6 +10,7 @@ const {
     GAME_HEIGHT,
     WORLD_MARGIN,
     MOB_TIERS,
+    BOW_MAX_DISTANCE,
 } = require('./config');
 const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
@@ -64,6 +65,10 @@ function registerSocketHandlers(io) {
             guardStartTime: 0,
             isStunned: false,
             isUpgrading: false,
+            upgradeShield: false,
+            lifeStartedAt: 0,
+            lifeMobKills: 0,
+            lifePlayerKills: 0,
             pendingUpgrades: 0,
             isSelectingLoadout: true,
             upgradeCounts: createUpgradeCounts(),
@@ -129,6 +134,7 @@ function registerSocketHandlers(io) {
             const p = players[socket.id];
             if (!p) return;
             p.isSelectingLoadout = false;
+            if (!p.lifeStartedAt) p.lifeStartedAt = Date.now();
             io.emit('statsUpdate', players);
         });
 
@@ -189,9 +195,19 @@ function registerSocketHandlers(io) {
         socket.on('selectUpgrade', (type) => {
             const p = players[socket.id];
             if (!p) return;
+            if (!(p.pendingUpgrades > 0)) {
+                // Nothing to apply (e.g. the player died mid-pick); just let the client close the menu.
+                socket.emit('upgradeApplied');
+                return;
+            }
             p.stats = normalizeStats(p.stats);
-            p.upgradeCounts = p.upgradeCounts || createUpgradeCounts();
+            p.upgradeCounts = Object.assign(createUpgradeCounts(), p.upgradeCounts || {});
             if (type === 'dmg') p.stats.dmg += 0.2;
+            else if (type === 'range') p.stats.range += 0.15;
+            else if (type === 'hp') {
+                p.stats.hp += 20;
+                p.hp = Math.min(getMaxHpFromStats(p.stats), p.hp + 20);
+            }
             else if (type === 'projectile') p.stats.projectile += 0.2;
             else if (type === 'speed') p.stats.speed += 0.25;
             else if (type === 'move') p.stats.move += 0.1;
@@ -201,6 +217,7 @@ function registerSocketHandlers(io) {
             if (p.pendingUpgrades <= 0) {
                 p.pendingUpgrades = 0;
                 p.isUpgrading = false;
+                p.upgradeShield = false;
             }
             io.emit('statsUpdate', players);
             socket.emit('upgradeApplied');
@@ -212,7 +229,7 @@ function registerSocketHandlers(io) {
             let targetId = payload.targetId;
             let finalAttacker = players[attackerId];
             let finalTarget = players[targetId];
-            if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
+            if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
             if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'wire') return;
 
             const now = Date.now();
@@ -275,7 +292,7 @@ function registerSocketHandlers(io) {
             let targetId = payload.targetId;
             const finalAttacker = players[attackerId];
             const finalTarget = players[targetId];
-            if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
+            if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
             if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'ash') return;
             applyAshImpact(attackerId, targetId, payload, false);
         });
@@ -309,7 +326,7 @@ function registerSocketHandlers(io) {
             const attacker = players[socket.id];
             const targetId = payload.targetId;
             const target = players[targetId];
-            if (!attacker || !target || sanitizeWeapon(attacker.weapon) !== 'bow' || target.isUpgrading || target.isSelectingLoadout) return;
+            if (!attacker || !target || sanitizeWeapon(attacker.weapon) !== 'bow' || target.upgradeShield || target.isSelectingLoadout) return;
             applyBowImpact(socket.id, targetId, payload, Boolean(payload.reflected));
         });
 
@@ -317,7 +334,7 @@ function registerSocketHandlers(io) {
             const attacker = players[socket.id];
             const target = players[targetId];
             if (attacker && sanitizeWeapon(attacker.weapon) === 'bow') return;
-            if (attacker && target && target.hp > 0 && !target.isUpgrading && !target.isSelectingLoadout) {
+            if (attacker && target && target.hp > 0 && !target.upgradeShield && !target.isSelectingLoadout) {
                 const now = Date.now();
                 const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
                 const canHit = attacker.isAttacking && attacker.attackPhase === 2 && isTargetInWeaponAttack(attacker, target);
@@ -368,8 +385,7 @@ function registerSocketHandlers(io) {
             const endX = Number.isFinite(payload.endX) ? payload.endX : mob.x;
             const endY = Number.isFinite(payload.endY) ? payload.endY : mob.y;
             if (Math.hypot(mob.x - endX, mob.y - endY) > mob.radius + 40) return;
-            const range = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
-            if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > range + mob.radius + 120) return;
+            if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > BOW_MAX_DISTANCE + mob.radius + 120) return;
             const hitKey = `${socket.id}:bowmob:${String(payload.projectileId || '').slice(0, 80)}`;
             if (hasHitTargetForKey(hitKey, `mob:${mob.id}`)) return;
             const damage = Math.floor(11 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
@@ -402,7 +418,7 @@ function registerSocketHandlers(io) {
             });
 
             for (const [targetId, target] of Object.entries(players)) {
-                if (targetId === socket.id || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+                if (targetId === socket.id || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
                 if (Math.hypot(target.x - startX, target.y - startY) > attackRange) continue;
                 if (distToSegment({ x: startX, y: startY }, { x: endX, y: endY }, target) > slashWidth) continue;
                 if (hasHitTargetForKey(slashKey, targetId)) continue;

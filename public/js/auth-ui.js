@@ -59,6 +59,32 @@ function setSkillSelection(skill) {
     });
     setSkillError(`${getSkillLabel(selectedSkill)}가 선택되었습니다.`);
 }
+function formatSurvivalTime(ms) {
+    const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+function renderDeathSummary() {
+    const summary = lastDeathSummary || {};
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+    setText('death-cause', summary.killerName ? `${summary.killerName}에게 쓰러졌습니다.` : '몬스터에게 쓰러졌습니다.');
+    setText('death-time', formatSurvivalTime(summary.survivedMs));
+    setText('death-level', `Lv.${summary.level || 1}`);
+    setText('death-xp', String(summary.totalXp || 0));
+    setText('death-mob-kills', String(summary.mobKills || 0));
+    setText('death-player-kills', String(summary.playerKills || 0));
+}
+function showDeathScreen() {
+    renderDeathSummary();
+    document.getElementById('overlay-death')?.classList.remove('hidden');
+}
+function hideDeathScreen() {
+    document.getElementById('overlay-death')?.classList.add('hidden');
+}
 function showWeaponPanel(auth) {
     pendingAuth = auth;
     document.getElementById('overlay-start')?.classList.remove('hidden');
@@ -113,7 +139,7 @@ function enterGame(nickname, accountId, weapon, skill) {
         player.stats = normalizeStats(createBaseStatsForWeapon(player.weapon));
         player.maxHp = getMaxHpFromStats(player.stats);
         player.hp = player.maxHp;
-        player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
+        player.upgradeCounts = { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 };
         player.gearRush = createDefaultGearRush();
         socket.emit('setWeapon', player.weapon);
     }
@@ -182,6 +208,11 @@ document.getElementById('btn-signup')?.addEventListener('click', () => {
     setAuthError('register', '');
 });
 document.getElementById('btn-register')?.addEventListener('click', handleRegister);
+document.getElementById('btn-restart')?.addEventListener('click', () => {
+    hideDeathScreen();
+    setWeaponError('');
+    showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
+});
 document.getElementById('btn-back-login')?.addEventListener('click', () => {
     setAuthMode('login');
     setAuthError('login', '');

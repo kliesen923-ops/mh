@@ -126,6 +126,7 @@ function getUpgradeLevelLabel(type) {
     if (type === 'move') return `Lv.${(counts.move || 0) + 1}`;
     if (type === 'dodge') return `Lv.${(counts.dodge || 0) + 1}`;
     if (type === 'projectile') return `Lv.${(counts.projectile || 0) + 1}`;
+    if (type === 'hp') return `Lv.${(counts.hp || 0) + 1}`;
     return 'Lv.1';
 }
 

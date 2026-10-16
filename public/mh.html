@@ -178,10 +178,23 @@
         </div>
     </div>
 
+    <div id="overlay-death" class="overlay hidden">
+        <h1 class="death-title">사망</h1>
+        <div id="death-cause" class="death-cause"></div>
+        <div class="death-stats">
+            <div class="death-stat"><span>생존 시간</span><b id="death-time">0:00</b></div>
+            <div class="death-stat"><span>도달 레벨</span><b id="death-level">1</b></div>
+            <div class="death-stat"><span>모은 경험치</span><b id="death-xp">0</b></div>
+            <div class="death-stat"><span>몬스터 처치</span><b id="death-mob-kills">0</b></div>
+            <div class="death-stat"><span>플레이어 처치</span><b id="death-player-kills">0</b></div>
+        </div>
+        <p class="death-note">모은 경험치는 쓰러진 자리에 흩뿌려졌습니다.</p>
+        <button id="btn-restart" class="start-btn" type="button">다시 시작</button>
+    </div>
     <div id="overlay-upgrade" class="overlay hidden">
         <h1 style="color:#f1c40f; text-shadow: 0 0 10px #f1c40f; margin-bottom: 5px;">LEVEL UP!</h1>
         <p>업그레이드를 하나 선택해서 캐릭터를 강화하세요.</p>
-        <div id="upgrade-timer">업그레이드 시간: 9초</div>
+        <div id="upgrade-timer">업그레이드 시간: 6초</div>
         <div id="upgrade-cards">
             <div class="card" onclick="selectUpgrade('dmg')">
                 <div class="upgrade-level-badge" data-upgrade-level="dmg">Lv.1</div>
@@ -244,6 +257,16 @@
                 </div>
                 <h4>회피 거리 강화</h4>
                 <p>회피 시 이동 거리가 <br><b>15%</b> 증가합니다.</p>
+            </div>
+            <div class="card" onclick="selectUpgrade('hp')">
+                <div class="upgrade-level-badge" data-upgrade-level="hp">Lv.1</div>
+                <div class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
+                    </svg>
+                </div>
+                <h4>체력 강화</h4>
+                <p>최대 체력 <b>+20</b><br>체력 <b>20</b> 회복</p>
             </div>
         </div>
     </div>

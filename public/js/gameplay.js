@@ -157,7 +157,7 @@ function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
     for (const id of Object.keys(allPlayers)) {
         if (id === myId) continue;
         const target = allPlayers[id];
-        if (!target || target.hp <= 0 || target.isUpgrading) continue;
+        if (!target || target.hp <= 0 || target.upgradeShield) continue;
         const distance = distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target);
         if (distance > 26) continue;
         const score = Math.hypot(target.x - effect.startX, target.y - effect.startY);
@@ -198,6 +198,10 @@ function updateMobVisuals(dt) {
     mobDeathEffects = mobDeathEffects.filter((effect) => {
         effect.life -= dt;
         return effect.life > 0;
+    });
+    collectingOrbs = collectingOrbs.filter((orb) => {
+        orb.life -= dt;
+        return orb.life > 0;
     });
 }
 
@@ -437,7 +441,6 @@ function startBowShot() {
     releaseGuardForAction();
     if(player.isDodging || player.hp <= 0 || player.isStunned) return;
     const angle = player.aAngle || player.angle;
-    const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
     const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
     const giantBonus = getBowProjectileBonus(player);
     const totalShots = Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)) + giantBonus);
@@ -446,10 +449,8 @@ function startBowShot() {
     for (let i = 0; i < totalShots; i++) {
         const offset = (i - centerOffset) * spreadStep;
         const shotAngle = angle + offset;
-        const edge = {
-            x: player.x + Math.cos(shotAngle) * attackRange,
-            y: player.y + Math.sin(shotAngle) * attackRange,
-        };
+        // Arrows fly to the edge of the visible screen.
+        const edge = getRayCanvasEdge(player.x, player.y, shotAngle);
         const projectileId = `${myId || 'bow'}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}:${i}`;
         bowProjectiles.push({
             id: projectileId,

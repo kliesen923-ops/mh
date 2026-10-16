@@ -1,7 +1,7 @@
 socket.on('connect', () => { myId = socket.id; });
 socket.on('currentPlayers', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), data[myId].ultimate || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.x = data[myId].x; player.y = data[myId].y; player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), data[myId].ultimate || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
@@ -55,7 +55,7 @@ function showUpgradeUI() {
     }
     
     Object.keys(keys).forEach(k => keys[k] = false);
-    upgradeTimeLeft = 9;
+    upgradeTimeLeft = UPGRADE_PICK_SECONDS;
     const timerEl = document.getElementById('upgrade-timer');
     timerEl.innerText = '업그레이드 시간: ' + upgradeTimeLeft + '초';
     if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
@@ -75,7 +75,7 @@ socket.on('upgradeApplied', () => {
 
 socket.on('statsUpdate', (data) => { 
     allPlayers = data; 
-    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), data[myId].ultimate || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
+    if(data[myId]) { player.hp = data[myId].hp; player.weapon = normalizeWeapon(data[myId].weapon); player.stats = normalizeStats(data[myId].stats); player.maxHp = getMaxHpFromStats(player.stats); player.level = data[myId].level; player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 }, data[myId].upgradeCounts || {}); player.giantScale = Number.isFinite(data[myId].giantScale) ? data[myId].giantScale : 1; player.giantAttackMult = Number.isFinite(data[myId].giantAttackMult) ? data[myId].giantAttackMult : 1; player.giantActive = Boolean(data[myId].giantActive); player.giantEndsAt = Number.isFinite(data[myId].giantEndsAt) ? data[myId].giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(data[myId].giantRecoveryEndsAt) ? data[myId].giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), data[myId].gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), data[myId].ultimate || {}); player.skill = normalizeSkill(data[myId].skill); updateSkillButtonLabel(); updateHUD(); }
     updateLeaderboard(); 
 });
 
@@ -84,7 +84,7 @@ socket.on('playerRespawn', (p) => {
     if(p.id === myId) { 
         player.x = p.x; player.y = p.y; player.hp = p.hp; 
         player.isStunned = false; player.isGuarding = false; 
-        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), p.gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), p.ultimate || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
+        player.level = p.level; player.weapon = normalizeWeapon(p.weapon); player.stats = normalizeStats(p.stats); player.maxHp = getMaxHpFromStats(player.stats); player.upgradeCounts = Object.assign({ dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 }, p.upgradeCounts || {}); player.giantScale = Number.isFinite(p.giantScale) ? p.giantScale : 1; player.giantAttackMult = Number.isFinite(p.giantAttackMult) ? p.giantAttackMult : 1; player.giantActive = Boolean(p.giantActive); player.giantEndsAt = Number.isFinite(p.giantEndsAt) ? p.giantEndsAt : 0; player.giantRecoveryEndsAt = Number.isFinite(p.giantRecoveryEndsAt) ? p.giantRecoveryEndsAt : 0; player.gearRush = Object.assign(createDefaultGearRush(), p.gearRush || {}); player.ultimate = Object.assign(createDefaultUltimate(), p.ultimate || {}); player.skill = normalizeSkill(p.skill); updateSkillButtonLabel();
         updateHUD();
     } 
     updateLeaderboard(); 
@@ -93,10 +93,17 @@ socket.on('playerRespawn', (p) => {
 socket.on('playerDisconnected', (id) => { delete allPlayers[id]; updateLeaderboard(); });
 socket.on('playerDied', (data) => {
     if (data && data.victimId === myId) {
+        if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
+        pendingUpgrades = 0;
+        isUpgrading = false;
+        document.getElementById('overlay-upgrade').classList.add('hidden');
         gameState = 'TITLE';
-        showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
-        setWeaponError('사망했습니다. 무기를 다시 선택하세요.');
+        showDeathScreen();
     }
+});
+socket.on('deathSummary', (data) => {
+    lastDeathSummary = data || null;
+    renderDeathSummary();
 });
 socket.on('skillChanged', (data) => {
     if (data && data.id === myId) {
@@ -153,9 +160,6 @@ socket.on('mobKilled', (data) => {
         maxLife: 0.35,
     });
     mobs.delete(data.id);
-    if (data.killerId === myId && data.xp > 0) {
-        healingTexts.push({ playerId: myId, text: `+${data.xp} XP`, color: '#5ad8ff', life: 0.9, maxLife: 0.9 });
-    }
 });
 socket.on('mobDamage', (data) => {
     const amount = Math.floor(Number(data && data.amount) || 0);
@@ -164,6 +168,23 @@ socket.on('mobDamage', (data) => {
 });
 socket.on('xpOrbs', (data) => {
     xpOrbs = Array.isArray(data) ? data : [];
+});
+socket.on('xpOrbsAdded', (data) => {
+    if (Array.isArray(data)) xpOrbs = xpOrbs.concat(data);
+});
+socket.on('xpOrbsRemoved', (data) => {
+    if (!Array.isArray(data) || data.length === 0) return;
+    const byId = new Map(data.map((entry) => [entry.id, entry]));
+    let myXp = 0;
+    xpOrbs = xpOrbs.filter((orb) => {
+        const entry = byId.get(orb.id);
+        if (!entry) return true;
+        // Picked-up orbs fly into whoever collected them.
+        if (entry.by) collectingOrbs.push({ x: orb.x, y: orb.y, value: orb.value, by: entry.by, life: 0.22, maxLife: 0.22 });
+        if (entry.by === myId) myXp += orb.value;
+        return false;
+    });
+    if (myXp > 0) healingTexts.push({ playerId: myId, text: `+${myXp} XP`, color: '#5ad8ff', life: 0.9, maxLife: 0.9 });
 });
 socket.on('healingCrossUpdate', (data) => {
     healingCrosses = Array.isArray(data) ? data : [];

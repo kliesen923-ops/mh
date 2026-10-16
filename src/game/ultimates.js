@@ -48,7 +48,7 @@ function applySwordUltimate(playerId) {
                 weapon: 'ult-sword',
             });
             for (const [targetId, target] of Object.entries(players)) {
-                if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+                if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
                 const dx = target.x - current.x;
                 const dy = target.y - current.y;
                 if (Math.hypot(dx, dy) > 126) continue;
@@ -92,7 +92,7 @@ function applyHammerUltimate(playerId) {
     const attackAngle = attacker.aAngle || attacker.angle;
     state.io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attackAngle, weapon: 'ult-hammer' });
     for (const [targetId, target] of Object.entries(players)) {
-        if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+        if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
         const dx = target.x - attacker.x;
         const dy = target.y - attacker.y;
         if (Math.hypot(dx, dy) > coneRange) continue;
@@ -143,7 +143,7 @@ function applySpearUltimate(playerId) {
     broadcastUltimateState(playerId);
     state.io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attacker.angle, weapon: 'spear-ult' });
     for (const [targetId, target] of Object.entries(players)) {
-        if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+        if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
         const dx = target.x - attacker.x;
         const dy = target.y - attacker.y;
         if (Math.hypot(dx, dy) > attacker.ultimate.radius) continue;
@@ -197,7 +197,7 @@ function applyBowUltimate(playerId) {
     });
     const hitKey = `${playerId}:ult-bow:${now}`;
     for (const [targetId, target] of Object.entries(players)) {
-        if (targetId === playerId || !target || target.hp <= 0 || target.isUpgrading || target.isSelectingLoadout) continue;
+        if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
         if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > 54) continue;
         if (hasHitTargetForKey(hitKey, targetId)) continue;
         const damage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));

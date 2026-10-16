@@ -40,8 +40,10 @@ const GUARD_DURATION_SEC = 0.5;
 const JUST_GUARD_WINDOW_SEC = 0.1;
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};
-let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = 9;
+const UPGRADE_PICK_SECONDS = 6;
+let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = UPGRADE_PICK_SECONDS;
 let pendingAuth = null;
+let lastDeathSummary = null;
 let currentSession = null;
 const isLocalAuthBypass = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 let selectedWeapon = 'sword';
@@ -57,6 +59,7 @@ let mobs = new Map();
 let mobTiers = [];
 let mobDeathEffects = [];
 let xpOrbs = [];
+let collectingOrbs = [];
 const keys = {};
 function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
@@ -102,7 +105,7 @@ const player = {
     wire: { active: false, kind: 'wire', tx: 0, ty: 0, progress: 0, maxDistance: 500 }, wireCooldown: 0,
     moveDir: { x: 0, y: 0 }, animTime: 0,
     stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 },
-    upgradeCounts: { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 },
+    upgradeCounts: { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 },
     giantScale: 1,
     giantAttackMult: 1,
     giantActive: false,

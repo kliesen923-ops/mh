@@ -24,7 +24,20 @@ function resolveKill(attackerId, targetId) {
     target.hp = 0;
     target.deaths++;
     updateAccountScore(target.accountId, 'deaths', 1);
+    // Sent before the stats reset so the victim's death screen shows this life's record.
+    state.io.to(targetId).emit('deathSummary', {
+        killerName: attacker ? attacker.name : null,
+        survivedMs: target.lifeStartedAt ? Math.max(0, Date.now() - target.lifeStartedAt) : 0,
+        level: target.level,
+        totalXp: target.totalXp || 0,
+        mobKills: target.lifeMobKills || 0,
+        playerKills: target.lifePlayerKills || 0,
+    });
+    target.lifeStartedAt = 0;
+    target.lifeMobKills = 0;
+    target.lifePlayerKills = 0;
     if (attacker) {
+        attacker.lifePlayerKills = (attacker.lifePlayerKills || 0) + 1;
         attacker.kills++;
         updateAccountScore(attacker.accountId, 'kills', 1);
         attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + Math.floor(getMaxHpFromStats(attacker.stats) * 0.5));
@@ -35,6 +48,7 @@ function resolveKill(attackerId, targetId) {
     target.upgradeCounts = createUpgradeCounts();
     target.pendingUpgrades = 0;
     target.isUpgrading = false;
+    target.upgradeShield = false;
     target.isSelectingLoadout = true;
     clearUltimateState(target);
     target.gearRush = createDefaultGearRush();
@@ -53,7 +67,6 @@ function resolveKill(attackerId, targetId) {
             players[targetId].y = spawn.y;
             players[targetId].isStunned = false;
             players[targetId].isGuarding = false;
-            players[targetId].isSelectingLoadout = true;
             players[targetId].gearRush = createDefaultGearRush();
             clearUltimateState(players[targetId]);
             players[targetId].giantActive = false;
@@ -70,7 +83,7 @@ function resolveKill(attackerId, targetId) {
 function applyBowImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout) return;
+    if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
 
     const now = Date.now();
     const startX = Number.isFinite(payload.startX) ? payload.startX : finalAttacker.x;
@@ -170,7 +183,7 @@ function emitAshProjectile(originId, impactId, startX, startY, endX, endY, refle
 function applyAshImpact(attackerId, targetId, payload, reflected) {
     const finalAttacker = players[attackerId];
     const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.isUpgrading || finalTarget.isSelectingLoadout || finalTarget.isStunned) return;
+    if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout || finalTarget.isStunned) return;
 
     const now = Date.now();
     const wireProgress = Number.isFinite(payload.progress)

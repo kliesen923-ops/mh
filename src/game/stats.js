@@ -60,7 +60,7 @@ function getAttackRangeMultiplier(player) {
 }
 
 function createUpgradeCounts() {
-    return { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0 };
+    return { dmg: 0, range: 0, speed: 0, move: 0, dodge: 0, projectile: 0, hp: 0 };
 }
 
 function createDefaultGearRush() {

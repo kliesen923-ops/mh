@@ -1,9 +1,13 @@
 const state = require('./state');
+const { UPGRADE_SHIELD_MS } = require('../config');
 const { markStatsDirty } = require('./sync');
+const { getAverageMobXp } = require('./tiers');
 
+// Scales with the XP that mobs at this level give, so each level takes a
+// similar, slowly growing number of kills (about 7 early, 15 late).
 function xpToNextLevel(level) {
     const current = Math.max(1, Math.floor(Number.isFinite(level) ? level : 1));
-    return 4 + current * 3;
+    return Math.ceil(getAverageMobXp(current) * (6 + current * 0.3));
 }
 
 function createProgression() {
@@ -30,12 +34,28 @@ function grantXp(playerId, amount) {
     }
     p.xpToNext = xpToNextLevel(p.level);
     if (levelsGained > 0) {
+        if (!p.isUpgrading) startUpgradeShield(playerId);
         p.isUpgrading = true;
         p.pendingUpgrades = (p.pendingUpgrades || 0) + levelsGained;
         state.io.to(playerId).emit('levelUp', { newLevel: p.level, count: levelsGained });
     }
     markStatsDirty();
     return levelsGained;
+}
+
+// Briefly protects a player from PvP while the upgrade menu is open.
+function startUpgradeShield(playerId) {
+    const p = state.players[playerId];
+    if (!p) return;
+    const token = (p.upgradeShieldToken || 0) + 1;
+    p.upgradeShieldToken = token;
+    p.upgradeShield = true;
+    setTimeout(() => {
+        const current = state.players[playerId];
+        if (!current || current.upgradeShieldToken !== token || !current.upgradeShield) return;
+        current.upgradeShield = false;
+        markStatsDirty();
+    }, UPGRADE_SHIELD_MS);
 }
 
 module.exports = {

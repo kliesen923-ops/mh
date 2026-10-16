@@ -96,7 +96,7 @@ test('melee hit damages and a lethal hit kills, scatters XP and respawns', async
     target.hp = 5;
     Object.assign(target, { level: 4, xp: 2, totalXp: 30 });
     const died = once(targetClient, 'playerDied');
-    const orbsDropped = once(attackerClient, 'xpOrbs');
+    const orbsDropped = once(attackerClient, 'xpOrbsAdded');
     await swing();
     const [death] = await died;
     assert.deepEqual(death, { victimId: targetClient.id, attackerId: attackerClient.id });
@@ -170,7 +170,7 @@ test('mobs chase only their owner and are reported to nearby players', async () 
     clearAllMobs();
 });
 
-test('mobs deal contact damage, and killing one grants XP', async () => {
+test('mobs deal contact damage, and a killed mob drops XP to pick up', async () => {
     clearAllMobs();
     const ownerClient = await connect();
     const owner = await readyPlayer(ownerClient);
@@ -186,6 +186,7 @@ test('mobs deal contact damage, and killing one grants XP', async () => {
     owner.hp = 100;
     const xpBefore = owner.totalXp;
     const killed = once(ownerClient, 'mobKilled');
+    const dropped = once(ownerClient, 'xpOrbsAdded');
     biter.hp = 1;
     ownerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
     ownerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
@@ -193,6 +194,15 @@ test('mobs deal contact damage, and killing one grants XP', async () => {
     const [kill] = await killed;
     assert.equal(kill.id, biter.id);
     assert.equal(kill.killerId, ownerClient.id);
+    const [[orb]] = await dropped;
+    assert.deepEqual([orb.x, orb.y, orb.value], [biter.x, biter.y, biter.xp], 'orb left where the mob died');
+    assert.equal(owner.totalXp, xpBefore, 'XP is not granted until the orb is picked up');
+    assert.equal(owner.hp, 100, 'already at full health');
+
+    const collected = once(ownerClient, 'xpOrbsRemoved');
+    tickMobs(Date.now(), { spawn: false });
+    const [[removed]] = await collected;
+    assert.deepEqual(removed, { id: orb.id, by: ownerClient.id, value: biter.xp });
     assert.equal(owner.totalXp, xpBefore + biter.xp);
     assert.equal(getMobsForOwner(ownerClient.id).length, 0);
 });
@@ -215,16 +225,62 @@ test('XP levels players up and pauses their mobs during the upgrade pick', async
     Object.assign(p, { x: 1500, y: 800, hp: 100, level: 1, xp: 0, totalXp: 0, pendingUpgrades: 0 });
 
     const leveled = once(client, 'levelUp');
-    grantXp(client.id, 7 + 10 + 1);
+    grantXp(client.id, 7 + 7 + 1);
     assert.deepEqual((await leveled)[0], { newLevel: 3, count: 2 });
     assert.equal(p.xp, 1);
     assert.equal(p.isUpgrading, true);
+    assert.equal(p.upgradeShield, true);
 
     const mob = spawnMob(client.id, { x: 1700, y: 800, tier: 0 });
     tickMobs(Date.now(), { spawn: false });
     assert.equal(mob.x, 1700, 'mob frozen while upgrading');
-    p.isUpgrading = false;
+
+    const firstPick = once(client, 'upgradeApplied');
+    client.emit('selectUpgrade', 'range');
+    await firstPick;
+    assert.ok(Math.abs(p.stats.range - 1.15) < 1e-9, 'range upgrade applies');
+    const hpBefore = p.hp;
+    const secondPick = once(client, 'upgradeApplied');
+    client.emit('selectUpgrade', 'hp');
+    await secondPick;
+    assert.equal(p.stats.hp, 120);
+    assert.equal(p.hp, Math.min(120, hpBefore + 20));
+    assert.equal(p.isUpgrading, false);
+    assert.equal(p.upgradeShield, false);
+    assert.deepEqual([p.upgradeCounts.range, p.upgradeCounts.hp], [1, 1]);
+
+    // No pending picks left: extra requests are ignored.
+    client.emit('selectUpgrade', 'dmg');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(p.stats.dmg, 1);
     clearAllMobs();
+});
+
+test('players can be hit again once the upgrade shield runs out', async () => {
+    const attackerClient = await connect();
+    const targetClient = await connect();
+    const attacker = await readyPlayer(attackerClient);
+    const target = await readyPlayer(targetClient);
+    Object.assign(attacker, { x: 2600, y: 1400, angle: 0, weapon: 'sword' });
+    Object.assign(target, { x: 2650, y: 1400, hp: 100, isUpgrading: true });
+
+    const swing = () => {
+        attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+        attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+        attackerClient.emit('playerHitTarget', targetClient.id);
+    };
+
+    target.upgradeShield = true;
+    swing();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(target.hp, 100, 'shielded right after the menu opens');
+
+    target.upgradeShield = false;
+    const hit = once(attackerClient, 'statsUpdate');
+    swing();
+    await hit;
+    assert.equal(target.hp, 90, 'hittable while still picking once the shield is gone');
+    target.isUpgrading = false;
 });
 
 test('scattered XP orbs are collected by walking over them', async () => {
@@ -257,4 +313,67 @@ test('dying to your own mobs counts as a death with no killer', async () => {
     tickMobs(Date.now(), { spawn: false });
     assert.equal(getMobsForOwner(client.id).length, 0, 'mobs vanish when their owner dies');
     clearXpOrbs();
+});
+
+test('picking a loadout before the respawn timer still leaves the player active', async () => {
+    const attackerClient = await connect();
+    const victimClient = await connect();
+    const attacker = await readyPlayer(attackerClient);
+    const victim = await readyPlayer(victimClient);
+    Object.assign(attacker, { x: 3000, y: 300, angle: 0, weapon: 'sword' });
+    Object.assign(victim, { x: 3050, y: 300, hp: 5 });
+
+    const died = once(victimClient, 'playerDied');
+    attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+    attackerClient.emit('playerHitTarget', victimClient.id);
+    await died;
+
+    // Player confirms weapon and skill right away, before the 3s respawn.
+    await readyPlayer(victimClient);
+    assert.equal(victim.isSelectingLoadout, false);
+    await new Promise((resolve) => {
+        victimClient.on('playerRespawn', (p) => { if (p.id === victimClient.id) resolve(); });
+    });
+    assert.equal(victim.hp > 0, true);
+    assert.equal(victim.isSelectingLoadout, false, 'respawn must not put the player back into loadout selection');
+    clearXpOrbs();
+});
+
+test('the victim gets a record of the life that just ended', async () => {
+    clearAllMobs();
+    const killerClient = await connect();
+    const victimClient = await connect();
+    const killer = await readyPlayer(killerClient);
+    const victim = await readyPlayer(victimClient);
+    Object.assign(killer, { x: 400, y: 1700, angle: 0, weapon: 'sword', name: 'Killer' });
+    Object.assign(victim, { x: 450, y: 1700, hp: 100, level: 5, totalXp: 42, lifeStartedAt: Date.now() - 65000 });
+
+    // The victim kills one mob first.
+    const mob = spawnMob(victimClient.id, { x: 480, y: 1700, tier: 0 });
+    mob.hp = 1;
+    victim.angle = 0;
+    victimClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    victimClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+    const mobDown = once(victimClient, 'mobKilled');
+    victimClient.emit('mobHit', mob.id);
+    await mobDown;
+    victim.totalXp = 42;
+
+    victim.hp = 5;
+    const summary = once(victimClient, 'deathSummary');
+    killerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    killerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
+    killerClient.emit('playerHitTarget', victimClient.id);
+    const [record] = await summary;
+    assert.equal(record.killerName, 'Killer');
+    assert.equal(record.level, 5);
+    assert.equal(record.totalXp, 42);
+    assert.equal(record.mobKills, 1);
+    assert.equal(record.playerKills, 0);
+    assert.ok(record.survivedMs >= 65000 && record.survivedMs < 70000, `survived ${record.survivedMs}ms`);
+    assert.equal(killer.lifePlayerKills, 1);
+    assert.deepEqual([victim.lifeStartedAt, victim.lifeMobKills], [0, 0], 'life stats reset for the next run');
+    clearXpOrbs();
+    clearAllMobs();
 });
