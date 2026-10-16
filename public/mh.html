@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>2D HUNTER ARENA</title>
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
         <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,6 +27,7 @@
             <div>공격속도: <b id="attack-speed-value">100</b></div>
         </div>
     </div>
+    <button id="btn-fullscreen" type="button" aria-label="전체화면">⛶</button>
     <div id="leaderboard"><h3>랭킹</h3><div id="score-list"></div></div>
     <div id="chat-container"><div id="chat-messages"></div><div id="chat-input-container"><input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="50"></div></div>
     <div id="joy-container"><div id="joy-stick"></div></div>
@@ -248,6 +256,7 @@
     <script src="js/input.js"></script>
     <script src="js/render.js"></script>
     <script src="js/controls.js"></script>
+    <script src="js/fullscreen.js"></script>
     <script src="js/auth-ui.js"></script>
 </body>
 </html>

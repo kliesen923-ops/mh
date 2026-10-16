@@ -41,6 +41,12 @@ test('serves the game page and static assets', async () => {
     assert.match(await page.text(), /js\/core\.js/);
     assert.equal((await fetch(`${baseUrl}/js/core.js`)).status, 200);
     assert.equal((await fetch(`${baseUrl}/style.css`)).status, 200);
+    const manifest = await (await fetch(`${baseUrl}/manifest.webmanifest`)).json();
+    assert.equal(manifest.display, 'fullscreen');
+    assert.equal(manifest.orientation, 'landscape');
+    for (const icon of manifest.icons) {
+        assert.equal((await fetch(`${baseUrl}/${icon.src}`)).status, 200, icon.src);
+    }
 });
 
 test('does not expose server source or package metadata', async () => {

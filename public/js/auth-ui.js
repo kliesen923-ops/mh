@@ -126,6 +126,7 @@ function enterGame(nickname, accountId, weapon, skill) {
     hideSkillPanel();
     document.getElementById('overlay-start').classList.add('hidden');
     gameState = 'PLAYING';
+    requestGameFullscreen();
     requestAnimationFrame(loop);
 }
 async function handleLogin() {
