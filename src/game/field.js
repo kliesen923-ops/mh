@@ -156,9 +156,9 @@ function placeHealPotion(ownerId) {
 
 function tickZone(zone, now) {
     if (zone.kind === 'heal') {
-        // Heals everyone standing in it, enemies included.
+        // Heals only the player who set it down, while they stand in it.
         for (const [id, p] of Object.entries(players)) {
-            if (p.hp <= 0 || p.isSelectingLoadout) continue;
+            if (id !== zone.ownerId || p.hp <= 0 || p.isSelectingLoadout) continue;
             if (Math.hypot(p.x - zone.x, p.y - zone.y) > zone.radius) continue;
             const maxHp = getMaxHpFromStats(p.stats);
             const amount = Math.min(HEAL_POTION.healPerTick, Math.max(0, maxHp - p.hp));
