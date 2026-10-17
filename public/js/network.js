@@ -369,6 +369,7 @@ socket.on('dragonProjectile', (effect) => {
         progress: 0,
         duration: Math.max(220, Number(effect.duration) || 600),
         reflected: Boolean(effect.reflected),
+        seed: Math.random() * Math.PI * 2,
     });
 });
 socket.on('bowProjectileResolved', (effect) => {
