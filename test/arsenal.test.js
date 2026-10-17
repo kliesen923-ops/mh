@@ -67,6 +67,7 @@ async function swing(client, comboStep, targetId) {
 
 test('new weapons and skills are accepted by name', async () => {
     const client = await connect();
+    // Still on the loadout screen (not ready yet), where weapons and skills can change.
     for (const weapon of ['scythe', 'gauntlet', 'staff']) {
         client.emit('setWeapon', weapon);
         await wait(30);
@@ -214,11 +215,11 @@ test('a heal potion is set down at your feet and heals only its owner', async ()
     // An enemy standing in it gets nothing.
     Object.assign(target, { x: 310, y: 300 });
     tickField(zone.startAt + 1100);
-    assert.equal(attacker.hp, 59, 'three heal ticks while standing in it');
+    assert.equal(attacker.hp, 62, 'three heal ticks while standing in it');
     assert.equal(target.hp, 50, 'enemies are not healed');
     attacker.x = 600;
     tickField(zone.startAt + 1600);
-    assert.equal(attacker.hp, 59, 'nothing once the owner steps out');
+    assert.equal(attacker.hp, 62, 'nothing once the owner steps out');
 });
 
 test('bow ultimate dragons all fly at one speed, hit as they pass, and root the archer', async () => {

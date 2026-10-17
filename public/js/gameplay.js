@@ -326,9 +326,9 @@ function getAngleDiff(a1, a2) {
 
 function isGuardBroken() { return (player.guardBrokenUntil || 0) > Date.now(); }
 function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0 && !isGuardBroken()) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
-function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
+function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = GUARD_COOLDOWN_SEC; socket.emit('playerAction', { isGuarding: false }); } }
 function releaseGuardForAction() { if (player.isGuarding) releaseGuard(); }
-function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || isRootedByUltimate() || player.isAttacking || player.dodgeCooldown > 0 || (player.gearRush && player.gearRush.active)) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
+function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || isRootedByUltimate() || player.isAttacking || player.dodgeCooldown > 0 || (player.gearRush && player.gearRush.active)) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = DODGE_COOLDOWN_SEC; socket.emit('playerAction', { isDodging: true }); }
 function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
 function beginAttack() {
     releaseGuardForAction();

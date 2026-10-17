@@ -134,14 +134,19 @@ function drawDragonBeam(angle, halfWidth, originX, originY, elapsed, remain) {
     const grow = Math.min(1, elapsed / 160);
     ctx.rotate(angle);
     ctx.globalAlpha = Math.min(1, remain * 1.8);
-    ctx.fillStyle = 'rgba(60, 190, 255, 0.24)';
+    // A soft lane of light, brightest down the middle and fading toward its far end.
+    const across = ctx.createLinearGradient(0, -halfWidth, 0, halfWidth);
+    across.addColorStop(0, 'rgba(60, 190, 255, 0)');
+    across.addColorStop(0.5, 'rgba(60, 190, 255, 0.22)');
+    across.addColorStop(1, 'rgba(60, 190, 255, 0)');
+    ctx.fillStyle = across;
     ctx.fillRect(0, -halfWidth, len * grow, halfWidth * 2);
-    ctx.strokeStyle = 'rgba(160, 235, 255, 0.85)';
+    const along = ctx.createLinearGradient(0, 0, len * grow, 0);
+    along.addColorStop(0, 'rgba(200, 245, 255, 0.6)');
+    along.addColorStop(1, 'rgba(200, 245, 255, 0)');
+    ctx.strokeStyle = along;
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -halfWidth); ctx.lineTo(len * grow, -halfWidth);
-    ctx.moveTo(0, halfWidth); ctx.lineTo(len * grow, halfWidth);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(len * grow, 0); ctx.stroke();
     ctx.globalAlpha = 1;
 }
 
@@ -222,6 +227,134 @@ function drawStaffUltimateArea(ult, elapsed) {
     ctx.shadowBlur = 0;
 }
 
+// Glowing extras drawn on top of each ultimate's area (additive light).
+function drawUltimateFlourish(type, ult, source, elapsed, remain) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    if (type === 'sword') {
+        // Three crescents of sword energy orbiting the caster.
+        const r = (ult.radius || 126) * 0.85;
+        for (let i = 0; i < 3; i++) {
+            const a = elapsed / 140 + (i * Math.PI * 2) / 3;
+            ctx.save();
+            ctx.rotate(a);
+            const g = ctx.createLinearGradient(-r, 0, r, 0);
+            g.addColorStop(0, 'rgba(255, 230, 150, 0)');
+            g.addColorStop(1, 'rgba(255, 245, 210, 0.85)');
+            ctx.strokeStyle = g;
+            ctx.lineWidth = 10;
+            ctx.lineCap = 'round';
+            ctx.shadowColor = 'rgba(255, 220, 120, 1)';
+            ctx.shadowBlur = 18;
+            ctx.beginPath(); ctx.arc(0, 0, r, -0.9, 0.2); ctx.stroke();
+            ctx.restore();
+        }
+    } else if (type === 'spear') {
+        // A shimmering hex lattice and turning rune marks on the barrier.
+        const r = ult.radius || 180;
+        ctx.strokeStyle = `rgba(160, 225, 255, ${0.18 + 0.12 * Math.sin(elapsed / 90)})`;
+        ctx.lineWidth = 1.2;
+        for (let ring = 1; ring <= 3; ring++) {
+            const rr = (r * ring) / 3.2;
+            ctx.beginPath();
+            for (let k = 0; k <= 6; k++) {
+                const a = (k / 6) * Math.PI * 2 + elapsed / 2000;
+                if (k === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+            }
+            ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(200, 240, 255, 0.85)';
+        for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2 - elapsed / 600;
+            ctx.save();
+            ctx.translate(Math.cos(a) * (r - 4), Math.sin(a) * (r - 4));
+            ctx.rotate(a);
+            ctx.fillRect(-1.5, -6, 3, 12);
+            ctx.restore();
+        }
+    } else if (type === 'dual') {
+        // Red flames licking up around the berserker.
+        for (let i = 0; i < 14; i++) {
+            const a = (i / 14) * Math.PI * 2 + elapsed / 500;
+            const h = 26 + Math.abs(Math.sin(elapsed / 70 + i * 2.1)) * 30;
+            const bx = Math.cos(a) * 26;
+            const by = Math.sin(a) * 26;
+            const g = ctx.createLinearGradient(bx, by, bx, by - h);
+            g.addColorStop(0, 'rgba(255, 60, 30, 0.7)');
+            g.addColorStop(1, 'rgba(255, 200, 80, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(bx - 6, by);
+            ctx.quadraticCurveTo(bx - 4, by - h * 0.6, bx, by - h);
+            ctx.quadraticCurveTo(bx + 4, by - h * 0.6, bx + 6, by);
+            ctx.closePath();
+            ctx.fill();
+        }
+    } else if (type === 'scythe') {
+        // Pale souls spiralling into the reaper.
+        const r = ult.radius || 170;
+        for (let i = 0; i < 9; i++) {
+            const phase = ((elapsed / 700) + i / 9) % 1;
+            const a = i * 0.7 + phase * 5;
+            const rr = r * (1 - phase);
+            const x = Math.cos(a) * rr;
+            const y = Math.sin(a) * rr;
+            const g = ctx.createRadialGradient(x, y, 0, x, y, 12);
+            g.addColorStop(0, `rgba(225, 205, 255, ${0.9 * (1 - phase)})`);
+            g.addColorStop(1, 'rgba(150, 90, 255, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+        }
+    } else if (type === 'gauntlet') {
+        // Fist afterimages streaking down the cone.
+        const r = ult.radius || 120;
+        const angle = ult.angle || 0;
+        for (let i = 0; i < 6; i++) {
+            const phase = ((elapsed / 120) + i / 6) % 1;
+            const off = ((i * 37) % 10) / 10 - 0.5;
+            const a = angle + off * (ult.extra || Math.PI / 4);
+            const d = r * (0.25 + phase * 0.75);
+            const x = Math.cos(a) * d;
+            const y = Math.sin(a) * d;
+            ctx.fillStyle = `rgba(255, 200, 120, ${0.7 * (1 - phase)})`;
+            ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = `rgba(255, 240, 210, ${0.6 * (1 - phase)})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(x - Math.cos(a) * 24, y - Math.sin(a) * 24); ctx.lineTo(x, y); ctx.stroke();
+        }
+    } else if (type === 'staff') {
+        // A fiery trail behind the falling rock.
+        const impactMs = ult.extra || 800;
+        const fill = Math.min(1, elapsed / impactMs);
+        if (fill < 1) {
+            const drop = (1 - fill) * 260 / VIEW_Y_SCALE;
+            const g = ctx.createLinearGradient(0, -drop - 160, 0, -drop);
+            g.addColorStop(0, 'rgba(255, 120, 40, 0)');
+            g.addColorStop(1, 'rgba(255, 190, 90, 0.9)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(-14, -drop - 160);
+            ctx.lineTo(14, -drop - 160);
+            ctx.lineTo(24, -drop);
+            ctx.lineTo(-24, -drop);
+            ctx.closePath();
+            ctx.fill();
+        }
+    } else if (type === 'hammer') {
+        // A bright shockwave front running out along the wedge.
+        const r = ult.radius || 160;
+        const arc = ult.extra || Math.PI / 6;
+        const angle = ult.angle || 0;
+        const front = r * Math.min(1, elapsed / 300);
+        ctx.strokeStyle = `rgba(255, 220, 140, ${Math.min(1, remain * 2)})`;
+        ctx.lineWidth = 8;
+        ctx.shadowColor = 'rgba(255, 140, 60, 1)';
+        ctx.shadowBlur = 20;
+        ctx.beginPath(); ctx.arc(0, 0, front, angle - arc, angle + arc); ctx.stroke();
+    }
+    ctx.restore();
+}
+
 function drawUltimateAreas() {
     const now = Date.now();
     Object.values(allPlayers).forEach((p) => {
@@ -249,6 +382,7 @@ function drawUltimateAreas() {
         else if (type === 'scythe') drawScytheUltimateArea(ult, elapsed, remain);
         else if (type === 'gauntlet') drawGauntletUltimateArea(ult, elapsed, remain);
         else if (type === 'staff') drawStaffUltimateArea(ult, elapsed);
+        drawUltimateFlourish(type, ult, source, elapsed, remain);
         ctx.restore();
     });
 }

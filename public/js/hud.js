@@ -229,8 +229,8 @@ function updateCooldownButton(id, remaining, duration) {
 }
 
 function updateCooldownUI() {
-    updateCooldownButton('btn-dodge', player.dodgeCooldown, 1.0);
-    updateCooldownButton('btn-guard', player.guardCooldown, 1.0);
+    updateCooldownButton('btn-dodge', player.dodgeCooldown, DODGE_COOLDOWN_SEC);
+    updateCooldownButton('btn-guard', player.guardCooldown, GUARD_COOLDOWN_SEC);
     updateCooldownButton('btn-wire', player.wireCooldown, SKILL_PRESETS[normalizeSkill(player.skill || selectedSkill)]?.cooldown || 1.0);
     const weapon = normalizeWeapon(player.weapon);
     updateCooldownButton('btn-ultimate', getUltimateCooldownRemaining(player), getUltimateCooldownSec(player));

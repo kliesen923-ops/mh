@@ -47,10 +47,10 @@ const ULTIMATE_NAMES = {
     staff: '운석 낙하',
 };
 const SKILL_PRESETS = {
-    wire: { label: '땡겨', cooldown: 2.0 },
-    ash: { label: '애쉬궁', cooldown: 2.0 },
-    gear: { label: '입체기동', cooldown: 3.0 },
-    trap: { label: '덫', cooldown: 6.0 },
+    wire: { label: '땡겨', cooldown: 7.0 },
+    ash: { label: '애쉬궁', cooldown: 8.0 },
+    gear: { label: '입체기동', cooldown: 5.0 },
+    trap: { label: '덫', cooldown: 8.0 },
     blink: { label: '표식', cooldown: 10.0 },
     potion: { label: '포션', cooldown: 14.0 },
 };
@@ -76,6 +76,9 @@ const DUAL_RUSH_WINDUP_SEC = 0.18;
 const DUAL_RUSH_SLASH_INTERVAL_SEC = 0.025;
 const DUAL_RUSH_SLASH_COUNT = 10;
 const GUARD_DURATION_SEC = 0.5;
+// Cooldowns after a guard is released and after a dodge starts (the server checks them too).
+const GUARD_COOLDOWN_SEC = 1.0;
+const DODGE_COOLDOWN_SEC = 1.5;
 const JUST_GUARD_WINDOW_SEC = 0.1;
 
 let gameState = 'TITLE', isChatting = false, isUpgrading = false, myId = null, allPlayers = {};

@@ -144,13 +144,13 @@ function hitPlayer(projectile, targetId) {
     }
     if (projectile.kind === 'ash') {
         if (target.isStunned) return true;
-        // Longer flights stun longer: 0.3s point blank up to 2s at full range.
+        // Longer flights stun longer: 0.3s point blank up to 1.5s at full range.
         const travelled = Math.hypot(target.x - projectile.startX, target.y - projectile.startY);
         const ratio = Math.max(0, Math.min(1, travelled / PROJECTILES.ash.range));
-        let stunMs = Math.round((0.3 + ratio * 1.7) * 1000);
+        let stunMs = Math.round((0.3 + ratio * 1.2) * 1000);
         if (isGuardActive(target, now) && facing) stunMs = Math.round(stunMs * 0.5);
         state.io.emit('combatEffect', { x: target.x, y: target.y, angle: projectile.angle, weapon: 'ash' });
-        stunPlayer(targetId, Math.max(300, Math.min(2000, stunMs)));
+        stunPlayer(targetId, Math.max(300, Math.min(1500, stunMs)));
         return true;
     }
     // Wire: a just guard pulls the thrower in instead.

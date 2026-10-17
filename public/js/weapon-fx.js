@@ -218,6 +218,7 @@ function drawSwingTrails() {
         if (!owner) return;
         const p = Math.min(1, (now - trail.bornAt) / trail.life);
         ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
         ctx.translate(owner.x, owner.y);
         drawSwingTrail(trail, p);
         ctx.restore();
@@ -241,6 +242,9 @@ function spawnHitParticles(effect) {
             addParticle(x, y, angle + (Math.random() - 0.5) * spread, speedMin + Math.random() * (speedMax - speedMin), life, size, c, kind);
         }
     };
+    // A soft flash on every hit, and a little shake when it happens close to you.
+    emitParticles('glow', x, y, { color: color.glow, size: weapon === 'hammer' ? 60 : 36, life: 0.2 });
+    if (isNearMe(x, y, 260)) shakeScreen(weapon === 'hammer' ? 4 : 2, weapon === 'hammer' ? 160 : 90);
     if (weapon === 'hammer') {
         spray(9, Math.PI * 2, 80, 220, 0.5, 4, '120, 80, 50', 'chunk');
         spray(6, Math.PI * 2, 30, 70, 0.6, 14, '180, 150, 120', 'mist');
@@ -270,9 +274,17 @@ function drawHitParticles() {
         const drift = t * (1 - p * 0.5);
         const x = part.x + part.vx * drift;
         const y = part.y + part.vy * drift;
+        if (p < 0) return;
         ctx.save();
+        if (part.kind === 'glow' || part.kind === 'ember' || part.kind === 'ring' || part.kind === 'shard') {
+            ctx.globalCompositeOperation = 'lighter';
+            drawGlowParticle(part, part.kind === 'ring' ? part.x : x, part.kind === 'ring' ? part.y : y, p);
+            ctx.restore();
+            return;
+        }
         ctx.globalAlpha = 1 - p;
         if (part.kind === 'spark') {
+            ctx.globalCompositeOperation = 'lighter';
             ctx.strokeStyle = `rgba(${part.color}, 1)`;
             ctx.lineWidth = part.size;
             ctx.lineCap = 'round';
@@ -307,6 +319,7 @@ function drawWeaponHit(effect, t) {
     const weapon = WEAPON_FX[effect.weapon] ? effect.weapon : 'sword';
     const color = WEAPON_FX[weapon];
     const grow = 1 - t;
+    ctx.globalCompositeOperation = 'lighter';
     ctx.shadowColor = `rgba(${color.glow}, 0.9)`;
     ctx.shadowBlur = 14;
     if (weapon === 'sword') {
@@ -392,4 +405,137 @@ function drawWeaponHit(effect, t) {
         }
     }
     ctx.shadowBlur = 0;
+}
+
+// ── Extra juice: glow particles, shockwave rings, ultimate cast flashes, shake ────
+
+// Adds a few particles of a kind around (x, y). kind: glow (soft light), ember (rises and
+// flickers), shard (spinning chip), ring (expanding shockwave).
+function emitParticles(kind, x, y, options = {}) {
+    const count = options.count || 1;
+    for (let i = 0; i < count; i++) {
+        const angle = Number.isFinite(options.angle) ? options.angle + (Math.random() - 0.5) * (options.spread ?? Math.PI * 2) : Math.random() * Math.PI * 2;
+        const speed = (options.speedMin ?? 0) + Math.random() * ((options.speedMax ?? 0) - (options.speedMin ?? 0));
+        hitParticles.push({
+            x: x + (Math.random() - 0.5) * (options.jitter || 0),
+            y: y + (Math.random() - 0.5) * (options.jitter || 0),
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            bornAt: performance.now() + (options.delay || 0) * Math.random(),
+            life: (options.life || 0.5) * 1000,
+            size: options.size || 4,
+            color: options.color || '255, 255, 255',
+            kind,
+        });
+    }
+}
+
+// Screen shake that never weakens one already running.
+function shakeScreen(strength, ms) {
+    const now = Date.now();
+    if (now < screenShake.until && screenShake.strength > strength) return;
+    screenShake.strength = strength;
+    screenShake.until = now + ms;
+}
+
+function isNearMe(x, y, distance) {
+    return Math.hypot(x - player.x, y - player.y) < distance;
+}
+
+// Glowing kinds are drawn additively so overlapping light gets brighter.
+function drawGlowParticle(part, x, y, p) {
+    if (part.kind === 'glow') {
+        const r = part.size * (0.6 + p * 0.8);
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, `rgba(${part.color}, ${0.9 * (1 - p)})`);
+        g.addColorStop(1, `rgba(${part.color}, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    } else if (part.kind === 'ember') {
+        const flicker = 0.6 + Math.sin(performance.now() / 40 + part.bornAt) * 0.4;
+        ctx.fillStyle = `rgba(${part.color}, ${(1 - p) * flicker})`;
+        ctx.beginPath(); ctx.arc(x, y - p * 60, part.size * (1 - p * 0.5), 0, Math.PI * 2); ctx.fill();
+    } else if (part.kind === 'ring') {
+        ctx.strokeStyle = `rgba(${part.color}, ${1 - p})`;
+        ctx.lineWidth = Math.max(1, part.size * (1 - p));
+        ctx.beginPath(); ctx.arc(x, y, 10 + p * (part.vx || 120), 0, Math.PI * 2); ctx.stroke();
+    } else if (part.kind === 'shard') {
+        ctx.translate(x, y);
+        ctx.rotate(p * 12 + part.bornAt);
+        ctx.fillStyle = `rgba(${part.color}, ${1 - p})`;
+        ctx.beginPath(); ctx.moveTo(0, -part.size); ctx.lineTo(part.size * 0.6, part.size * 0.7); ctx.lineTo(-part.size * 0.6, part.size * 0.5); ctx.closePath(); ctx.fill();
+    }
+}
+
+const ULT_FX_COLORS = {
+    sword: '255, 225, 140', hammer: '255, 140, 60', spear: '140, 215, 255', bow: '90, 220, 255',
+    dual: '255, 70, 70', scythe: '180, 130, 255', gauntlet: '255, 180, 90', staff: '255, 122, 217',
+};
+
+// The moment an ultimate goes off: a pillar of light, shockwave rings and rising embers.
+function spawnUltimateCastFx(type, x, y) {
+    const color = ULT_FX_COLORS[type] || '255, 255, 255';
+    castPillars.push({ x, y, color, bornAt: performance.now(), life: 700 });
+    emitParticles('ring', x, y, { color, size: 10, life: 0.6 });
+    hitParticles[hitParticles.length - 1].vx = 220;
+    emitParticles('ring', x, y, { color: '255, 255, 255', size: 4, life: 0.45 });
+    hitParticles[hitParticles.length - 1].vx = 150;
+    emitParticles('ember', x, y, { color, count: 22, jitter: 70, size: 3, life: 0.9 });
+    emitParticles('glow', x, y, { color, size: 120, life: 0.4 });
+    if (isNearMe(x, y, 700)) shakeScreen(4, 220);
+}
+
+let castPillars = [];
+function drawCastPillars() {
+    const now = performance.now();
+    castPillars = castPillars.filter((pillar) => now - pillar.bornAt < pillar.life);
+    castPillars.forEach((pillar) => {
+        const p = (now - pillar.bornAt) / pillar.life;
+        const width = 46 * (1 - p * 0.6);
+        const height = 260 / VIEW_Y_SCALE;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createLinearGradient(pillar.x, pillar.y, pillar.x, pillar.y - height);
+        g.addColorStop(0, `rgba(${pillar.color}, ${0.75 * (1 - p)})`);
+        g.addColorStop(1, `rgba(${pillar.color}, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(pillar.x - width / 2, pillar.y - height, width, height);
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 * (1 - p)})`;
+        ctx.fillRect(pillar.x - width / 8, pillar.y - height * 0.9, width / 4, height * 0.9);
+        ctx.restore();
+    });
+}
+
+// Particles and shake for the hit marks of ultimates.
+function spawnUltimateHitFx(effect) {
+    const { x, y, angle, weapon } = effect;
+    const near = isNearMe(x, y, 500);
+    if (weapon === 'ult-sword') {
+        emitParticles('spark', x, y, { angle, spread: 1.2, count: 8, speedMin: 200, speedMax: 420, life: 0.3, size: 2, color: '255, 245, 210' });
+        emitParticles('glow', x, y, { color: '255, 225, 140', size: 40, life: 0.25 });
+    } else if (weapon === 'ult-hammer') {
+        emitParticles('chunk', x, y, { count: 12, speedMin: 120, speedMax: 320, life: 0.6, size: 5, color: '120, 80, 50' });
+        emitParticles('glow', x, y, { color: '255, 140, 60', size: 70, life: 0.35 });
+        if (near) shakeScreen(7, 260);
+    } else if (weapon === 'spear-ult') {
+        emitParticles('shard', x, y, { count: 8, speedMin: 100, speedMax: 240, life: 0.5, size: 6, color: '190, 235, 255' });
+        emitParticles('glow', x, y, { color: '140, 215, 255', size: 50, life: 0.3 });
+    } else if (weapon === 'ult-dual') {
+        emitParticles('spark', x, y, { count: 10, speedMin: 160, speedMax: 360, life: 0.25, size: 2, color: '255, 90, 90' });
+    } else if (weapon === 'dragon') {
+        emitParticles('glow', x, y, { color: '90, 220, 255', size: 70, life: 0.35 });
+        emitParticles('shard', x, y, { angle, spread: 1.6, count: 10, speedMin: 150, speedMax: 320, life: 0.5, size: 5, color: '200, 245, 255' });
+        if (near) shakeScreen(5, 200);
+    } else if (weapon === 'ult-scythe') {
+        emitParticles('mist', x, y, { count: 4, speedMin: 10, speedMax: 50, life: 0.7, size: 16, color: '70, 20, 120' });
+        emitParticles('ember', x, y, { count: 8, jitter: 40, size: 3, life: 0.7, color: '200, 160, 255' });
+    } else if (weapon === 'ult-gauntlet') {
+        emitParticles('spark', x, y, { angle, spread: 1.4, count: 8, speedMin: 200, speedMax: 400, life: 0.25, size: 2.4, color: '255, 200, 120' });
+        if (near) shakeScreen(3, 120);
+    } else if (weapon === 'meteor') {
+        emitParticles('chunk', x, y, { count: 22, speedMin: 150, speedMax: 420, life: 0.8, size: 6, color: '90, 50, 35' });
+        emitParticles('ember', x, y, { count: 30, jitter: 140, size: 4, life: 1.2, color: '255, 150, 60' });
+        emitParticles('glow', x, y, { color: '255, 150, 60', size: 220, life: 0.5 });
+        emitParticles('mist', x, y, { count: 8, speedMin: 40, speedMax: 120, life: 1.2, size: 30, color: '80, 60, 50' });
+    }
 }

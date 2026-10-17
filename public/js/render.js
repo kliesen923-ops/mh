@@ -327,6 +327,8 @@ function drawCombatEffects() {
         ctx.save();
         ctx.translate(effect.x, effect.y);
         ctx.globalAlpha = alpha;
+        // Ultimate hit marks are light: overlapping ones add up.
+        if (SPECIAL_EFFECTS.has(effect.weapon)) ctx.globalCompositeOperation = 'lighter';
         if (WEAPON_FX[effect.weapon]) {
             drawWeaponHit(effect, t);
         } else if (effect.weapon === 'ult-dual') {
@@ -356,23 +358,23 @@ function drawCombatEffects() {
             ctx.arc(0, 0, 8 + (1 - t) * 5, 0, Math.PI * 2);
             ctx.fill();
         } else if (effect.weapon === 'dragon') {
-            const beamLen = 122 + (1 - t) * 36;
-            ctx.strokeStyle = 'rgba(70, 220, 255, 0.98)';
-            ctx.fillStyle = 'rgba(30, 150, 255, 0.95)';
-            ctx.lineWidth = 10;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
+            // The dragon's bite: a cold flash and fangs of light.
+            const r = 20 + (1 - t) * 50;
+            const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+            g.addColorStop(0, 'rgba(230, 250, 255, 0.95)');
+            g.addColorStop(1, 'rgba(60, 180, 255, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
             ctx.rotate(effect.angle);
-            ctx.moveTo(-beamLen, -16);
-            ctx.quadraticCurveTo(-beamLen * 0.56, -40, -beamLen * 0.08, -18);
-            ctx.quadraticCurveTo(beamLen * 0.18, -44, beamLen * 0.56, -14);
-            ctx.quadraticCurveTo(beamLen * 0.86, -24, beamLen, 0);
-            ctx.quadraticCurveTo(beamLen * 0.86, 24, beamLen * 0.56, 14);
-            ctx.quadraticCurveTo(beamLen * 0.18, 44, -beamLen * 0.08, 18);
-            ctx.quadraticCurveTo(-beamLen * 0.56, 40, -beamLen, 16);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            ctx.fillStyle = 'rgba(200, 245, 255, 0.95)';
+            for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(-10, side * 6);
+                ctx.lineTo(18 + (1 - t) * 14, side * 2);
+                ctx.lineTo(-4, side * 16);
+                ctx.closePath();
+                ctx.fill();
+            }
         } else if (effect.weapon === 'ult-sword') {
             const slashLen = 64 + (1 - t) * 22;
             ctx.lineWidth = 6.2;
@@ -1118,6 +1120,7 @@ function draw() {
     drawHealingTexts();
     drawCombatEffects();
     drawHitParticles();
+    drawCastPillars();
     drawAshProjectiles();
     drawBowProjectiles();
     drawDragonProjectiles();

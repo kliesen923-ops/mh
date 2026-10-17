@@ -142,13 +142,13 @@ function registerSocketHandlers(io) {
 
         socket.on('setWeapon', (weapon) => {
             const p = players[socket.id];
-            if (!p) return;
+            // Only on the loadout screen (start and after death), never mid-game.
+            if (!p || !p.isSelectingLoadout) return;
             const nextWeapon = sanitizeWeapon(weapon);
             p.weapon = nextWeapon;
             p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
-            // Full health only when picking a loadout; switching mid-game is no free heal.
-            p.hp = p.isSelectingLoadout ? getMaxHpFromStats(p.stats) : Math.min(p.hp, getMaxHpFromStats(p.stats));
-            clearUltimateState(p);
+            p.hp = getMaxHpFromStats(p.stats);
+            clearUltimateState(p, { resetCooldown: true });
             io.emit('statsUpdate', players);
         });
 
@@ -161,7 +161,8 @@ function registerSocketHandlers(io) {
 
         socket.on('setSkill', (skill) => {
             const p = players[socket.id];
-            if (!p) return;
+            // Only on the loadout screen (start and after death), never mid-game.
+            if (!p || !p.isSelectingLoadout) return;
             p.skill = sanitizeSkill(skill);
             io.emit('statsUpdate', players);
         });

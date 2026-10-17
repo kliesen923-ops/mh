@@ -29,6 +29,7 @@ function noteUltimateCast(playerId, ultimate) {
     const caster = playerId === myId ? player : allPlayers[playerId];
     const nearby = caster && Math.abs(caster.x - player.x) < canvas.width && Math.abs(caster.y - player.y) < canvas.height;
     if (nearby) playSound('ult');
+    if (caster) spawnUltimateCastFx(type, caster.x, caster.y);
     if (nearby && (type === 'hammer' || type === 'bow')) {
         screenShake.until = Date.now() + (type === 'hammer' ? 380 : 260);
         screenShake.strength = type === 'hammer' ? 9 : 5;
@@ -179,6 +180,8 @@ function pushCombatEffect(effect) {
     const plain = PLAIN_EFFECTS.has(effect.weapon);
     const weaponKey = special || plain ? effect.weapon : normalizeWeapon(effect.weapon);
     const life = special ? (effect.weapon === 'meteor' ? 0.7 : 0.45) : (HIT_LIFE[weaponKey] || 0.22);
+    if (special && effect.damage) spawnUltimateHitFx({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: Number(effect.angle) || 0, weapon: effect.weapon });
+    if (effect.weapon === 'meteor' && !effect.damage) spawnUltimateHitFx({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: 0, weapon: 'meteor' });
     if (effect.damage && !special && !plain) spawnHitParticles({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: Number(effect.angle) || 0, weapon: weaponKey });
     combatEffects.push({
         x: Number(effect.x) || 0,

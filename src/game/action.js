@@ -7,7 +7,7 @@ const { GUARD_DURATION_MS, SKILL_COOLDOWN_MS, SKILL_COOLDOWN_SLACK_MS } = requir
 // Fraction of the client's own timings the server insists on (room for lag and frame jitter).
 const TIMING_SLACK = 0.75;
 const GUARD_COOLDOWN_MS = 1000;
-const DODGE_COOLDOWN_MS = 1000;
+const DODGE_COOLDOWN_MS = 1500;
 const DODGE_DISTANCE = 160;
 const RUSH_DISTANCE = 340;
 

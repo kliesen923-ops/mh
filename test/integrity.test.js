@@ -170,13 +170,15 @@ test('wire and ash shots are resolved by the server and respect cooldowns', asyn
     assert.equal(victim.p.isStunned, false);
 });
 
-test('switching weapons mid-game does not heal', async () => {
-    const { client, p } = await ready('sword');
+test('weapons and skills cannot be changed mid-game', async () => {
+    const { client, p } = await ready('sword', 'wire');
     p.hp = 20;
     client.emit('setWeapon', 'hammer');
+    client.emit('setSkill', 'potion');
     await wait(40);
-    assert.equal(p.weapon, 'hammer');
-    assert.equal(p.hp, 20);
+    assert.equal(p.weapon, 'sword');
+    assert.equal(p.skill, 'wire');
+    assert.equal(p.hp, 20, 'and no free heal');
 });
 
 test('dual-blade rush slashes only count along the rush, ten per rush', async () => {
@@ -197,4 +199,21 @@ test('dual-blade rush slashes only count along the rush, ten per rush', async ()
     for (let i = 0; i < 14; i++) client.emit('dualRushSlash', { startX: 1090, startY: 1000, endX: 1110, endY: 1000, angle: 0 });
     await wait(60);
     assert.equal(p.rushSlashes, 10);
+});
+
+test('an ultimate stays on cooldown after it ends', async () => {
+    const { client, p } = await ready('hammer');
+    client.emit('useUltimate', { angle: 0 });
+    await wait(40);
+    const firstStart = p.ultimate.startAt;
+    const cooldownEndsAt = p.ultimate.cooldownEndsAt;
+    assert.ok(cooldownEndsAt > Date.now() + 10000, 'the hammer cooldown is 13s');
+    // The slam lasts 0.7s; once it ends the cooldown must still be running.
+    await wait(800);
+    assert.equal(p.ultimate.active, false);
+    assert.equal(p.ultimate.cooldownEndsAt, cooldownEndsAt);
+    client.emit('useUltimate', { angle: 0 });
+    await wait(40);
+    assert.equal(p.ultimate.active, false, 'a second cast during the cooldown is refused');
+    assert.notEqual(p.ultimate.startAt, firstStart + 1);
 });
