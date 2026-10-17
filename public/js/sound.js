@@ -88,7 +88,8 @@ function isOnScreen(x, y) {
 function updateSoundButton() {
     const button = document.getElementById('btn-sound');
     if (!button) return;
-    button.textContent = soundMuted ? '🔇' : '🔊';
+    button.innerHTML = soundMuted ? '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M17 9l5 6" /><path d="M22 9l-5 6" /></svg>' : '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16.5 8.5a5 5 0 0 1 0 7" /><path d="M19 6a8.5 8.5 0 0 1 0 12" /></svg>';
+    button.classList.toggle('off', soundMuted);
     button.setAttribute('aria-label', soundMuted ? '소리 켜기' : '소리 끄기');
 }
 

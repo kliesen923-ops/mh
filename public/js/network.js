@@ -352,14 +352,18 @@ socket.on('bowProjectileResolved', (effect) => {
     const resolvedId = String(effect.projectileId || '');
     bowProjectiles = bowProjectiles.filter((p) => p.id !== resolvedId);
 });
+const CHAT_MAX_LINES = 30;
 socket.on('chatMessage', (data) => {
+    if (!data) return;
+    const isSystem = data.id === 'SYSTEM';
     const msgEl = document.createElement('div');
+    msgEl.className = 'chat-line' + (isSystem ? ' system' : '');
     const nameEl = document.createElement('b');
-    nameEl.style.color = '#f1c40f';
-    nameEl.textContent = `${String(data.id).substring(0,4)}:`;
+    nameEl.textContent = isSystem ? '알림' : (allPlayers[data.id]?.name || '???');
     msgEl.appendChild(nameEl);
-    msgEl.appendChild(document.createTextNode(` ${String(data.message)}`));
+    msgEl.appendChild(document.createTextNode(String(data.message)));
     const messagesEl = document.getElementById('chat-messages');
     messagesEl.appendChild(msgEl);
+    while (messagesEl.children.length > CHAT_MAX_LINES) messagesEl.firstChild.remove();
     messagesEl.scrollTop = messagesEl.scrollHeight;
 });

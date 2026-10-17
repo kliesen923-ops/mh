@@ -912,20 +912,32 @@ function drawMobs() {
     });
 }
 
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+
+// Draws into the HUD's own canvas, sized for the device's pixel ratio.
 function drawMinimap() {
-    const w = 180;
-    const h = 90;
-    const x = (canvas.width - w) / 2;
-    const y = 104;
-    const sx = w / WORLD_WIDTH;
-    const sy = h / WORLD_HEIGHT;
+    if (!minimapCtx) return;
+    const ratio = Math.min(3, window.devicePixelRatio || 1);
+    const w = minimapCanvas.clientWidth || 200;
+    const h = minimapCanvas.clientHeight || 100;
+    if (minimapCanvas.width !== Math.round(w * ratio) || minimapCanvas.height !== Math.round(h * ratio)) {
+        minimapCanvas.width = Math.round(w * ratio);
+        minimapCanvas.height = Math.round(h * ratio);
+    }
+    const ctx = minimapCtx;
+    const pad = 6;
+    const x = pad;
+    const y = pad;
+    const sx = (w - pad * 2) / WORLD_WIDTH;
+    const sy = (h - pad * 2) / WORLD_HEIGHT;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, w, h);
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.fillRect(x, y, w - pad * 2, h - pad * 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
     ctx.strokeRect(x + camera.x * sx, y + camera.y * sy, canvas.width * sx, canvas.height * sy);
     ctx.fillStyle = '#5ad8ff';
     xpOrbs.forEach((orb) => ctx.fillRect(x + orb.x * sx - 1, y + orb.y * sy - 1, 2, 2));
@@ -973,7 +985,7 @@ function draw() {
     ctx.restore();
     if (gameState === 'PLAYING') {
         drawMinimap();
-        drawBossBar();
+        updateBossBar();
     }
     drawAnnouncements();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }

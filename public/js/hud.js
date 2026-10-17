@@ -1,43 +1,37 @@
+const LEADERBOARD_ROWS = 5;
+function makeRankRow(p, position) {
+    const row = document.createElement('div');
+    row.className = 'rank-row' + (p.id === myId ? ' me' : '');
+    const pos = document.createElement('span');
+    pos.className = 'rank-pos';
+    pos.textContent = String(position);
+    const name = document.createElement('span');
+    name.className = 'rank-name';
+    name.textContent = p.name || 'Hunter';
+    const level = document.createElement('span');
+    level.className = 'rank-level';
+    level.textContent = `Lv.${p.level || 1}`;
+    const kills = document.createElement('span');
+    kills.className = 'rank-kills';
+    kills.textContent = `${p.kills || 0}킬`;
+    row.append(pos, name, level, kills);
+    return row;
+}
 function updateLeaderboard() {
-    const list = document.getElementById('score-list'); if(!list) return; list.innerHTML = '';
-    const table = document.createElement('table');
-    table.className = 'score-table';
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    ['이름', '킬', '데스'].forEach(text => {
-        const th = document.createElement('th');
-        th.textContent = text;
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    Object.values(allPlayers).sort((a,b) => b.kills - a.kills).forEach(p => {
-        const lvlTxt = "Lv." + (p.level || 1);
-        const row = document.createElement('tr');
-        const nameCell = document.createElement('td');
-        const nameWrap = document.createElement('span');
-        nameWrap.className = 'name-cell';
-        const badge = document.createElement('span');
-        badge.className = 'level-badge';
-        badge.textContent = lvlTxt;
-        const nameText = document.createElement('span');
-        nameText.className = 'name-text';
-        nameText.textContent = p.name || 'Hunter';
-        nameWrap.appendChild(badge);
-        nameWrap.appendChild(nameText);
-        nameCell.appendChild(nameWrap);
-        const killsCell = document.createElement('td');
-        killsCell.textContent = p.kills || 0;
-        const deathsCell = document.createElement('td');
-        deathsCell.textContent = p.deaths || 0;
-        row.appendChild(nameCell);
-        row.appendChild(killsCell);
-        row.appendChild(deathsCell);
-        tbody.appendChild(row);
-    });
-    table.appendChild(tbody);
-    list.appendChild(table);
+    const list = document.getElementById('score-list');
+    if (!list) return;
+    const ranked = Object.values(allPlayers)
+        .filter((p) => !p.isSelectingLoadout || p.id === myId)
+        .sort((a, b) => (b.level || 1) - (a.level || 1) || (b.kills || 0) - (a.kills || 0));
+    list.textContent = '';
+    ranked.slice(0, LEADERBOARD_ROWS).forEach((p, i) => list.append(makeRankRow(p, i + 1)));
+    const myIndex = ranked.findIndex((p) => p.id === myId);
+    if (myIndex >= LEADERBOARD_ROWS) {
+        const gap = document.createElement('div');
+        gap.className = 'rank-gap';
+        gap.textContent = '···';
+        list.append(gap, makeRankRow(ranked[myIndex], myIndex + 1));
+    }
 }
 
 function formatDamage(value) {
@@ -191,6 +185,8 @@ function updateXpBar() {
     levelText.textContent = `Lv.${me.level || 1}`;
     xpText.textContent = `${xp}/${xpToNext}`;
     xpFill.style.width = `${Math.min(100, (xp / xpToNext) * 100)}%`;
+    const name = document.getElementById('hud-name');
+    if (name) name.textContent = me.name || 'Hunter';
 }
 
 function updateHUD() {
@@ -205,6 +201,7 @@ function updateHUD() {
     const hp = Math.max(0, Math.ceil(player.hp || 0));
     hpText.textContent = `${hp}/${maxHp}`;
     hpFill.style.width = `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`;
+    document.getElementById('hud')?.classList.toggle('hp-low', hp / maxHp <= 0.3);
     updateXpBar();
 
     player.stats = normalizeStats(player.stats);
