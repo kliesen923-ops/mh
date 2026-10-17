@@ -35,7 +35,7 @@ const {
 const { sanitizeAction } = require('./game/action');
 const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayerHits } = require('./game/hits');
 const { resolveKill, applyBowImpact, applyAshImpact } = require('./game/combat');
-const { ULTIMATE_HANDLERS } = require('./game/ultimates');
+const { ULTIMATE_HANDLERS, isRootedByUltimate } = require('./game/ultimates');
 const { getHealingCrossList, getGiantPotionList } = require('./game/pickups');
 const { createProgression } = require('./game/progression');
 const { getXpOrbList } = require('./game/xpOrbs');
@@ -170,6 +170,7 @@ function registerSocketHandlers(io) {
             if (players[socket.id] && !players[socket.id].isStunned) {
                 const p = players[socket.id];
                 const now = Date.now();
+                if (isRootedByUltimate(p, now)) return;
                 const dt = Math.max((now - (p.lastMoveAt || now)) / 1000, 1 / 60);
                 const nextX = Number(movementData.x);
                 const nextY = Number(movementData.y);

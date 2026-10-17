@@ -236,10 +236,8 @@ function update(dt) {
         const dodgeMultiplier = Number.isFinite(player.stats.dodge) ? player.stats.dodge : 1;
         player.x += player.dDX * 800 * dodgeMultiplier * dt; player.y += player.dDY * 800 * dodgeMultiplier * dt;
         player.dTimer -= dt; if(player.dTimer <= 0) { player.isDodging = false; socket.emit('playerAction', { isDodging: false }); }
-    } else if(player.isAttacking) {
-        if (normalizeWeapon(player.weapon) !== 'bow') {
-            player.x += Math.cos(player.aAngle) * 150 * dt; player.y += Math.sin(player.aAngle) * 150 * dt;
-        }
+    } else if(player.isAttacking || isRootedByUltimate()) {
+        // Attacks are swung in place, and the hammer slam plants you until it fades.
     } else if(mx !== 0 || my !== 0) {
         player.stats = normalizeStats(player.stats);
         const d = Math.hypot(mx, my), s = (player.isGuarding ? 175 : 350) * player.stats.move * dt;
@@ -363,7 +361,7 @@ function getAngleDiff(a1, a2) {
 function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
 function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
 function releaseGuardForAction() { if (player.isGuarding) releaseGuard(); }
-function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || player.isAttacking || player.dodgeCooldown > 0 || (player.gearRush && player.gearRush.active)) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
+function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || isRootedByUltimate() || player.isAttacking || player.dodgeCooldown > 0 || (player.gearRush && player.gearRush.active)) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
 function canStartAttack() { return gameState === 'PLAYING' && !isChatting && !isUpgrading && player.hp > 0 && !player.isStunned; }
 function beginAttack() {
     releaseGuardForAction();
@@ -480,8 +478,14 @@ function startBowShot() {
         });
     }
 }
+// The hammer ultimate roots its caster until the hit area fades (matches the server).
+function isRootedByUltimate() {
+    const ult = getUltimateState(player);
+    return Boolean(ult && ult.active && ult.type === 'hammer' && Date.now() < (ult.endsAt || 0));
+}
 function startGearRush() {
     releaseGuardForAction();
+    if (isRootedByUltimate()) return;
     if (player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0 || (player.gearRush && player.gearRush.active)) return;
     player.wireCooldown = getSkillCooldown('gear');
     const angle = player.angle;
