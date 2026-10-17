@@ -43,13 +43,15 @@
             <div><span>공격속도</span><b id="attack-speed-value">100</b></div>
         </div>
     </div>
+    <div id="hud-left" class="game-ui">
+        <canvas id="minimap" class="hud-panel"></canvas>
+        <div id="leaderboard" class="hud-panel"><h3>랭킹</h3><div id="score-list"></div></div>
+    </div>
     <div id="hud-right" class="game-ui">
         <div class="hud-icons">
             <button id="btn-sound" class="hud-icon ui-click" type="button" aria-label="소리 끄기"></button>
             <button id="btn-fullscreen" class="hud-icon ui-click" type="button" aria-label="전체화면"></button>
         </div>
-        <canvas id="minimap" class="hud-panel"></canvas>
-        <div id="leaderboard" class="hud-panel"><h3>랭킹</h3><div id="score-list"></div></div>
     </div>
     <div id="boss-bar" class="game-ui hidden">
         <div class="boss-bar-label"><span id="boss-bar-name">보스</span></div>
