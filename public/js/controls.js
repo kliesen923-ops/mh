@@ -25,10 +25,12 @@ window.addEventListener('pointermove', e => {
     if(joyId === e.pointerId) {
         const r = joyContainer.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
         let dx = e.clientX - cx, dy = e.clientY - cy;
+        // Travel reaches the ring's edge; the knob is moved in the container's unscaled pixels.
+        const travel = r.width * 0.32, scale = r.width / joyContainer.offsetWidth;
         const d = Math.hypot(dx, dy);
-        if(d > 50) { dx *= 50/d; dy *= 50/d; }
-        joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
-        player.moveDir = { x: dx/50, y: (dy/50)/VIEW_Y_SCALE };
+        if(d > travel) { dx *= travel/d; dy *= travel/d; }
+        joyStick.style.transform = `translate(${dx/scale}px, ${dy/scale}px)`;
+        player.moveDir = { x: dx/travel, y: (dy/travel)/VIEW_Y_SCALE };
         aimMode = 'touch';
     }
 });
