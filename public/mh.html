@@ -75,26 +75,26 @@
     
     <div id="overlay-start" class="overlay">
         <h1>HUNTER ARENA: LEVEL UP</h1>
-        <div id="login-panel" class="auth-panel">
-            <input id="login-id" class="auth-field" type="text" maxlength="20" placeholder="ID" autocomplete="username">
-            <input id="login-password" class="auth-field" type="password" maxlength="32" placeholder="Password" autocomplete="current-password">
+        <form id="login-panel" class="auth-panel" novalidate>
+            <input id="login-id" class="auth-field" type="text" maxlength="20" placeholder="ID" autocomplete="username" enterkeyhint="next">
+            <input id="login-password" class="auth-field" type="password" maxlength="32" placeholder="Password" autocomplete="current-password" enterkeyhint="go">
             <div id="login-error" class="nickname-error"></div>
             <div class="start-actions">
-                <button id="btn-login" class="start-btn" type="button">LOGIN</button>
+                <button id="btn-login" class="start-btn" type="submit">LOGIN</button>
                 <button id="btn-signup" class="start-btn" type="button">SIGN UP</button>
             </div>
-        </div>
-        <div id="register-panel" class="auth-panel hidden">
-            <input id="register-id" class="auth-field" type="text" maxlength="20" placeholder="ID" autocomplete="username">
-            <input id="register-nickname" class="auth-field" type="text" maxlength="10" placeholder="Nickname 2~10" autocomplete="nickname">
-            <input id="register-password" class="auth-field" type="password" maxlength="32" placeholder="Password" autocomplete="new-password">
-            <input id="register-password-confirm" class="auth-field" type="password" maxlength="32" placeholder="Confirm Password" autocomplete="new-password">
+        </form>
+        <form id="register-panel" class="auth-panel hidden" novalidate>
+            <input id="register-id" class="auth-field" type="text" maxlength="20" placeholder="ID" autocomplete="username" enterkeyhint="next">
+            <input id="register-nickname" class="auth-field" type="text" maxlength="10" placeholder="Nickname 2~10" autocomplete="nickname" enterkeyhint="next">
+            <input id="register-password" class="auth-field" type="password" maxlength="32" placeholder="Password" autocomplete="new-password" enterkeyhint="next">
+            <input id="register-password-confirm" class="auth-field" type="password" maxlength="32" placeholder="Confirm Password" autocomplete="new-password" enterkeyhint="go">
             <div id="register-error" class="nickname-error"></div>
             <div class="start-actions">
-                <button id="btn-register" class="start-btn" type="button">REGISTER</button>
+                <button id="btn-register" class="start-btn" type="submit">REGISTER</button>
                 <button id="btn-back-login" class="start-btn" type="button">LOGIN</button>
             </div>
-        </div>
+        </form>
         <div id="loadout-panel" class="loadout-panel hidden">
             <h2 class="loadout-title">캐릭터 준비</h2>
             <div id="loadout-note" class="loadout-note">외형과 무기를 고르고 게임을 시작하세요.</div>

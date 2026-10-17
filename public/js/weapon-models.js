@@ -148,11 +148,13 @@ function drawSpearModel(s) {
     const finisher = s.comboStep === 3;
     const fullThrustX = 28 + 1.45 * 12;
     let tipLength = 24;
-    let shaftLength = Math.max(38, (s.thrustReach - fullThrustX - tipLength) * 2);
+    // Held a quarter of the way up the shaft, so only a short butt sticks out behind.
+    const grip = 0.25;
+    let shaftLength = Math.max(38, (s.thrustReach - fullThrustX - tipLength) / (1 - grip));
     tipLength = Math.max(16, Math.min(30, shaftLength * 0.18));
-    shaftLength = Math.max(38, (s.thrustReach - fullThrustX - tipLength) * 2);
+    shaftLength = Math.max(38, (s.thrustReach - fullThrustX - tipLength) / (1 - grip));
     const shaftY = 20 - s.spearThrust * 1.5;
-    const shaftX = 28 + s.spearThrust * 12 - shaftLength * 0.5;
+    const shaftX = 28 + s.spearThrust * 12 - shaftLength * grip;
     const endX = shaftX + shaftLength;
     const midY = shaftY + 3;
     ctx.fillStyle = woodFill(0, shaftY, 0, shaftY + 6);

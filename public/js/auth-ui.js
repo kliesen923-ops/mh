@@ -316,13 +316,20 @@ if (savedLoginId) {
 }
 setAuthMode('login');
 updateSkillButtonLabel();
-document.getElementById('btn-login')?.addEventListener('click', handleLogin);
+// The panels are forms, so the Enter key and a phone keyboard's Go/Done button submit them.
+document.getElementById('login-panel')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleLogin();
+});
 document.getElementById('btn-signup')?.addEventListener('click', () => {
     requestGameFullscreen();
     setAuthMode('register');
     setAuthError('register', '');
 });
-document.getElementById('btn-register')?.addEventListener('click', handleRegister);
+document.getElementById('register-panel')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleRegister();
+});
 document.getElementById('btn-stats')?.addEventListener('click', (e) => {
     const hud = document.getElementById('hud');
     const open = !hud.classList.contains('show-stats');
@@ -365,40 +372,19 @@ document.getElementById('btn-loadout-start')?.addEventListener('click', () => {
     enterGame(pendingAuth.nickname, pendingAuth.id, normalizeWeapon(selectedWeapon), normalizeSkill(selectedSkill), selectedLook);
     pendingAuth = null;
 });
-document.getElementById('login-id')?.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter') {
-        e.preventDefault();
-        handleLogin();
-    }
-});
-document.getElementById('login-password')?.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter') {
-        e.preventDefault();
-        handleLogin();
-    }
-});
-document.getElementById('register-id')?.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter') {
-        e.preventDefault();
-        handleRegister();
-    }
-});
-document.getElementById('register-nickname')?.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter') {
-        e.preventDefault();
-        handleRegister();
-    }
-});
-document.getElementById('register-password')?.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter') {
-        e.preventDefault();
-        handleRegister();
-    }
-});
-document.getElementById('register-password-confirm')?.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter') {
-        e.preventDefault();
-        handleRegister();
-    }
+// Enter (or Next) in a field moves on to the next empty field; otherwise the form submits.
+// Phone keyboards leave e.code empty, so check e.key and keyCode.
+document.querySelectorAll('.auth-panel').forEach((form) => {
+    form.addEventListener('keydown', (e) => {
+        if (!(e.key === 'Enter' || e.keyCode === 13) || e.isComposing) return;
+        const fields = [...form.querySelectorAll('.auth-field')];
+        const index = fields.indexOf(e.target);
+        if (index < 0) return;
+        const next = fields.slice(index + 1).find((field) => !field.value);
+        if (next) {
+            e.preventDefault();
+            next.focus();
+        }
+    });
 });
 
