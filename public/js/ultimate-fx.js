@@ -176,6 +176,9 @@ function drawUltimateAreas() {
         const type = normalizeWeapon(ult.type);
         // Hammer and bow fire once from where they were cast; the others follow the caster.
         const fixed = type === 'hammer' || type === 'bow';
+        // Their direction, size and origin come from the server, so wait for its copy
+        // instead of drawing the local guess (which pointed right until it arrived).
+        if (fixed && ult.predicted) return;
         const originX = fixed && ult.x ? ult.x : source.x;
         const originY = fixed && ult.y ? ult.y : source.y;
         ctx.save();
