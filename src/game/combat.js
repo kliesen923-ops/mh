@@ -2,6 +2,7 @@ const state = require('./state');
 const { JUST_GUARD_WINDOW_MS, SWORD_JUST_GUARD_WINDOW_MS, BOW_ARROW_DAMAGE } = require('../config');
 const { sanitizeWeapon } = require('../utils/sanitize');
 const { getAngleDiff, createProjectileId, randomWorldPoint } = require('../utils/geometry');
+const { GAME_WIDTH, GAME_HEIGHT } = require('../config');
 const { updateAccountScore } = require('../db');
 const { recordRun } = require('../records');
 const {
@@ -23,6 +24,29 @@ function isJustGuarding(target, now = Date.now()) {
     if (!target || !target.isGuarding) return false;
     const windowMs = sanitizeWeapon(target.weapon) === 'sword' ? SWORD_JUST_GUARD_WINDOW_MS : JUST_GUARD_WINDOW_MS;
     return (now - (target.guardStartTime || 0)) < windowMs;
+}
+
+// Moves a player on the server's say-so (pulls, teleports); the client snaps to it.
+function forcePlayerPosition(id, x, y) {
+    const p = players[id];
+    if (!p) return;
+    p.x = Math.max(25, Math.min(GAME_WIDTH - 25, x));
+    p.y = Math.max(25, Math.min(GAME_HEIGHT - 25, y));
+    p.lastMoveAt = Date.now();
+    state.io.emit('playerMoved', { id, x: p.x, y: p.y, angle: p.angle, forced: true });
+}
+
+// Hit from an area or projectile: guarding while facing the source halves it.
+function damagePlayerFrom(attackerId, targetId, amount, fromX, fromY, effectWeapon) {
+    const target = players[targetId];
+    if (!target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) return false;
+    const angleToSource = Math.atan2(fromY - target.y, fromX - target.x);
+    let damage = Math.max(1, Math.floor(amount));
+    if (target.isGuarding && getAngleDiff(target.angle, angleToSource) < Math.PI / 3) damage = Math.max(1, Math.floor(damage * 0.5));
+    target.hp -= damage;
+    state.io.emit('combatEffect', { x: target.x, y: target.y, angle: angleToSource + Math.PI, weapon: effectWeapon, damage });
+    if (target.hp <= 0) resolveKill(attackerId, targetId);
+    return true;
 }
 
 // Stuns a player for ms unless they are already stunned.
@@ -320,6 +344,8 @@ function shouldReflectFromSpearUltimate(finalTarget, projectileStartX, projectil
 
 module.exports = {
     isJustGuarding,
+    forcePlayerPosition,
+    damagePlayerFrom,
     stunPlayer,
     resolveKill,
     applyBowImpact,

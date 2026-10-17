@@ -8,6 +8,10 @@ const {
     HAMMER_FINISHER_PLAYER_STUN_MS,
     DUAL_FLANK_DAMAGE_MULT,
     BOW_ARROW_DAMAGE,
+    SCYTHE_PULL_DISTANCE,
+    GAUNTLET_GUARD_BREAK_MS,
+    SKILL_COOLDOWN_MS,
+    SKILL_COOLDOWN_SLACK_MS,
     MAX_CHAT_LENGTH,
     GAME_WIDTH,
     GAME_HEIGHT,
@@ -26,6 +30,7 @@ const {
     normalizeStats,
     getWeaponAttackProfile,
     isTargetInWeaponAttack,
+    isRangedWeapon,
     getMaxHpFromStats,
     getAttackMultiplier,
     getAttackRangeMultiplier,
@@ -37,7 +42,8 @@ const {
 } = require('./game/stats');
 const { sanitizeAction } = require('./game/action');
 const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayerHits } = require('./game/hits');
-const { resolveKill, applyBowImpact, applyAshImpact, isJustGuarding, stunPlayer } = require('./game/combat');
+const { resolveKill, applyBowImpact, applyAshImpact, isJustGuarding, stunPlayer, forcePlayerPosition } = require('./game/combat');
+const { castStaffOrb, throwHealPotion, placeTrap, getBlinkMark, placeBlinkMark, clearBlinkMark, getFieldState, clearFieldForOwner } = require('./game/field');
 const { ULTIMATE_HANDLERS, isRootedByUltimate } = require('./game/ultimates');
 const { getHealingCrossList, getGiantPotionList } = require('./game/pickups');
 const { createProgression } = require('./game/progression');
@@ -45,6 +51,33 @@ const { getXpOrbList } = require('./game/xpOrbs');
 const { getMob, damageMob, hitMobs, clearMobsForOwner } = require('./game/mobs');
 
 const { players } = state;
+
+// Weapon-specific extras of a third combo hit landing on a player.
+function applyFinisherToPlayer(attacker, weapon, targetId, target, now) {
+    if (weapon === 'hammer') {
+        stunPlayer(targetId, HAMMER_FINISHER_PLAYER_STUN_MS);
+    } else if (weapon === 'scythe') {
+        // Drags the target in to just in front of the reaper.
+        const angle = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+        if (Math.hypot(target.x - attacker.x, target.y - attacker.y) > SCYTHE_PULL_DISTANCE) {
+            forcePlayerPosition(targetId, attacker.x + Math.cos(angle) * SCYTHE_PULL_DISTANCE, attacker.y + Math.sin(angle) * SCYTHE_PULL_DISTANCE);
+        }
+    } else if (weapon === 'gauntlet') {
+        // Breaks the guard: it drops now and can't be raised again for a moment.
+        target.isGuarding = false;
+        target.guardBrokenUntil = now + GAUNTLET_GUARD_BREAK_MS;
+        state.io.emit('guardBroken', { id: targetId, until: target.guardBrokenUntil, ms: GAUNTLET_GUARD_BREAK_MS });
+    }
+}
+
+// Server-side check of secondary skill cooldowns.
+function trySpendSkill(p, kind, now) {
+    const cooldownMs = SKILL_COOLDOWN_MS[kind] || 0;
+    const last = (p.skillUsedAt && p.skillUsedAt[kind]) || 0;
+    if (now - last < cooldownMs - SKILL_COOLDOWN_SLACK_MS) return false;
+    p.skillUsedAt = Object.assign({}, p.skillUsedAt, { [kind]: now });
+    return true;
+}
 
 function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
@@ -99,6 +132,7 @@ function registerSocketHandlers(io) {
         socket.emit('giantPotionUpdate', getGiantPotionList());
         socket.emit('mobTiers', MOB_TIERS.map(({ name, color, radius }) => ({ name, color, radius })));
         socket.emit('xpOrbs', getXpOrbList());
+        socket.emit('fieldState', getFieldState());
         socket.broadcast.emit('newPlayer', players[socket.id]);
 
         socket.on('setName', (name) => {
@@ -350,7 +384,7 @@ function registerSocketHandlers(io) {
         socket.on('playerHitTarget', (targetId) => {
             const attacker = players[socket.id];
             const target = players[targetId];
-            if (attacker && sanitizeWeapon(attacker.weapon) === 'bow') return;
+            if (attacker && isRangedWeapon(attacker.weapon)) return;
             if (attacker && target && target.hp > 0 && !target.upgradeShield && !target.isSelectingLoadout) {
                 const now = Date.now();
                 const attackRange = getWeaponAttackProfile(attacker.weapon).reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
@@ -381,7 +415,7 @@ function registerSocketHandlers(io) {
                 });
                 target.hp -= damage;
                 if (target.hp <= 0) resolveKill(socket.id, targetId);
-                else if (weapon === 'hammer' && attacker.comboStep === 3) stunPlayer(targetId, HAMMER_FINISHER_PLAYER_STUN_MS);
+                else if (attacker.comboStep === 3) applyFinisherToPlayer(attacker, weapon, targetId, target, now);
                 io.emit('statsUpdate', players);
             }
         });
@@ -389,7 +423,7 @@ function registerSocketHandlers(io) {
         socket.on('mobHit', (mobId) => {
             const attacker = players[socket.id];
             const mob = getMob(mobId);
-            if (!attacker || !mob || attacker.hp <= 0 || sanitizeWeapon(attacker.weapon) === 'bow') return;
+            if (!attacker || !mob || attacker.hp <= 0 || isRangedWeapon(attacker.weapon)) return;
             if (!attacker.isAttacking || attacker.attackPhase !== 2) return;
             // Measure to the edge of the mob's body nearest the attacker.
             const distance = Math.hypot(mob.x - attacker.x, mob.y - attacker.y) || 1;
@@ -483,6 +517,42 @@ function registerSocketHandlers(io) {
             if (hitAny) io.emit('statsUpdate', players);
         });
 
+        socket.on('staffCast', (payloadData) => {
+            const p = players[socket.id];
+            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+            if (!p || p.hp <= 0 || p.isStunned || p.isSelectingLoadout || sanitizeWeapon(p.weapon) !== 'staff') return;
+            if (!p.isAttacking || p.attackPhase !== 2) return;
+            if (hasHitTargetThisAttack(socket.id, 'staff-cast')) return;
+            const angle = Number.isFinite(payload.angle) ? payload.angle : (Number.isFinite(p.aAngle) ? p.aAngle : p.angle);
+            const range = getWeaponAttackProfile('staff').reach * (p.stats && Number.isFinite(p.stats.range) ? p.stats.range : 1);
+            castStaffOrb(socket.id, angle, { range, big: p.comboStep === 3 });
+        });
+
+        // Trap, blink mark and heal potion.
+        socket.on('useSkill', (payloadData) => {
+            const p = players[socket.id];
+            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+            if (!p || p.hp <= 0 || p.isStunned || p.isSelectingLoadout || p.isUpgrading) return;
+            const kind = sanitizeSkill(p.skill);
+            if (sanitizeSkill(payload.kind) !== kind) return;
+            const now = Date.now();
+            if (kind === 'blink') {
+                // Second press inside the window: jump back to the mark.
+                const mark = getBlinkMark(socket.id, now);
+                if (mark) {
+                    clearBlinkMark(socket.id);
+                    io.emit('blinked', { id: socket.id, fromX: p.x, fromY: p.y, x: mark.x, y: mark.y });
+                    forcePlayerPosition(socket.id, mark.x, mark.y);
+                    return;
+                }
+                if (trySpendSkill(p, kind, now)) placeBlinkMark(socket.id);
+                return;
+            }
+            if (!trySpendSkill(p, kind, now)) return;
+            if (kind === 'trap') placeTrap(socket.id);
+            else if (kind === 'potion') throwHealPotion(socket.id, Number.isFinite(payload.angle) ? payload.angle : p.angle);
+        });
+
         socket.on('chatMessage', (msg) => {
             const message = String(msg || '').trim().slice(0, MAX_CHAT_LENGTH);
             if (!message) return;
@@ -492,6 +562,7 @@ function registerSocketHandlers(io) {
             delete players[socket.id];
             clearPlayerHits(socket.id);
             clearMobsForOwner(socket.id);
+            clearFieldForOwner(socket.id);
             io.emit('playerDisconnected', socket.id);
         });
     });

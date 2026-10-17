@@ -6,6 +6,9 @@ const ULTIMATE_COLORS = {
     spear: '#8fd8ff',
     bow: '#5ad8ff',
     dual: '#ff5a5a',
+    scythe: '#b58cff',
+    gauntlet: '#ffb35a',
+    staff: '#ff7ad9',
 };
 
 function updateFloatingFx(dt) {
@@ -164,6 +167,61 @@ function drawDualUltimateArea(source, elapsed, remain) {
     drawUltimateTimer(range + 8, remain, ULTIMATE_COLORS.dual);
 }
 
+function drawScytheUltimateArea(ult, elapsed, remain) {
+    const r = ult.radius || 170;
+    ctx.fillStyle = `rgba(120, 80, 200, ${0.12 + 0.05 * Math.sin(elapsed / 70)})`;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    // Spiral arms pulling inward.
+    ctx.strokeStyle = 'rgba(200, 170, 255, 0.75)';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) {
+        const base = -elapsed / 160 + (i * Math.PI) / 2;
+        ctx.beginPath();
+        for (let k = 0; k <= 12; k++) {
+            const f = k / 12;
+            const a = base + f * 1.6;
+            const rr = r * (1 - f * 0.8);
+            if (k === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.stroke();
+    }
+    drawUltimateTimer(r + 8, remain, ULTIMATE_COLORS.scythe);
+}
+
+function drawGauntletUltimateArea(ult, elapsed, remain) {
+    const r = ult.radius || 120;
+    const arc = ult.extra || Math.PI / 4;
+    const angle = ult.angle || 0;
+    ctx.fillStyle = `rgba(255, 179, 90, ${0.16 + 0.1 * Math.abs(Math.sin(elapsed / 60))})`;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, angle - arc, angle + arc); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 210, 140, 0.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, r, angle - arc, angle + arc); ctx.stroke();
+    ctx.globalAlpha = 1;
+}
+
+// The meteor's landing circle fills up until it strikes.
+function drawStaffUltimateArea(ult, elapsed) {
+    const r = ult.radius || 150;
+    const impactMs = ult.extra || 800;
+    const fill = Math.min(1, elapsed / impactMs);
+    if (fill >= 1) return;
+    ctx.fillStyle = 'rgba(255, 90, 60, 0.14)';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 120, 60, 0.3)';
+    ctx.beginPath(); ctx.arc(0, 0, r * fill, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(255, 150, 90, ${0.6 + 0.4 * Math.sin(elapsed / 50)})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    // The falling rock, shown high above the circle and dropping in.
+    const drop = (1 - fill) * 260 / VIEW_Y_SCALE;
+    ctx.fillStyle = '#5b3a2a';
+    ctx.shadowColor = 'rgba(255, 140, 60, 0.9)';
+    ctx.shadowBlur = 20;
+    ctx.beginPath(); ctx.arc(0, -drop, 18 + fill * 8, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
 function drawUltimateAreas() {
     const now = Date.now();
     Object.values(allPlayers).forEach((p) => {
@@ -174,8 +232,8 @@ function drawUltimateAreas() {
         const elapsed = Math.max(0, now - (ult.startAt || now));
         const remain = Math.max(0, Math.min(1, (ult.endsAt - now) / Math.max(1, ult.endsAt - ult.startAt)));
         const type = normalizeWeapon(ult.type);
-        // Hammer and bow fire once from where they were cast; the others follow the caster.
-        const fixed = type === 'hammer' || type === 'bow';
+        // Hammer, bow, gauntlet and staff fire from where they were cast; the others follow the caster.
+        const fixed = type === 'hammer' || type === 'bow' || type === 'gauntlet' || type === 'staff';
         // Their direction, size and origin come from the server, so wait for its copy
         // instead of drawing the local guess (which pointed right until it arrived).
         if (fixed && ult.predicted) return;
@@ -188,6 +246,9 @@ function drawUltimateAreas() {
         else if (type === 'spear') drawSpearUltimateArea(ult, elapsed, remain);
         else if (type === 'bow') drawBowUltimateArea(ult, originX, originY, elapsed, remain);
         else if (type === 'dual') drawDualUltimateArea(source, elapsed, remain);
+        else if (type === 'scythe') drawScytheUltimateArea(ult, elapsed, remain);
+        else if (type === 'gauntlet') drawGauntletUltimateArea(ult, elapsed, remain);
+        else if (type === 'staff') drawStaffUltimateArea(ult, elapsed);
         ctx.restore();
     });
 }

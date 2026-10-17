@@ -13,6 +13,9 @@ const WEAPON_PRESETS = {
     spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
     dual: { label: '쌍검', stats: { dmg: 0.82, range: 0.82, speed: 1.45, move: 1.02, dodge: 1.0, projectile: 1.0, hp: 92 } },
     bow: { label: '활', stats: { dmg: 1.2, range: 1.0, speed: 0.84, move: 1.08, dodge: 1.0, projectile: 1.0, hp: 90 } },
+    scythe: { label: '낫', stats: { dmg: 1.3, range: 1.0, speed: 0.85, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
+    gauntlet: { label: '건틀릿', stats: { dmg: 0.7, range: 1.0, speed: 1.7, move: 1.05, dodge: 1.0, projectile: 1.0, hp: 95 } },
+    staff: { label: '지팡이', stats: { dmg: 1.0, range: 1.0, speed: 0.8, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 85 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
@@ -20,11 +23,15 @@ const ATTACK_PROFILES = {
     spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 40 },
     dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
+    scythe: { reach: 105, arc: Math.PI * 0.4, lineWidth: 22 },
+    gauntlet: { reach: 62, arc: Math.PI * 0.5, lineWidth: 18 },
+    staff: { reach: 380, arc: Math.PI * 0.08, lineWidth: 10 },
 };
 // The third hit of a combo reaches further (and, for the spear, wider). Matches the server.
 const COMBO_FINISHER = {
     hammer: { reach: 1.25, width: 1 },
     spear: { reach: 1.35, width: 1.4 },
+    scythe: { reach: 1.15, width: 1 },
 };
 // Attack-speed picks shorten the ultimate cooldown (matches the server).
 const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
@@ -37,18 +44,31 @@ const ULTIMATE_NAMES = {
     spear: '반사 결계',
     bow: '용의 화살',
     dual: '광폭화',
+    scythe: '사신의 원무',
+    gauntlet: '연타 러시',
+    staff: '운석 낙하',
 };
 const SKILL_PRESETS = {
     wire: { label: '땡겨', cooldown: 2.0 },
     ash: { label: '애쉬궁', cooldown: 2.0 },
     gear: { label: '입체기동', cooldown: 3.0 },
+    trap: { label: '덫', cooldown: 6.0 },
+    blink: { label: '표식', cooldown: 10.0 },
+    potion: { label: '포션', cooldown: 14.0 },
 };
+// Staff orb numbers the HUD shows (matches the server's STAFF_ORB).
+const STAFF_ORB_DAMAGE = 16;
+const STAFF_ORB_FINISHER_DAMAGE = 26;
+const BLINK_MARK_SEC = 4;
 const ULTIMATE_PRESETS = {
     sword: { cooldown: 11.0, duration: 1.2 },
     hammer: { cooldown: 13.0, duration: 0.7 },
     spear: { cooldown: 15.0, duration: 2.2 },
     bow: { cooldown: 14.0, duration: 0.8 },
     dual: { cooldown: 14.0, duration: 4.0 },
+    scythe: { cooldown: 13.0, duration: 0.9 },
+    gauntlet: { cooldown: 12.0, duration: 0.7 },
+    staff: { cooldown: 15.0, duration: 1.0 },
 };
 const DUAL_RUSH_WINDUP_SEC = 0.18;
 const DUAL_RUSH_SLASH_INTERVAL_SEC = 0.025;
@@ -70,6 +90,11 @@ let combatEffects = [];
 let ashProjectiles = [];
 let bowProjectiles = [];
 let dragonProjectiles = [];
+let staffOrbs = [];
+let staffBlasts = [];
+let potionFlights = [];
+let fieldFx = [];
+let fieldState = { traps: [], zones: [], marks: [] };
 let healingCrosses = [];
 let healingTexts = [];
 let giantPotions = [];

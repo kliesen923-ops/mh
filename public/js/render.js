@@ -254,6 +254,44 @@ function drawCharacter(p, color) {
             ctx.closePath();
             ctx.fill();
         }
+    } else if (weapon === 'scythe') {
+        // Long shaft with a curved blade at the end that hooks back toward the wielder.
+        const shaftEnd = Math.max(50, localReach - 6);
+        ctx.fillStyle = "#4a3426";
+        ctx.fillRect(14, 20, shaftEnd - 14, 6);
+        ctx.fillStyle = comboStep===3 ? "#f1c40f" : "#c9cfe0";
+        ctx.beginPath();
+        ctx.moveTo(shaftEnd + 2, 18);
+        ctx.quadraticCurveTo(shaftEnd + 6, -14, shaftEnd - 38, -16);
+        ctx.quadraticCurveTo(shaftEnd - 10, -6, shaftEnd - 4, 22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(160, 120, 255, 0.7)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    } else if (weapon === 'gauntlet') {
+        // An armoured fist that punches forward on the hit.
+        const punch = isAttacking ? (attackPhase === 2 ? 14 : (attackPhase === 1 ? -4 : 6)) : 0;
+        ctx.save();
+        ctx.translate(punch, 0);
+        ctx.fillStyle = comboStep===3 ? "#f1c40f" : "#8d96a8";
+        heroRoundRect(ctx, 28, 12, 22, 22, 6); ctx.fill();
+        ctx.fillStyle = "#5d6576";
+        heroRoundRect(ctx, 20, 15, 10, 16, 3); ctx.fill();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(48, 16 + i * 7, 2.2, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+    } else if (weapon === 'staff') {
+        const glow = comboStep === 3 && isAttacking ? 1.5 : 1;
+        ctx.fillStyle = "#6b4a2f";
+        ctx.fillRect(8, 20, 56, 5);
+        ctx.fillStyle = "#3f2a1a";
+        ctx.fillRect(58, 17, 5, 11);
+        ctx.shadowColor = "rgba(255, 122, 217, 0.9)";
+        ctx.shadowBlur = 12 * glow;
+        ctx.fillStyle = "rgba(255, 122, 217, 0.95)";
+        ctx.beginPath(); ctx.arc(69, 22, 7 * glow, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
     } else {
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35,18,weaponLength,10);
@@ -297,8 +335,8 @@ function drawCharacter(p, color) {
             ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
             ctx.fillStyle = comboStep===3?"rgba(255,200,0,0.95)":"rgba(255,255,255,0.9)";
             ctx.fill();
-        } else if (weapon === 'bow') {
-            // The arrow projectile itself shows the shot.
+        } else if (isRangedWeapon(weapon)) {
+            // The projectile itself shows the shot.
         } else {
             ctx.beginPath();
             let sA = ba-2.0, eA = ba+0.5; let counter = false;
@@ -497,6 +535,44 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(0, 0, ring + 14, 0, Math.PI * 2);
             ctx.stroke();
+        } else if (effect.weapon === 'ult-scythe') {
+            // A full reaping circle.
+            const ring = 60 + (1 - t) * 90;
+            ctx.strokeStyle = `rgba(181, 140, 255, ${0.3 + t * 0.6})`;
+            ctx.lineWidth = 12 * t + 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, ring, effect.angle, effect.angle + Math.PI * 1.7);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, ring - 10, effect.angle + 0.3, effect.angle + Math.PI * 1.5);
+            ctx.stroke();
+        } else if (effect.weapon === 'ult-gauntlet') {
+            // Impact star in front of the fist.
+            const burst = 20 + (1 - t) * 26;
+            ctx.fillStyle = `rgba(255, 179, 90, ${0.5 * t + 0.2})`;
+            ctx.beginPath();
+            for (let i = 0; i < 16; i++) {
+                const a = effect.angle + (Math.PI * 2 * i) / 16;
+                const r = i % 2 ? burst * 0.45 : burst;
+                if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r); else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath();
+            ctx.fill();
+        } else if (effect.weapon === 'meteor') {
+            const blast = 40 + (1 - t) * 130;
+            ctx.fillStyle = `rgba(255, 120, 60, ${0.45 * t})`;
+            ctx.beginPath(); ctx.arc(0, 0, blast, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = `rgba(255, 230, 160, ${t})`;
+            ctx.lineWidth = 8 * t + 2;
+            ctx.beginPath(); ctx.arc(0, 0, blast, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = `rgba(255, 250, 220, ${t})`;
+            ctx.beginPath(); ctx.arc(0, 0, 28 * t, 0, Math.PI * 2); ctx.fill();
+        } else if (effect.weapon === 'staff' || effect.weapon === 'burn' || effect.weapon === 'trap') {
+            const color = effect.weapon === 'staff' ? '255, 122, 217' : (effect.weapon === 'burn' ? '255, 140, 60' : '220, 225, 235');
+            ctx.fillStyle = `rgba(${color}, ${0.6 * t})`;
+            ctx.beginPath(); ctx.arc(0, 0, 10 + (1 - t) * 12, 0, Math.PI * 2); ctx.fill();
         } else if (effect.weapon === 'parry') {
             // Just guard: a gold flash ring with sparks thrown back at the attacker.
             const ring = 20 + (1 - t) * 30;
@@ -1043,6 +1119,7 @@ function draw() {
     ctx.translate(-camera.x + shake.x, -camera.y * VIEW_Y_SCALE + shake.y);
     ctx.scale(1, VIEW_Y_SCALE);
     drawWorldBackground();
+    drawFieldObjects();
     drawUltimateAreas();
     drawBossSlams();
     drawXpOrbs();
@@ -1057,6 +1134,7 @@ function draw() {
     drawAshProjectiles();
     drawBowProjectiles();
     drawDragonProjectiles();
+    drawFieldEffects();
     drawDamageTexts();
     drawUltimateBanners();
     ctx.restore();

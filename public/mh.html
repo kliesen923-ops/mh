@@ -96,6 +96,7 @@
         <div id="loadout-panel" class="loadout-panel hidden">
             <h2 class="loadout-title">캐릭터 준비</h2>
             <div id="loadout-note" class="loadout-note">외형과 무기를 고르고 게임을 시작하세요.</div>
+            <div id="loadout-desc" class="loadout-desc"></div>
             <div class="loadout-body">
                 <section class="loadout-look">
                     <canvas id="look-preview" width="140" height="150" aria-label="캐릭터 미리보기"></canvas>
@@ -164,6 +165,39 @@
                             <h4>활</h4>
                             <p>기본공격이 화살 투사체입니다.<br>저스트 가드에 반사됩니다.</p>
                         </div>
+                        <div class="weapon-card" data-weapon="scythe" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M6 20L16 6" />
+                                    <path d="M16 6c-3-2-8-2-11 1 4-1 8 0 11 3" />
+                                </svg>
+                            </div>
+                            <h4>낫</h4>
+                            <p>넓게 휘둘러 베고<br>3타로 적을 끌어옵니다.</p>
+                        </div>
+                        <div class="weapon-card" data-weapon="gauntlet" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M7 10V6a2 2 0 0 1 4 0v4" />
+                                    <path d="M11 9V5a2 2 0 0 1 4 0v5" />
+                                    <path d="M15 10V7a2 2 0 0 1 4 0v6a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-2a2 2 0 0 1 2-2" />
+                                </svg>
+                            </div>
+                            <h4>건틀릿</h4>
+                            <p>가장 빠른 근접 연타.<br>3타가 가드를 부숩니다.</p>
+                        </div>
+                        <div class="weapon-card" data-weapon="staff" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M5 20L15 10" />
+                                    <circle cx="17" cy="7" r="3" />
+                                    <path d="M21 3l-1 1" />
+                                    <path d="M17 1v1" />
+                                </svg>
+                            </div>
+                            <h4>지팡이</h4>
+                            <p>느린 마법탄이 터지며<br>불타는 장판을 남깁니다.</p>
+                        </div>
                     </div>
                     <h3>보조무기</h3>
                     <div class="weapon-grid loadout-skills">
@@ -201,6 +235,41 @@
                             </div>
                             <h4>입체기동</h4>
                             <p>특수 와이어 2개로<br>전방으로 빠르게 이동합니다.</p>
+                        </div>
+                        <div class="weapon-card" data-skill="trap" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="13" r="6" />
+                                    <path d="M6 13l2-2 2 2 2-2 2 2 2-2 2 2" />
+                                    <path d="M12 7V4" />
+                                </svg>
+                            </div>
+                            <h4>덫</h4>
+                            <p>발밑에 덫을 깔아<br>밟은 적을 묶습니다.</p>
+                        </div>
+                        <div class="weapon-card" data-skill="blink" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="4" />
+                                    <path d="M12 3v3" />
+                                    <path d="M12 18v3" />
+                                    <path d="M3 12h3" />
+                                    <path d="M18 12h3" />
+                                </svg>
+                            </div>
+                            <h4>순간이동 표식</h4>
+                            <p>표식을 남기고 4초 안에<br>다시 누르면 돌아옵니다.</p>
+                        </div>
+                        <div class="weapon-card" data-skill="potion" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M9 3h6" />
+                                    <path d="M10 3v4l-4 6a5 5 0 0 0 4 8h4a5 5 0 0 0 4-8l-4-6V3" />
+                                    <path d="M9 14h6" />
+                                </svg>
+                            </div>
+                            <h4>회복 포션</h4>
+                            <p>회복 장판을 던집니다.<br>적도 회복되니 주의!</p>
                         </div>
                     </div>
                 </section>
@@ -318,6 +387,7 @@
     <script src="js/hero-look.js"></script>
     <script src="js/render.js"></script>
     <script src="js/ultimate-fx.js"></script>
+    <script src="js/field-fx.js"></script>
     <script src="js/boss-fx.js"></script>
     <script src="js/sound.js"></script>
     <script src="js/controls.js"></script>

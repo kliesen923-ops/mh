@@ -52,7 +52,13 @@ function normalizeStats(stats) {
 }
 
 function normalizeWeapon(weapon) {
-    return weapon === 'hammer' ? 'hammer' : (weapon === 'spear' ? 'spear' : (weapon === 'dual' ? 'dual' : (weapon === 'bow' ? 'bow' : 'sword')));
+    return Object.prototype.hasOwnProperty.call(WEAPON_PRESETS, weapon) ? weapon : 'sword';
+}
+
+// Ranged weapons fire projectiles instead of swinging (matches the server).
+function isRangedWeapon(weapon) {
+    const nextWeapon = normalizeWeapon(weapon);
+    return nextWeapon === 'bow' || nextWeapon === 'staff';
 }
 
 function createBaseStatsForWeapon(weapon) {
@@ -98,7 +104,7 @@ function getEffectiveAttackRange(weapon, stats, sourcePlayer) {
     const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
     const ultimate = getUltimateState(sourcePlayer);
     const ultimateRangeMult = ultimate.active && ultimate.type === 'dual' ? 1.45 : 1;
-    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale) * ultimateRangeMult;
+    return profile.reach * statRange * (isRangedWeapon(weapon) ? 1 : giantScale) * ultimateRangeMult;
 }
 
 function getComboFinisher(weapon, comboStep) {
@@ -117,7 +123,7 @@ function getVisualAttackRange(weapon, stats, sourcePlayer) {
     const giantScale = Math.max(1, Number.isFinite(sourcePlayer && sourcePlayer.giantScale) ? sourcePlayer.giantScale : 1);
     const ultimate = getUltimateState(sourcePlayer);
     const ultimateRangeMult = ultimate.active && ultimate.type === 'dual' ? 1.45 : 1;
-    return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale) * ultimateRangeMult;
+    return profile.reach * statRange * (isRangedWeapon(weapon) ? 1 : giantScale) * ultimateRangeMult;
 }
 
 function getBowProjectileBonus(sourcePlayer) {
@@ -207,9 +213,10 @@ function updateHUD() {
     player.stats = normalizeStats(player.stats);
     const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
     const isBow = normalizeWeapon(player.weapon) === 'bow';
-    basicDamage.textContent = formatDamage((isBow ? 14 : 10) * dmgScale);
-    secondDamage.textContent = formatDamage(20 * dmgScale);
-    heavyDamage.textContent = formatDamage(35 * dmgScale);
+    const isStaff = normalizeWeapon(player.weapon) === 'staff';
+    basicDamage.textContent = formatDamage((isBow ? 14 : (isStaff ? STAFF_ORB_DAMAGE : 10)) * dmgScale);
+    secondDamage.textContent = formatDamage((isStaff ? STAFF_ORB_DAMAGE : 20) * dmgScale);
+    heavyDamage.textContent = formatDamage((isStaff ? STAFF_ORB_FINISHER_DAMAGE : 35) * dmgScale);
     updateCombatReadouts();
 }
 
