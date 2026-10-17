@@ -68,12 +68,13 @@ const STAFF_ORB = {
     patchDamage: 4,
 };
 // Secondary skills: cooldowns are checked on the server too (with a little slack for lag).
-const SKILL_COOLDOWN_MS = { wire: 2000, ash: 2000, gear: 3000, trap: 6000, blink: 10000, potion: 14000 };
+// Long enough that crowd control (wire pull, ash stun, trap root) can't be chained into a lock.
+const SKILL_COOLDOWN_MS = { wire: 7000, ash: 8000, gear: 5000, trap: 8000, blink: 10000, potion: 14000 };
 const SKILL_COOLDOWN_SLACK_MS = 150;
 const TRAP = { maxPerOwner: 2, lifetimeMs: 30000, armMs: 400, radius: 32, rootMs: 1200, mobStunMs: 1500, damage: 6 };
 const BLINK_MARK_MS = 4000;
 // Set down at your feet, like a healing field.
-const HEAL_POTION = { radius: 90, durationMs: 3000, tickMs: 500, healPerTick: 3 };
+const HEAL_POTION = { radius: 90, durationMs: 3000, tickMs: 500, healPerTick: 4 };
 // Upgrades that also power up ultimates: each attack-speed pick shortens the cooldown.
 const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
 const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;

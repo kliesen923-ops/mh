@@ -170,13 +170,15 @@ test('wire and ash shots are resolved by the server and respect cooldowns', asyn
     assert.equal(victim.p.isStunned, false);
 });
 
-test('switching weapons mid-game does not heal', async () => {
-    const { client, p } = await ready('sword');
+test('weapons and skills cannot be changed mid-game', async () => {
+    const { client, p } = await ready('sword', 'wire');
     p.hp = 20;
     client.emit('setWeapon', 'hammer');
+    client.emit('setSkill', 'potion');
     await wait(40);
-    assert.equal(p.weapon, 'hammer');
-    assert.equal(p.hp, 20);
+    assert.equal(p.weapon, 'sword');
+    assert.equal(p.skill, 'wire');
+    assert.equal(p.hp, 20, 'and no free heal');
 });
 
 test('dual-blade rush slashes only count along the rush, ten per rush', async () => {

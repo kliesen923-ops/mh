@@ -127,8 +127,10 @@ test('hammer ultimate damages targets in front and goes on cooldown', async () =
     const target = await readyPlayer(targetClient);
 
     let weaponSet = once(attackerClient, 'statsUpdate');
+    state.players[attackerClient.id].isSelectingLoadout = true;
     attackerClient.emit('setWeapon', 'hammer');
     await weaponSet;
+    state.players[attackerClient.id].isSelectingLoadout = false;
     Object.assign(attacker, { x: 600, y: 300, angle: 0, aAngle: 0 });
     Object.assign(target, { x: 680, y: 300, hp: 100 });
 
@@ -393,8 +395,10 @@ test('hammer hits knock mobs back, and the finisher stuns them', async () => {
     const client = await connect();
     const p = await readyPlayer(client);
     const weaponSet = once(client, 'statsUpdate');
+    state.players[client.id].isSelectingLoadout = true;
     client.emit('setWeapon', 'hammer');
     await weaponSet;
+    state.players[client.id].isSelectingLoadout = false;
     Object.assign(p, { x: 1000, y: 600, angle: 0, hp: 9999 });
 
     const mob = spawnMob(client.id, { x: 1060, y: 600, tier: 5 });
@@ -428,8 +432,10 @@ test('the spear ultimate keeps mobs outside its barrier', async () => {
     const client = await connect();
     const p = await readyPlayer(client);
     const weaponSet = once(client, 'statsUpdate');
+    state.players[client.id].isSelectingLoadout = true;
     client.emit('setWeapon', 'spear');
     await weaponSet;
+    state.players[client.id].isSelectingLoadout = false;
     Object.assign(p, { x: 2000, y: 1000, angle: 0, hp: 9999 });
     const mob = spawnMob(client.id, { x: 2040, y: 1000, tier: 5 });
 
@@ -447,8 +453,10 @@ test('hammer ultimate stuns the mobs it hits', async () => {
     const client = await connect();
     const p = await readyPlayer(client);
     const weaponSet = once(client, 'statsUpdate');
+    state.players[client.id].isSelectingLoadout = true;
     client.emit('setWeapon', 'hammer');
     await weaponSet;
+    state.players[client.id].isSelectingLoadout = false;
     Object.assign(p, { x: 3000, y: 1000, angle: 0, aAngle: 0, hp: 9999 });
     const mob = spawnMob(client.id, { x: 3080, y: 1000, tier: 5 });
 
@@ -475,8 +483,10 @@ test('upgrades carry over to ultimates', async () => {
     });
     const useWeapon = async (weapon) => {
         const set = nextStats((me) => me.weapon === weapon);
+        state.players[client.id].isSelectingLoadout = true;
         client.emit('setWeapon', weapon);
         await set;
+        state.players[client.id].isSelectingLoadout = false;
         Object.assign(p, { x: 1200, y: 1600, hp: 9999, angle: 0, aAngle: 0 });
     };
     const cast = async () => {
@@ -529,8 +539,10 @@ test('bow and hammer ultimates fire where the player is facing, not the last att
             };
             client.on('statsUpdate', onUpdate);
         });
+        state.players[client.id].isSelectingLoadout = true;
         client.emit('setWeapon', weapon);
         await set;
+        state.players[client.id].isSelectingLoadout = false;
         // Last attack went right (0), but the player has since turned to face down (PI / 2).
         Object.assign(p, { x: 2000, y: 900, hp: 9999, aAngle: 0, angle: 0 });
         p.ultimate.cooldownEndsAt = 0;
@@ -580,8 +592,10 @@ test('hammer ultimate is a long, narrow wedge and roots the caster until it ends
         };
         attackerClient.on('statsUpdate', onUpdate);
     });
+    state.players[attackerClient.id].isSelectingLoadout = true;
     attackerClient.emit('setWeapon', 'hammer');
     await set;
+    state.players[attackerClient.id].isSelectingLoadout = false;
     Object.assign(attacker, { x: 2400, y: 1500, angle: 0, aAngle: 0, hp: 9999 });
     const [far, offAxis, beside] = targets;
     Object.assign(far, { x: 2400 + 230, y: 1500, hp: 1000 });                                   // straight ahead, past the old 163 reach
