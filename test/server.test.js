@@ -609,3 +609,47 @@ test('hammer ultimate is a long, narrow wedge and roots the caster until it ends
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.equal(attacker.x, 2450, 'free to move once it ends');
 });
+
+test('weapon matchups: just guard parries melee, hammer finisher stuns, dual blades flank', async () => {
+    const attackerClient = await connect();
+    const targetClient = await connect();
+    const attacker = await readyPlayer(attackerClient);
+    const target = await readyPlayer(targetClient);
+    const swing = async (comboStep) => {
+        attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep, aAngle: 0 });
+        attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep, aAngle: 0 });
+        attackerClient.emit('playerHitTarget', targetClient.id);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+    };
+    const reset = (weapon, targetWeapon, targetAngle) => {
+        Object.assign(attacker, { x: 300, y: 300, angle: 0, weapon, stats: { ...attacker.stats, dmg: 1 }, isStunned: false });
+        Object.assign(target, { x: 350, y: 300, hp: 100, angle: targetAngle, weapon: targetWeapon, isGuarding: false, isStunned: false });
+    };
+
+    // A guard raised 150ms ago is still a just guard for the sword, not for the spear.
+    reset('spear', 'sword', Math.PI);
+    Object.assign(target, { isGuarding: true, guardStartTime: Date.now() - 150 });
+    const parried = once(attackerClient, 'combatEffect');
+    await swing(1);
+    assert.equal((await parried)[0].weapon, 'parry');
+    assert.equal(target.hp, 100);
+    assert.equal(attacker.isStunned, true);
+
+    reset('sword', 'spear', Math.PI);
+    Object.assign(target, { isGuarding: true, guardStartTime: Date.now() - 150 });
+    await swing(2);
+    assert.equal(target.hp, 90, 'a late guard only halves the hit');
+    assert.equal(attacker.isStunned, false);
+
+    reset('hammer', 'sword', 0);
+    await swing(3);
+    assert.equal(target.hp, 65);
+    assert.equal(target.isStunned, true);
+
+    reset('dual', 'sword', 0);
+    await swing(1);
+    assert.equal(target.hp, 87, 'hit from behind deals 30% more');
+    reset('dual', 'sword', Math.PI);
+    await swing(2);
+    assert.equal(target.hp, 80, 'hit from the front deals normal damage');
+});

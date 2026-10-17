@@ -5,6 +5,15 @@ const WIRE_COOLDOWN_MS = 900;
 const WIRE_STUN_MS = 1000;
 const GUARD_DURATION_MS = 500;
 const JUST_GUARD_WINDOW_MS = 100;
+// The sword is the parrying weapon: its just-guard window is twice as forgiving.
+const SWORD_JUST_GUARD_WINDOW_MS = 200;
+// A just guard against a melee hit blocks it and staggers the attacker this long.
+const PARRY_STAGGER_MS = 600;
+// The hammer's third hit briefly stuns players too (mobs get MOB_HIT_IMPACT's stun).
+const HAMMER_FINISHER_PLAYER_STUN_MS = 300;
+// Dual blades hit harder from the side or behind (target facing more than 90° away).
+const DUAL_FLANK_DAMAGE_MULT = 1.3;
+const BOW_ARROW_DAMAGE = 14;
 const MAX_CHAT_LENGTH = 50;
 const MAX_NAME_LENGTH = 10;
 // World size. The client shows a 1280x640 viewport that follows the player.
@@ -114,6 +123,11 @@ module.exports = {
     WIRE_STUN_MS,
     GUARD_DURATION_MS,
     JUST_GUARD_WINDOW_MS,
+    SWORD_JUST_GUARD_WINDOW_MS,
+    PARRY_STAGGER_MS,
+    HAMMER_FINISHER_PLAYER_STUN_MS,
+    DUAL_FLANK_DAMAGE_MULT,
+    BOW_ARROW_DAMAGE,
     MAX_CHAT_LENGTH,
     MAX_NAME_LENGTH,
     GAME_WIDTH,

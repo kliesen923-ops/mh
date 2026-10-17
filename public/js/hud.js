@@ -207,7 +207,7 @@ function updateHUD() {
     player.stats = normalizeStats(player.stats);
     const dmgScale = Number.isFinite(player.stats.dmg) ? player.stats.dmg : 1;
     const isBow = normalizeWeapon(player.weapon) === 'bow';
-    basicDamage.textContent = formatDamage((isBow ? 11 : 10) * dmgScale);
+    basicDamage.textContent = formatDamage((isBow ? 14 : 10) * dmgScale);
     secondDamage.textContent = formatDamage(20 * dmgScale);
     heavyDamage.textContent = formatDamage(35 * dmgScale);
     updateCombatReadouts();

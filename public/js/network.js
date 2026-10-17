@@ -161,7 +161,7 @@ socket.on('skillChanged', (data) => {
 });
 socket.on('combatEffect', pushCombatEffect);
 // Effects with their own drawing; any other weapon name falls back to a basic slash.
-const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash']);
+const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash', 'parry']);
 function pushCombatEffect(effect) {
     if (!effect) return;
     const special = SPECIAL_EFFECTS.has(effect.weapon);
@@ -174,6 +174,10 @@ function pushCombatEffect(effect) {
         life,
         maxLife: life,
     });
+    if (effect.weapon === 'parry') {
+        damageTexts.push({ x: Number(effect.x) || 0, y: (Number(effect.y) || 0) - 20, value: 0, text: '반격!', color: '#ffd84a', size: 20, drift: 0, life: 0.9, maxLife: 0.9 });
+        if (isOnScreen(effect.x, effect.y)) playSound('hit');
+    }
     if (effect.damage) {
         pushDamageText(effect.x, effect.y, effect.damage, { ultimate: effect.ultimate || special });
         if (isOnScreen(effect.x, effect.y)) playSound('hit');

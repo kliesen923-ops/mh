@@ -497,6 +497,23 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(0, 0, ring + 14, 0, Math.PI * 2);
             ctx.stroke();
+        } else if (effect.weapon === 'parry') {
+            // Just guard: a gold flash ring with sparks thrown back at the attacker.
+            const ring = 20 + (1 - t) * 30;
+            ctx.strokeStyle = `rgba(255, 216, 74, ${0.3 + t * 0.7})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, ring, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.lineWidth = 2.5;
+            for (let i = -2; i <= 2; i++) {
+                const a = effect.angle + i * 0.32;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * ring * 0.5, Math.sin(a) * ring * 0.5);
+                ctx.lineTo(Math.cos(a) * (ring + 14), Math.sin(a) * (ring + 14));
+                ctx.stroke();
+            }
         } else if (effect.weapon === 'ash') {
             const burst = 18 + (1 - t) * 24;
             ctx.strokeStyle = 'rgba(120, 210, 255, 0.95)';
