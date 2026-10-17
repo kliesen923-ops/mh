@@ -2,6 +2,7 @@ const state = require('./state');
 const { JUST_GUARD_WINDOW_MS } = require('../config');
 const { getAngleDiff, createProjectileId, randomWorldPoint } = require('../utils/geometry');
 const { updateAccountScore } = require('../db');
+const { recordRun } = require('../records');
 const {
     createBaseStatsForWeapon,
     getWeaponAttackProfile,
@@ -25,14 +26,18 @@ function resolveKill(attackerId, targetId) {
     target.deaths++;
     updateAccountScore(target.accountId, 'deaths', 1);
     // Sent before the stats reset so the victim's death screen shows this life's record.
-    state.io.to(targetId).emit('deathSummary', {
+    const summary = {
         killerName: attacker ? attacker.name : null,
         survivedMs: target.lifeStartedAt ? Math.max(0, Date.now() - target.lifeStartedAt) : 0,
         level: target.level,
         totalXp: target.totalXp || 0,
         mobKills: target.lifeMobKills || 0,
         playerKills: target.lifePlayerKills || 0,
-    });
+    };
+    state.io.to(targetId).emit('deathSummary', summary);
+    recordRun({ accountId: target.accountId, name: target.name, ...summary })
+        .then((records) => state.io.to(targetId).emit('deathRecords', records))
+        .catch((error) => console.error('Failed to save record:', error.message));
     target.lifeStartedAt = 0;
     target.lifeMobKills = 0;
     target.lifePlayerKills = 0;

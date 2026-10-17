@@ -6,6 +6,7 @@ const {
     XP_ORB_LIFETIME_MS,
     XP_ORB_PICKUP_RADIUS,
     XP_ORB_MAX_TOTAL,
+    BOW_XP_MAGNET_RANGE,
     XP_ORB_SCATTER_RADIUS,
     XP_ORB_MAX_COUNT_PER_DEATH,
 } = require('../config');
@@ -19,13 +20,14 @@ function getXpOrbList() {
     return orbs;
 }
 
-function createOrb(x, y, value, now) {
+function createOrb(x, y, value, now, magnetTo = null) {
     return {
         id: createProjectileId('xp'),
         x: Math.max(WORLD_MARGIN, Math.min(GAME_WIDTH - WORLD_MARGIN, x)),
         y: Math.max(WORLD_MARGIN, Math.min(GAME_HEIGHT - WORLD_MARGIN, y)),
         value,
         expiresAt: now + XP_ORB_LIFETIME_MS,
+        magnetTo,
     };
 }
 
@@ -40,11 +42,12 @@ function addOrbs(created) {
     }
 }
 
-// A killed mob leaves its XP on the ground.
-function dropXpOrb(x, y, value, now = Date.now()) {
+// A killed mob leaves its XP on the ground. `magnetTo` (a bow kill's archer) pulls it
+// to that player from up to BOW_XP_MAGNET_RANGE away.
+function dropXpOrb(x, y, value, magnetTo = null, now = Date.now()) {
     const amount = Math.floor(Number(value) || 0);
     if (amount <= 0) return null;
-    const orb = createOrb(x, y, amount, now);
+    const orb = createOrb(x, y, amount, now, magnetTo);
     addOrbs([orb]);
     return orb;
 }
@@ -77,7 +80,7 @@ function updateXpOrbs(now = Date.now()) {
         }
         for (const [id, p] of Object.entries(players)) {
             if (!p || p.hp <= 0 || p.isSelectingLoadout) continue;
-            const reach = XP_ORB_PICKUP_RADIUS * Math.max(1, p.giantScale || 1);
+            const reach = orb.magnetTo === id ? BOW_XP_MAGNET_RANGE : XP_ORB_PICKUP_RADIUS * Math.max(1, p.giantScale || 1);
             if (Math.abs(p.x - orb.x) > reach || Math.abs(p.y - orb.y) > reach) continue;
             if (Math.hypot(p.x - orb.x, p.y - orb.y) <= reach) {
                 grantXp(id, orb.value);

@@ -12,6 +12,8 @@ const {
     MOB_TIERS,
     BOW_MAX_DISTANCE,
     MOB_HIT_IMPACT,
+    BOW_MOB_KNOCKBACK,
+    BOW_PIERCE,
 } = require('./config');
 const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
@@ -396,9 +398,11 @@ function registerSocketHandlers(io) {
             if (Math.hypot(mob.x - endX, mob.y - endY) > mob.radius + 40) return;
             if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > BOW_MAX_DISTANCE + mob.radius + 120) return;
             const hitKey = `${socket.id}:bowmob:${String(payload.projectileId || '').slice(0, 80)}`;
+            const pierced = state.attackHitTargets.get(hitKey);
+            if (pierced && pierced.size >= BOW_PIERCE) return;
             if (hasHitTargetForKey(hitKey, `mob:${mob.id}`)) return;
             const damage = Math.floor(11 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
-            damageMob(mob.id, socket.id, damage, Number(payload.angle) || 0);
+            damageMob(mob.id, socket.id, damage, Number(payload.angle) || 0, { fromX: attacker.x, fromY: attacker.y, knockback: BOW_MOB_KNOCKBACK });
         });
 
         socket.on('dualRushSlash', (payloadData) => {

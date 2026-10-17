@@ -9,12 +9,13 @@ const {
     MOB_MIN_SPAWN_DISTANCE,
     MOB_CONTACT_COOLDOWN_MS,
     MOB_VIEW_DISTANCE,
+    BOSS,
 } = require('../config');
 const { getAngleDiff } = require('../utils/geometry');
 const { hasHitTargetForKey } = require('./hits');
 const { getMaxMobTier, pickMobTier } = require('./tiers');
 const { getMaxHpFromStats } = require('./stats');
-const { updateXpOrbs, dropXpOrb } = require('./xpOrbs');
+const { updateXpOrbs, dropXpOrb, scatterXp } = require('./xpOrbs');
 const { markStatsDirty, flushStats } = require('./sync');
 
 const { players } = state;
@@ -81,6 +82,67 @@ function spawnMob(ownerId, options = {}) {
     return mob;
 }
 
+function isBoss(mob) {
+    return Boolean(mob && mob.kind === 'boss');
+}
+
+function spawnBoss(ownerId, options = {}) {
+    const owner = players[ownerId];
+    if (!owner) return null;
+    const position = Number.isFinite(options.x) && Number.isFinite(options.y) ? { x: options.x, y: options.y } : pickSpawnPoint(owner);
+    if (!position) return null;
+    const level = Math.max(1, owner.level || 1);
+    const hp = BOSS.hpBase + level * BOSS.hpPerLevel;
+    const mob = {
+        id: nextMobId++,
+        ownerId,
+        kind: 'boss',
+        tier: MOB_TIERS.length - 1,
+        level,
+        x: position.x,
+        y: position.y,
+        hp,
+        maxHp: hp,
+        speed: BOSS.speed,
+        damage: BOSS.contactDamageBase + level,
+        slamDamage: Math.round(BOSS.slamDamageBase + level * 1.5),
+        xp: BOSS.xpBase + level * BOSS.xpPerLevel,
+        radius: BOSS.radius,
+        lastContactAt: 0,
+        nextSlamAt: Date.now() + 2500,
+        slamAt: 0,
+    };
+    mobs.set(mob.id, mob);
+    state.io.emit('bossSpawned', { id: mob.id, ownerId, ownerName: owner.name, level });
+    return mob;
+}
+
+// Starts a telegraphed slam when the owner is close, and lands it after the windup.
+function updateBoss(boss, ownerId, owner, now) {
+    if (boss.slamAt && now >= boss.slamAt) {
+        boss.slamAt = 0;
+        boss.nextSlamAt = now + BOSS.slamCooldownMs;
+        state.io.emit('bossSlamHit', { id: boss.id, x: boss.x, y: boss.y, radius: BOSS.slamRadius });
+        if (owner.isDodging || Math.hypot(owner.x - boss.x, owner.y - boss.y) > BOSS.slamRadius) return false;
+        let damage = boss.slamDamage;
+        if (owner.isGuarding && getAngleDiff(owner.angle, Math.atan2(boss.y - owner.y, boss.x - owner.x)) < Math.PI / 3) damage = Math.floor(damage * 0.5);
+        owner.hp -= damage;
+        state.io.to(ownerId).emit('mobDamage', { amount: damage });
+        markStatsDirty();
+        if (owner.hp <= 0) {
+            const { resolveKill } = require('./combat');
+            resolveKill(null, ownerId);
+            return true;
+        }
+        return false;
+    }
+    if (!boss.slamAt && now >= boss.nextSlamAt && Math.hypot(owner.x - boss.x, owner.y - boss.y) <= BOSS.slamTriggerDistance) {
+        boss.slamAt = now + BOSS.slamWindupMs;
+        state.io.emit('bossSlam', { id: boss.id, x: boss.x, y: boss.y, radius: BOSS.slamRadius, windupMs: BOSS.slamWindupMs });
+    }
+    return false;
+}
+
 function getMob(mobId) {
     return mobs.get(Number(mobId));
 }
@@ -112,7 +174,7 @@ function isMobStunned(mob, now = Date.now()) {
 
 // Pushes a mob away from (fromX, fromY) and/or stuns it.
 function applyMobImpact(mob, impact, now = Date.now()) {
-    if (!impact) return;
+    if (!impact || isBoss(mob)) return;
     const knockback = Number(impact.knockback) || 0;
     if (knockback > 0 && Number.isFinite(impact.fromX) && Number.isFinite(impact.fromY)) {
         const dx = mob.x - impact.fromX;
@@ -135,10 +197,17 @@ function damageMob(mobId, attackerId, damage, angle, impact = null) {
     if (mob.hp <= 0) {
         mobs.delete(mob.id);
         attacker.lifeMobKills = (attacker.lifeMobKills || 0) + 1;
-        // Small heal per kill so long fights are survivable without pickups.
-        if (attacker.hp > 0) attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + 1 + mob.tier);
-        state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId, damage: amount, ultimate: isUltimateActive(attacker) });
-        dropXpOrb(mob.x, mob.y, mob.xp);
+        // Small heal per kill so long fights are survivable without pickups; bosses heal more.
+        const maxHp = getMaxHpFromStats(attacker.stats);
+        const heal = isBoss(mob) ? Math.floor(maxHp * BOSS.killHealRatio) : 1 + mob.tier;
+        if (attacker.hp > 0) attacker.hp = Math.min(maxHp, attacker.hp + heal);
+        state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId, damage: amount, ultimate: isUltimateActive(attacker), boss: isBoss(mob) });
+        if (isBoss(mob)) {
+            scatterXp(mob.x, mob.y, mob.xp);
+            state.io.emit('bossDefeated', { id: mob.id, ownerId: mob.ownerId, killerId: attackerId, killerName: attacker.name });
+        } else {
+            dropXpOrb(mob.x, mob.y, mob.xp, attacker.weapon === 'bow' ? attackerId : null);
+        }
     } else {
         applyMobImpact(mob, impact);
         state.io.emit('mobDamaged', { id: mob.id, x: mob.x, y: mob.y, angle: Number.isFinite(angle) ? angle : 0, weapon: attacker.weapon || 'sword', damage: amount, ultimate: isUltimateActive(attacker) });
@@ -160,7 +229,8 @@ function hitMobs(attackerId, test, damage, angle, hitKey, impact = null) {
 
 function moveMobsForOwner(owner, ownerMobs, dt, now) {
     for (const mob of ownerMobs) {
-        if (isMobStunned(mob, now)) continue;
+        // Stunned mobs and bosses winding up a slam hold still.
+        if (isMobStunned(mob, now) || mob.slamAt) continue;
         const dx = owner.x - mob.x;
         const dy = owner.y - mob.y;
         const distance = Math.hypot(dx, dy);
@@ -232,6 +302,7 @@ function emitMobSnapshots() {
                 Math.max(0, Math.round((mob.hp / mob.maxHp) * 100)),
                 mob.ownerId === playerId ? 1 : 0,
                 isMobStunned(mob) ? 1 : 0,
+                isBoss(mob) ? 1 : 0,
             ]);
         }
         if (visible.length === 0 && !lastSentCount.get(playerId)) continue;
@@ -250,6 +321,7 @@ function pushMobsFromBarriers(now) {
         if (!ult || !ult.active || ult.type !== 'spear' || p.hp <= 0 || now >= (ult.endsAt || 0)) continue;
         const radius = ult.radius || 180;
         for (const mob of mobs.values()) {
+            if (isBoss(mob)) continue;
             const dx = mob.x - p.x;
             const dy = mob.y - p.y;
             const distance = Math.hypot(dx, dy) || 0.01;
@@ -280,6 +352,13 @@ function tickMobs(now = Date.now(), options = {}) {
     for (const [ownerId, owner] of Object.entries(players)) {
         if (!isOwnerActive(owner) || owner.isUpgrading) continue;
         const ownerMobs = byOwner.get(ownerId) || [];
+        if (owner.pendingBoss && !ownerMobs.some(isBoss)) {
+            const boss = spawnBoss(ownerId);
+            if (boss) {
+                owner.pendingBoss = false;
+                ownerMobs.push(boss);
+            }
+        }
         if (spawn && ownerMobs.length < getMaxMobsForLevel(owner.level)
             && now - (lastSpawnAt.get(ownerId) || 0) >= MOB_SPAWN_INTERVAL_MS) {
             lastSpawnAt.set(ownerId, now);
@@ -292,7 +371,10 @@ function tickMobs(now = Date.now(), options = {}) {
     }
     pushMobsFromBarriers(now);
     for (const [ownerId, owner, ownerMobs] of active) {
-        applyContactDamage(ownerId, owner, ownerMobs, now);
+        if (applyContactDamage(ownerId, owner, ownerMobs, now)) continue;
+        for (const mob of ownerMobs) {
+            if (isBoss(mob) && updateBoss(mob, ownerId, owner, now)) break;
+        }
     }
 
     updateXpOrbs(now);
@@ -311,6 +393,8 @@ module.exports = {
     clearAllMobs,
     damageMob,
     isMobStunned,
+    isBoss,
+    spawnBoss,
     hitMobs,
     tickMobs,
 };

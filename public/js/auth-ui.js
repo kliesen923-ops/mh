@@ -78,8 +78,35 @@ function renderDeathSummary() {
     setText('death-mob-kills', String(summary.mobKills || 0));
     setText('death-player-kills', String(summary.playerKills || 0));
 }
+// Personal best line, NEW badges on beaten records, and the top ranking.
+function renderDeathRecords() {
+    const records = lastDeathRecords;
+    const bestEl = document.getElementById('death-best');
+    const topEl = document.getElementById('death-top');
+    document.querySelectorAll('.death-stat[data-best]').forEach((card) => {
+        card.classList.toggle('new-best', Boolean(records && records.newBest && records.newBest[card.dataset.best]));
+    });
+    if (!bestEl || !topEl) return;
+    if (!records || !records.best) {
+        bestEl.textContent = '';
+        topEl.textContent = '';
+        return;
+    }
+    bestEl.innerHTML = `내 최고 기록 <b>Lv.${records.best.level}</b> · 생존 <b>${formatSurvivalTime(records.best.survivedMs)}</b> · 경험치 <b>${records.best.totalXp}</b>`;
+    topEl.textContent = '';
+    const myName = (currentSession && currentSession.nickname) || player.name;
+    (records.top || []).forEach((entry, i) => {
+        const item = document.createElement('span');
+        item.className = 'death-top-entry' + (entry.name === myName ? ' me' : '');
+        const rank = document.createElement('b');
+        rank.textContent = `${i + 1}위`;
+        item.append(rank, ` ${entry.name} Lv.${entry.level} · ${formatSurvivalTime(entry.survivedMs)}`);
+        topEl.append(item);
+    });
+}
 function showDeathScreen() {
     renderDeathSummary();
+    renderDeathRecords();
     document.getElementById('overlay-death')?.classList.remove('hidden');
 }
 function hideDeathScreen() {

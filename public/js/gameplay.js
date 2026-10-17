@@ -30,7 +30,9 @@ function updateBowProjectiles(dt) {
         if (effect.originId === myId && !effect.hitSent) {
             const hit = findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect);
             if (hit && hit.mobId) {
-                effect.hitSent = true;
+                // Arrows keep flying through mobs until they have pierced BOW_PIERCE of them.
+                effect.piercedMobs = effect.piercedMobs || new Set();
+                effect.piercedMobs.add(hit.mobId);
                 socket.emit('bowArrowHitMob', {
                     projectileId: effect.id,
                     mobId: hit.mobId,
@@ -38,7 +40,8 @@ function updateBowProjectiles(dt) {
                     endY: tipY,
                     angle: effect.angle,
                 });
-                return false;
+                if (effect.piercedMobs.size >= BOW_PIERCE) return false;
+                return effect.progress < 1;
             }
             if (hit) {
                 effect.hitSent = true;
@@ -164,6 +167,7 @@ function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
         candidates.push({ id, score });
     }
     mobs.forEach((mob) => {
+        if (effect.piercedMobs && effect.piercedMobs.has(mob.id)) return;
         const radius = getMobRadius(mob);
         if (distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, mob) > radius + 8) return;
         candidates.push({ mobId: mob.id, score: Math.hypot(mob.x - effect.startX, mob.y - effect.startY) });
@@ -173,6 +177,7 @@ function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
 }
 
 function getMobRadius(mob) {
+    if (mob.boss) return BOSS_RADIUS;
     const tier = mobTiers[mob.tier];
     return tier && Number.isFinite(tier.radius) ? tier.radius : 16;
 }
