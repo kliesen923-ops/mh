@@ -27,6 +27,7 @@ function noteUltimateCast(playerId, ultimate) {
     ultimateBanners.push({ playerId, type, text: ULTIMATE_NAMES[type] || '궁극기', life: 1.3, maxLife: 1.3 });
     const caster = playerId === myId ? player : allPlayers[playerId];
     const nearby = caster && Math.abs(caster.x - player.x) < canvas.width && Math.abs(caster.y - player.y) < canvas.height;
+    if (nearby) playSound('ult');
     if (nearby && (type === 'hammer' || type === 'bow')) {
         screenShake.until = Date.now() + (type === 'hammer' ? 380 : 260);
         screenShake.strength = type === 'hammer' ? 9 : 5;
@@ -69,6 +70,7 @@ socket.on('playerStunned', (data) => {
 });
 
 socket.on('levelUp', (data) => {
+    playSound('levelUp');
     player.level = data.newLevel;
     pendingUpgrades += data.count;
     if (!isUpgrading) showUpgradeUI();
@@ -132,6 +134,8 @@ socket.on('playerRespawn', (p) => {
 socket.on('playerDisconnected', (id) => { delete allPlayers[id]; updateLeaderboard(); });
 socket.on('playerDied', (data) => {
     if (data && data.victimId === myId) {
+        playSound('death');
+        announcements = [];
         if (upgradeTimerInterval) clearInterval(upgradeTimerInterval);
         pendingUpgrades = 0;
         isUpgrading = false;
@@ -142,7 +146,12 @@ socket.on('playerDied', (data) => {
 });
 socket.on('deathSummary', (data) => {
     lastDeathSummary = data || null;
+    lastDeathRecords = null;
     renderDeathSummary();
+});
+socket.on('deathRecords', (data) => {
+    lastDeathRecords = data || null;
+    renderDeathRecords();
 });
 socket.on('skillChanged', (data) => {
     if (data && data.id === myId) {
@@ -165,20 +174,23 @@ function pushCombatEffect(effect) {
         life,
         maxLife: life,
     });
-    if (effect.damage) pushDamageText(effect.x, effect.y, effect.damage, { ultimate: effect.ultimate || special });
+    if (effect.damage) {
+        pushDamageText(effect.x, effect.y, effect.damage, { ultimate: effect.ultimate || special });
+        if (isOnScreen(effect.x, effect.y)) playSound('hit');
+    }
 }
 socket.on('mobTiers', (data) => {
     mobTiers = Array.isArray(data) ? data : [];
 });
 socket.on('mobs', (data) => {
     const seen = new Set();
-    (Array.isArray(data) ? data : []).forEach(([id, x, y, tier, hpPct, mine, stunned]) => {
+    (Array.isArray(data) ? data : []).forEach(([id, x, y, tier, hpPct, mine, stunned, boss]) => {
         seen.add(id);
         const mob = mobs.get(id);
         if (mob) {
-            Object.assign(mob, { tx: x, ty: y, tier, hpPct, mine: mine === 1, stunned: stunned === 1 });
+            Object.assign(mob, { tx: x, ty: y, tier, hpPct, mine: mine === 1, stunned: stunned === 1, boss: boss === 1 });
         } else {
-            mobs.set(id, { id, x, y, tx: x, ty: y, tier, hpPct, mine: mine === 1, stunned: stunned === 1, flash: 0, seed: Math.random() * Math.PI * 2 });
+            mobs.set(id, { id, x, y, tx: x, ty: y, tier, hpPct, mine: mine === 1, stunned: stunned === 1, boss: boss === 1, flash: 0, seed: Math.random() * Math.PI * 2 });
         }
     });
     for (const id of mobs.keys()) {
@@ -204,11 +216,43 @@ socket.on('mobKilled', (data) => {
         maxLife: 0.35,
     });
     pushDamageText(mob ? mob.x : data.x, mob ? mob.y : data.y, data.damage, { ultimate: data.ultimate, color: data.ultimate ? '#ffb347' : '#ffe066' });
+    if (isOnScreen(Number(data.x) || 0, Number(data.y) || 0)) playSound('kill');
     mobs.delete(data.id);
+});
+socket.on('bossSpawned', (data) => {
+    if (!data) return;
+    bossLevels[data.id] = data.level;
+    if (data.ownerId === myId) {
+        announce(`보스 등장! Lv.${data.level}`, '#ff5a5a');
+        playSound('bossSpawn');
+    }
+});
+socket.on('bossSlam', (data) => {
+    if (!data) return;
+    bossSlams.push({ id: data.id, x: data.x, y: data.y, radius: data.radius, windupMs: data.windupMs, hitAt: Date.now() + data.windupMs });
+});
+socket.on('bossSlamHit', (data) => {
+    if (!data) return;
+    bossSlams = bossSlams.filter((slam) => slam.id !== data.id);
+    bossSlamBursts.push({ x: data.x, y: data.y, radius: data.radius, life: 0.4, maxLife: 0.4 });
+    if (Math.hypot(data.x - player.x, data.y - player.y) < canvas.width * 0.7) {
+        screenShake.until = Date.now() + 320;
+        screenShake.strength = 8;
+        playSound('slam');
+    }
+});
+socket.on('bossDefeated', (data) => {
+    if (!data) return;
+    delete bossLevels[data.id];
+    if (data.ownerId === myId || data.killerId === myId) {
+        announce(data.killerId === myId ? '보스 처치!' : `${data.killerName}이(가) 보스를 처치!`, '#f1c40f');
+        playSound('bossDown');
+    }
 });
 socket.on('mobDamage', (data) => {
     const amount = Math.floor(Number(data && data.amount) || 0);
     if (amount <= 0) return;
+    playSound('hurt');
     healingTexts.push({ playerId: myId, text: `-${amount}`, color: '#ff5a5a', life: 0.7, maxLife: 0.7 });
 });
 socket.on('xpOrbs', (data) => {
@@ -225,10 +269,17 @@ socket.on('xpOrbsRemoved', (data) => {
         const entry = byId.get(orb.id);
         if (!entry) return true;
         // Picked-up orbs fly into whoever collected them.
-        if (entry.by) collectingOrbs.push({ x: orb.x, y: orb.y, value: orb.value, by: entry.by, life: 0.22, maxLife: 0.22 });
+        if (entry.by) {
+            // Far pickups (bow magnet) fly a little longer so the pull is visible.
+            const collector = entry.by === myId ? player : allPlayers[entry.by];
+            const distance = collector ? Math.hypot(collector.x - orb.x, collector.y - orb.y) : 0;
+            const life = Math.max(0.22, Math.min(0.6, distance / 1400));
+            collectingOrbs.push({ x: orb.x, y: orb.y, value: orb.value, by: entry.by, life, maxLife: life });
+        }
         if (entry.by === myId) myXp += orb.value;
         return false;
     });
+    if (myXp > 0) playSound('orb');
     if (myXp > 0) healingTexts.push({ playerId: myId, text: `+${myXp} XP`, color: '#5ad8ff', life: 0.9, maxLife: 0.9 });
 });
 socket.on('healingCrossUpdate', (data) => {
@@ -241,6 +292,7 @@ socket.on('healFloatingText', (data) => {
     if (!data || !data.playerId) return;
     const amount = Math.max(0, Math.floor(Number(data.amount) || 0));
     if (amount <= 0) return;
+    if (data.playerId === myId) playSound('heal');
     healingTexts.push({
         playerId: String(data.playerId),
         text: `+${amount}`,

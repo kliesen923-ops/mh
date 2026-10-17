@@ -36,12 +36,16 @@ const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
 const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
 // Angle between the bow ultimate's dragons when projectile upgrades add more.
 const DRAGON_SPREAD = 0.16;
-const HEAL_CROSS_SPAWN_DELAY_MS = 18000;
-const HEAL_CROSS_LIFETIME_MS = 12000;
+// Several pickups can be on the 3840x1920 map at once; a new one spawns every delay
+// while the map has fewer than the max.
+const HEAL_CROSS_MAX = 5;
+const HEAL_CROSS_SPAWN_DELAY_MS = 6000;
+const HEAL_CROSS_LIFETIME_MS = 40000;
 const HEAL_CROSS_BOUNDS = { xMin: 120, xMax: GAME_WIDTH - 120, yMin: 110, yMax: GAME_HEIGHT - 110 };
 const HEAL_CROSS_PICKUP_RADIUS = 34;
-const GIANT_POTION_SPAWN_DELAY_MS = 28000;
-const GIANT_POTION_LIFETIME_MS = 14000;
+const GIANT_POTION_MAX = 2;
+const GIANT_POTION_SPAWN_DELAY_MS = 15000;
+const GIANT_POTION_LIFETIME_MS = 40000;
 const GIANT_POTION_BOUNDS = { xMin: 120, xMax: GAME_WIDTH - 120, yMin: 110, yMax: GAME_HEIGHT - 110 };
 const GIANT_POTION_PICKUP_RADIUS = 36;
 const GIANT_POTION_DURATION_MS = 9000;
@@ -66,6 +70,24 @@ const MOB_MIN_SPAWN_DISTANCE = 450;
 const MOB_CONTACT_COOLDOWN_MS = 900;
 const MOB_VIEW_DISTANCE = 1000;
 const STATS_FLUSH_MS = 150;
+// Every BOSS_EVERY_LEVELS levels a player's own boss spawns. Bosses ignore knockback,
+// stuns and the spear barrier, and periodically slam the ground around themselves.
+const BOSS = {
+    everyLevels: 5,
+    radius: 44,
+    speed: 64,
+    hpBase: 500,
+    hpPerLevel: 90,
+    contactDamageBase: 16,
+    xpBase: 40,
+    xpPerLevel: 6,
+    slamRadius: 150,
+    slamWindupMs: 1100,
+    slamCooldownMs: 4500,
+    slamTriggerDistance: 260,
+    slamDamageBase: 24,
+    killHealRatio: 0.3,
+};
 // Players can't be hit by other players for this long after a level-up menu opens.
 const UPGRADE_SHIELD_MS = 3000;
 
@@ -73,6 +95,12 @@ const XP_ORB_LIFETIME_MS = 60000;
 // Orbs within this distance fly to the player and are collected.
 const XP_ORB_PICKUP_RADIUS = 80;
 const XP_ORB_MAX_TOTAL = 600;
+// Orbs from bow kills fly to the archer from this far away.
+const BOW_XP_MAGNET_RANGE = 900;
+// Arrows pierce through this many mobs, and nudge each one back a little. A big
+// knockback made archers spread damage over the swarm instead of finishing kills.
+const BOW_PIERCE = 3;
+const BOW_MOB_KNOCKBACK = 10;
 const XP_ORB_SCATTER_RADIUS = { min: 90, max: 260 };
 const XP_ORB_MAX_COUNT_PER_DEATH = 24;
 
@@ -96,10 +124,12 @@ module.exports = {
     ULTIMATE_COOLDOWN_CUT_PER_SPEED,
     ULTIMATE_MAX_COOLDOWN_CUT,
     DRAGON_SPREAD,
+    HEAL_CROSS_MAX,
     HEAL_CROSS_SPAWN_DELAY_MS,
     HEAL_CROSS_LIFETIME_MS,
     HEAL_CROSS_BOUNDS,
     HEAL_CROSS_PICKUP_RADIUS,
+    GIANT_POTION_MAX,
     GIANT_POTION_SPAWN_DELAY_MS,
     GIANT_POTION_LIFETIME_MS,
     GIANT_POTION_BOUNDS,
@@ -116,10 +146,14 @@ module.exports = {
     MOB_CONTACT_COOLDOWN_MS,
     MOB_VIEW_DISTANCE,
     STATS_FLUSH_MS,
+    BOSS,
     UPGRADE_SHIELD_MS,
     XP_ORB_LIFETIME_MS,
     XP_ORB_PICKUP_RADIUS,
     XP_ORB_MAX_TOTAL,
+    BOW_XP_MAGNET_RANGE,
+    BOW_MOB_KNOCKBACK,
+    BOW_PIERCE,
     XP_ORB_SCATTER_RADIUS,
     XP_ORB_MAX_COUNT_PER_DEATH,
 };

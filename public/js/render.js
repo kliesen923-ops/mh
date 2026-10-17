@@ -866,6 +866,10 @@ function drawXpGem(x, y, value, scale) {
 function drawMobs() {
     const now = Date.now();
     mobs.forEach((mob) => {
+        if (mob.boss) {
+            drawBoss(mob);
+            return;
+        }
         const tier = mobTiers[mob.tier] || { color: '#2ecc71', radius: 16 };
         const r = tier.radius || 16;
         const wobble = 1 + Math.sin(now / 140 + mob.seed) * 0.06;
@@ -925,6 +929,15 @@ function drawMinimap() {
     ctx.strokeRect(x + camera.x * sx, y + camera.y * sy, canvas.width * sx, canvas.height * sy);
     ctx.fillStyle = '#5ad8ff';
     xpOrbs.forEach((orb) => ctx.fillRect(x + orb.x * sx - 1, y + orb.y * sy - 1, 2, 2));
+    ctx.fillStyle = '#46e06a';
+    healingCrosses.forEach((cross) => ctx.fillRect(x + cross.x * sx - 2, y + cross.y * sy - 2, 4, 4));
+    ctx.fillStyle = '#c86bff';
+    giantPotions.forEach((potion) => ctx.fillRect(x + potion.x * sx - 2, y + potion.y * sy - 2, 4, 4));
+    mobs.forEach((mob) => {
+        if (!mob.boss) return;
+        ctx.fillStyle = '#ff3b3b';
+        ctx.beginPath(); ctx.arc(x + mob.x * sx, y + mob.y * sy, 4, 0, Math.PI * 2); ctx.fill();
+    });
     Object.values(allPlayers).forEach((p) => {
         if (p.hp <= 0 || p.isSelectingLoadout) return;
         const isMe = p.id === myId;
@@ -944,6 +957,7 @@ function draw() {
     ctx.translate(-camera.x + shake.x, -camera.y + shake.y);
     drawWorldBackground();
     drawUltimateAreas();
+    drawBossSlams();
     drawXpOrbs();
     drawHealingCrosses();
     drawGiantPotions();
@@ -957,7 +971,11 @@ function draw() {
     drawDamageTexts();
     drawUltimateBanners();
     ctx.restore();
-    if (gameState === 'PLAYING') drawMinimap();
+    if (gameState === 'PLAYING') {
+        drawMinimap();
+        drawBossBar();
+    }
+    drawAnnouncements();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
     requestAnimationFrame(loop);
 }

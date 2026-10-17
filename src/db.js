@@ -27,6 +27,13 @@ async function initDatabase() {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     `);
+    // Best single-life records, added after the table first shipped.
+    await dbPool.query(`
+        ALTER TABLE accounts
+            ADD COLUMN IF NOT EXISTS best_level INTEGER NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS best_survival_ms BIGINT NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS best_xp INTEGER NOT NULL DEFAULT 0
+    `);
 }
 
 function getAccountById(id) {

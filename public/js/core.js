@@ -12,7 +12,7 @@ const WEAPON_PRESETS = {
     hammer: { label: '망치', stats: { dmg: 1.8, range: 1.0, speed: 0.68, move: 0.9, dodge: 1.0, projectile: 1.0, hp: 120 } },
     spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
     dual: { label: '쌍검', stats: { dmg: 0.82, range: 0.82, speed: 1.45, move: 1.02, dodge: 1.0, projectile: 1.0, hp: 92 } },
-    bow: { label: '활', stats: { dmg: 1.2, range: 1.0, speed: 0.84, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 } },
+    bow: { label: '활', stats: { dmg: 1.2, range: 1.0, speed: 0.84, move: 1.08, dodge: 1.0, projectile: 1.0, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
@@ -29,6 +29,8 @@ const COMBO_FINISHER = {
 // Attack-speed picks shorten the ultimate cooldown (matches the server).
 const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
 const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
+// Arrows pass through this many mobs (matches the server).
+const BOW_PIERCE = 3;
 const ULTIMATE_NAMES = {
     sword: '검기 난무',
     hammer: '대지 분쇄',
@@ -59,6 +61,7 @@ const UPGRADE_PICK_SECONDS = 6;
 let pendingUpgrades = 0, upgradeTimerInterval = null, upgradeTimeLeft = UPGRADE_PICK_SECONDS;
 let pendingAuth = null;
 let lastDeathSummary = null;
+let lastDeathRecords = null;
 let currentSession = null;
 const isLocalAuthBypass = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 let selectedWeapon = 'sword';

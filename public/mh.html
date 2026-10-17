@@ -30,6 +30,7 @@
         </div>
     </div>
     <button id="btn-fullscreen" type="button" aria-label="전체화면">⛶</button>
+    <button id="btn-sound" type="button" aria-label="소리 끄기">🔊</button>
     <div id="leaderboard"><h3>랭킹</h3><div id="score-list"></div></div>
     <div id="chat-container"><div id="chat-messages"></div><div id="chat-input-container"><input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="50"></div></div>
     <div id="joy-container"><div id="joy-stick"></div></div>
@@ -182,12 +183,14 @@
         <h1 class="death-title">사망</h1>
         <div id="death-cause" class="death-cause"></div>
         <div class="death-stats">
-            <div class="death-stat"><span>생존 시간</span><b id="death-time">0:00</b></div>
-            <div class="death-stat"><span>도달 레벨</span><b id="death-level">1</b></div>
-            <div class="death-stat"><span>모은 경험치</span><b id="death-xp">0</b></div>
+            <div class="death-stat" data-best="survivedMs"><span>생존 시간</span><b id="death-time">0:00</b></div>
+            <div class="death-stat" data-best="level"><span>도달 레벨</span><b id="death-level">1</b></div>
+            <div class="death-stat" data-best="totalXp"><span>모은 경험치</span><b id="death-xp">0</b></div>
             <div class="death-stat"><span>몬스터 처치</span><b id="death-mob-kills">0</b></div>
             <div class="death-stat"><span>플레이어 처치</span><b id="death-player-kills">0</b></div>
         </div>
+        <div id="death-best" class="death-best"></div>
+        <div id="death-top" class="death-top"></div>
         <p class="death-note">모은 경험치는 쓰러진 자리에 흩뿌려졌습니다.</p>
         <button id="btn-restart" class="start-btn" type="button">다시 시작</button>
     </div>
@@ -281,6 +284,8 @@
     <script src="js/input.js"></script>
     <script src="js/render.js"></script>
     <script src="js/ultimate-fx.js"></script>
+    <script src="js/boss-fx.js"></script>
+    <script src="js/sound.js"></script>
     <script src="js/controls.js"></script>
     <script src="js/fullscreen.js"></script>
     <script src="js/auth-ui.js"></script>

@@ -1,5 +1,5 @@
 const state = require('./state');
-const { UPGRADE_SHIELD_MS } = require('../config');
+const { UPGRADE_SHIELD_MS, BOSS } = require('../config');
 const { markStatsDirty } = require('./sync');
 const { getAverageMobXp } = require('./tiers');
 
@@ -11,7 +11,7 @@ function xpToNextLevel(level) {
 }
 
 function createProgression() {
-    return { xp: 0, totalXp: 0, xpToNext: xpToNextLevel(1) };
+    return { xp: 0, totalXp: 0, xpToNext: xpToNextLevel(1), pendingBoss: false };
 }
 
 function resetProgression(player) {
@@ -31,6 +31,8 @@ function grantXp(playerId, amount) {
         p.xp -= xpToNextLevel(p.level);
         p.level += 1;
         levelsGained += 1;
+        // Spawned by the mob tick once the upgrade menu closes.
+        if (p.level % BOSS.everyLevels === 0) p.pendingBoss = true;
     }
     p.xpToNext = xpToNextLevel(p.level);
     if (levelsGained > 0) {
