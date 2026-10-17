@@ -1,5 +1,6 @@
-/* In-game HUD: player card (top left), icons + minimap + ranking (top right), boss bar
-   (top center), chat (above the joystick), joystick and action buttons. Panels share one
+/* In-game HUD: minimap + ranking (top left), icons (top right), boss bar (top center),
+   player card with HP and XP (bottom center, between the joystick and the buttons), chat
+   (above the joystick), joystick and action buttons. Panels share one
    glass look. --hud-scale shrinks info panels on small screens; --touch-scale sizes the
    controls by screen height. Both are set from JS in resize(). */
 :root {
@@ -35,20 +36,29 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     box-sizing: border-box;
 }
 
-/* Player card */
+/* Player card: bottom center, in the gap between the joystick and the button cluster.
+   The gap edges follow the touch controls' footprint (see the touch controls below). */
 #hud {
+    --gap-width: calc(100vw - var(--safe-left) - var(--safe-right) - 777px * var(--touch-scale) - 24px);
     position: absolute;
-    top: calc(var(--ui-gap) + var(--safe-top));
-    left: calc(var(--ui-gap) + var(--safe-left));
-    width: 230px;
-    padding: 12px 14px;
+    left: calc(var(--safe-left) + 365px * var(--touch-scale) + 12px + var(--gap-width) / 2);
+    bottom: calc(var(--ui-gap) + var(--safe-bottom));
+    width: min(360px, calc(var(--gap-width) / var(--hud-scale)));
+    padding: 8px 12px 10px;
     z-index: 500;
     pointer-events: none;
-    transform: scale(var(--hud-scale));
-    transform-origin: top left;
     font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgba(20, 23, 36, 0.55), rgba(10, 12, 20, 0.78));
+    border-color: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    transform: translateX(-50%) scale(var(--hud-scale));
+    transform-origin: bottom center;
 }
-.hud-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+/* Opening the stats grows the card upward, above the name row. */
+#hud .hud-stats { order: -1; margin: 0 0 8px; padding: 0 0 8px; border-top: 0; border-bottom: 1px solid var(--ui-border); }
+.hud-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
 .hud-level {
     flex: none;
     padding: 2px 8px;
@@ -76,9 +86,10 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     position: relative;
     height: 16px;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.5);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
     overflow: hidden;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
 }
 .hud-bar.hud-xp { height: 10px; margin-bottom: 0; }
 .hud-fill { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: inherit; transition: width 0.2s; }
@@ -100,16 +111,26 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 .hud-stats > div { display: flex; justify-content: space-between; gap: 6px; color: var(--ui-muted); }
 .hud-stats b { color: var(--ui-gold); font-weight: 700; }
 
-/* Top right column: icon buttons, minimap, ranking */
+/* Top left: minimap with the ranking below it (beside it on short screens) */
+#hud-left {
+    position: absolute;
+    top: calc(var(--ui-gap) + var(--safe-top));
+    left: calc(var(--ui-gap) + var(--safe-left));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    z-index: 500;
+    pointer-events: none;
+    transform: scale(var(--hud-scale));
+    transform-origin: top left;
+}
+
+/* Top right: icon buttons */
 #hud-right {
     position: absolute;
     top: calc(var(--ui-gap) + var(--safe-top));
     right: calc(var(--ui-gap) + var(--safe-right));
-    width: 200px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
     z-index: 500;
     pointer-events: none;
     transform: scale(var(--hud-scale));
@@ -132,6 +153,7 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 .hud-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .hud-icon.off { color: var(--ui-muted); }
 #minimap { display: block; width: 200px; height: 100px; padding: 0; margin: 0; }
+#leaderboard h3::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--ui-gold); vertical-align: 1px; }
 #leaderboard { width: 200px; padding: 10px 12px; font-size: 13px; }
 #leaderboard h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--ui-muted); }
 .rank-row { display: flex; align-items: center; gap: 7px; padding: 3px 0; }
@@ -370,19 +392,14 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     #chat-container { width: min(280px, 34vw); }
 }
 
-/* Phone-sized landscape screens: ranking beside the minimap rather than below it, clear of
-   the button column */
+/* Narrow screens: shift the boss bar right so it clears the ranking */
+@media (max-width: 760px) {
+    #boss-bar { left: calc(50% + 70px); width: 360px; }
+}
+
+/* Phone-sized landscape screens: ranking beside the minimap, clear of the chat above the joystick */
 @media (max-height: 700px) and (orientation: landscape) {
-    #hud-right {
-        width: 408px;
-        display: grid;
-        grid-template-columns: 200px 200px;
-        grid-template-areas: "icons icons" "rank map";
-        align-items: start;
-        justify-items: end;
-    }
-    .hud-icons { grid-area: icons; }
-    #minimap { grid-area: map; }
-    #leaderboard { grid-area: rank; }
+    #hud-left { flex-direction: row; }
+}
 }
 
