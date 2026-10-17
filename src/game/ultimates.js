@@ -4,8 +4,12 @@ const {
     getWeaponAttackProfile,
     getAttackMultiplier,
     getUltimateConfig,
+    getUltimateRangeMultiplier,
+    getUltimateCooldownMs,
+    getBowShotCount,
     clearUltimateState,
 } = require('./stats');
+const { DRAGON_SPREAD } = require('../config');
 const { hasHitTargetForKey } = require('./hits');
 const { resolveKill } = require('./combat');
 const { hitMobs } = require('./mobs');
@@ -28,8 +32,8 @@ function applySwordUltimate(playerId) {
         type: 'sword',
         startAt: now,
         endsAt: now + config.durationMs,
-        cooldownEndsAt: now + config.cooldownMs,
-        radius: 126,
+        cooldownEndsAt: now + getUltimateCooldownMs(attacker),
+        radius: Math.round(126 * getUltimateRangeMultiplier(attacker)),
         extra: 0,
     };
     broadcastUltimateState(playerId);
@@ -51,7 +55,7 @@ function applySwordUltimate(playerId) {
                 if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
                 const dx = target.x - current.x;
                 const dy = target.y - current.y;
-                if (Math.hypot(dx, dy) > 126) continue;
+                if (Math.hypot(dx, dy) > current.ultimate.radius) continue;
                 if (hasHitTargetForKey(key, targetId)) continue;
                 const damage = Math.floor((8 + (i % 3)) * (current.stats && Number.isFinite(current.stats.dmg) ? current.stats.dmg : 1) * getAttackMultiplier(current));
                 target.hp -= damage;
@@ -59,7 +63,7 @@ function applySwordUltimate(playerId) {
                 if (target.hp <= 0) resolveKill(playerId, targetId);
             }
             const mobDamage = Math.floor((8 + (i % 3)) * (current.stats && Number.isFinite(current.stats.dmg) ? current.stats.dmg : 1) * getAttackMultiplier(current));
-            hitMobs(playerId, (mob) => Math.hypot(mob.x - current.x, mob.y - current.y) <= 126 + mob.radius, mobDamage, slashAngle, key);
+            hitMobs(playerId, (mob) => Math.hypot(mob.x - current.x, mob.y - current.y) <= current.ultimate.radius + mob.radius, mobDamage, slashAngle, key);
             state.io.emit('statsUpdate', players);
         }, i * slashInterval);
     }
@@ -77,7 +81,7 @@ function applyHammerUltimate(playerId) {
     const now = Date.now();
     const config = getUltimateConfig(attacker.weapon);
     const profile = getWeaponAttackProfile(attacker.weapon);
-    const coneRange = Math.max(118, profile.reach * 1.7);
+    const coneRange = Math.max(118, profile.reach * 1.7) * getUltimateRangeMultiplier(attacker);
     const coneArc = Math.PI * 0.7;
     const attackAngle = attacker.aAngle || attacker.angle;
     // Position, direction and size go to clients so they can draw the exact hit area.
@@ -86,7 +90,7 @@ function applyHammerUltimate(playerId) {
         type: 'hammer',
         startAt: now,
         endsAt: now + config.durationMs,
-        cooldownEndsAt: now + config.cooldownMs,
+        cooldownEndsAt: now + getUltimateCooldownMs(attacker),
         radius: coneRange,
         angle: attackAngle,
         x: attacker.x,
@@ -140,8 +144,8 @@ function applySpearUltimate(playerId) {
         type: 'spear',
         startAt: now,
         endsAt: now + config.durationMs,
-        cooldownEndsAt: now + config.cooldownMs,
-        radius: 180,
+        cooldownEndsAt: now + getUltimateCooldownMs(attacker),
+        radius: Math.round(180 * getUltimateRangeMultiplier(attacker)),
         extra: 0,
     };
     broadcastUltimateState(playerId);
@@ -172,48 +176,55 @@ function applyBowUltimate(playerId) {
     if (!attacker) return;
     const now = Date.now();
     const config = getUltimateConfig(attacker.weapon);
+    const baseAngle = attacker.aAngle || attacker.angle;
+    // Projectile upgrades add dragons in a fan; range upgrades widen each one.
+    const shots = getBowShotCount(attacker);
+    const angles = Array.from({ length: shots }, (_, i) => baseAngle + (i - (shots - 1) / 2) * DRAGON_SPREAD);
+    const halfWidth = Math.round(54 * getUltimateRangeMultiplier(attacker));
     attacker.ultimate = {
         active: true,
         type: 'bow',
         startAt: now,
         endsAt: now + config.durationMs,
-        cooldownEndsAt: now + config.cooldownMs,
-        radius: 54,
-        angle: attacker.aAngle || attacker.angle,
+        cooldownEndsAt: now + getUltimateCooldownMs(attacker),
+        radius: halfWidth,
+        angle: baseAngle,
+        angles,
         x: attacker.x,
         y: attacker.y,
         extra: 0,
     };
     broadcastUltimateState(playerId);
-    const angle = attacker.aAngle || attacker.angle;
-    const edge = getRayWorldEdge(attacker.x, attacker.y, angle);
-    const endX = edge.x;
-    const endY = edge.y;
-    const attackRange = Math.max(1, Math.hypot(endX - attacker.x, endY - attacker.y));
-    const projectileId = createProjectileId('dragon');
-    state.io.emit('dragonProjectile', {
-        projectileId,
-        originId: playerId,
-        startX: attacker.x,
-        startY: attacker.y,
-        endX,
-        endY,
-        angle,
-        duration: Math.max(1000, Math.min(1800, Math.round(attackRange * 1.15))),
-        reflected: false,
+    const damageScale = (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker);
+    angles.forEach((angle, shot) => {
+        const edge = getRayWorldEdge(attacker.x, attacker.y, angle);
+        const endX = edge.x;
+        const endY = edge.y;
+        const attackRange = Math.max(1, Math.hypot(endX - attacker.x, endY - attacker.y));
+        state.io.emit('dragonProjectile', {
+            projectileId: createProjectileId('dragon'),
+            originId: playerId,
+            startX: attacker.x,
+            startY: attacker.y,
+            endX,
+            endY,
+            angle,
+            duration: Math.max(1000, Math.min(1800, Math.round(attackRange * 1.15))),
+            reflected: false,
+        });
+        // Each dragon can hit a target once; overlapping dragons can both hit it.
+        const hitKey = `${playerId}:ult-bow:${now}:${shot}`;
+        for (const [targetId, target] of Object.entries(players)) {
+            if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
+            if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > halfWidth) continue;
+            if (hasHitTargetForKey(hitKey, targetId)) continue;
+            const damage = Math.floor(26 * damageScale);
+            target.hp -= damage;
+            state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon', damage, ultimate: true });
+            if (target.hp <= 0) resolveKill(playerId, targetId);
+        }
+        hitMobs(playerId, (mob) => distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, mob) <= halfWidth + mob.radius, Math.floor(26 * damageScale), angle, hitKey);
     });
-    const hitKey = `${playerId}:ult-bow:${now}`;
-    for (const [targetId, target] of Object.entries(players)) {
-        if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
-        if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > 54) continue;
-        if (hasHitTargetForKey(hitKey, targetId)) continue;
-        const damage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
-        target.hp -= damage;
-        state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon', damage, ultimate: true });
-        if (target.hp <= 0) resolveKill(playerId, targetId);
-    }
-    const dragonMobDamage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
-    hitMobs(playerId, (mob) => distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, mob) <= 54 + mob.radius, dragonMobDamage, angle, hitKey);
     state.io.emit('statsUpdate', players);
     setTimeout(() => {
         if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'bow') {
@@ -233,7 +244,7 @@ function applyDualUltimate(playerId) {
         type: 'dual',
         startAt: now,
         endsAt: now + config.durationMs,
-        cooldownEndsAt: now + config.cooldownMs,
+        cooldownEndsAt: now + getUltimateCooldownMs(attacker),
         radius: 0,
         extra: 0,
     };

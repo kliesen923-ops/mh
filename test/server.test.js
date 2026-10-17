@@ -450,3 +450,50 @@ test('hammer ultimate stuns the mobs it hits', async () => {
     assert.ok(mob.x > 3150, 'pushed away from the slam');
     clearAllMobs();
 });
+
+test('upgrades carry over to ultimates', async () => {
+    const client = await connect();
+    const p = await readyPlayer(client);
+    const useWeapon = async (weapon) => {
+        const set = once(client, 'statsUpdate');
+        client.emit('setWeapon', weapon);
+        await set;
+        Object.assign(p, { x: 1200, y: 1600, hp: 9999, angle: 0, aAngle: 0 });
+    };
+    const cast = async () => {
+        p.ultimate.cooldownEndsAt = 0;
+        const updated = once(client, 'statsUpdate');
+        client.emit('useUltimate');
+        await updated;
+        return p.ultimate;
+    };
+
+    // Range picks grow the area, relative to the weapon's starting range.
+    await useWeapon('sword');
+    p.stats.range = 1.3;
+    assert.equal((await cast()).radius, Math.round(126 * 1.3));
+    await useWeapon('spear');
+    p.stats.range = 1.34 * 1.15;
+    assert.equal((await cast()).radius, Math.round(180 * 1.15));
+
+    // Attack-speed picks cut the cooldown by 8% each, up to 40%.
+    await useWeapon('hammer');
+    p.upgradeCounts.speed = 2;
+    let ult = await cast();
+    assert.ok(Math.abs((ult.cooldownEndsAt - Date.now()) - 13000 * 0.84) < 200);
+    p.upgradeCounts.speed = 9;
+    ult = await cast();
+    assert.ok(Math.abs((ult.cooldownEndsAt - Date.now()) - 13000 * 0.6) < 200);
+
+    // Projectile picks add dragons.
+    await useWeapon('bow');
+    p.stats.projectile = 1.4;
+    const dragons = [];
+    const onDragon = (d) => dragons.push(d);
+    client.on('dragonProjectile', onDragon);
+    ult = await cast();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    client.off('dragonProjectile', onDragon);
+    assert.equal(ult.angles.length, 3);
+    assert.equal(dragons.length, 3);
+});

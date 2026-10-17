@@ -4,8 +4,11 @@ function drawCharacter(p, color) {
     const profile = getWeaponAttackProfile(weapon);
     const attackRange = getStrikeRange(weapon, stats, p);
     const visualAttackRange = getVisualAttackRange(weapon, stats, p);
-    const weaponLength = Math.max(28, visualAttackRange - 28);
     const bodyScale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
+    // The weapon is drawn inside the body's giant-scale transform, so its length is in
+    // unscaled units; dividing keeps the tip at the real reach instead of scaling twice.
+    const localReach = visualAttackRange / bodyScale;
+    const weaponLength = Math.max(28, localReach - 28);
     const ultimate = getUltimateState(p);
     const dualUltimateActive = weapon === 'dual' && ultimate.active && ultimate.type === 'dual';
     const nameOffset = 65 * bodyScale;
@@ -103,16 +106,22 @@ function drawCharacter(p, color) {
     ctx.fillStyle = "#ffdbac";
     ctx.fillRect(15 + spearThrust * 7 + bowThrust * 5, 18 - spearThrust * 2 - bowThrust * 1.5, 20 + spearThrust * 5, 10);
     if (weapon === 'hammer') {
-        const handleLength = Math.max(18, weaponLength * 0.7);
-        const headSize = Math.max(18, Math.min(40, 20 + Math.max(0, weaponLength - 28) * 0.28));
+        // Head ends at the hammer's reach.
+        const headSize = Math.max(18, Math.min(34, 14 + localReach * 0.12));
+        const handleLength = Math.max(18, localReach - 35 - headSize);
         ctx.fillStyle = "#6e4b2f";
         ctx.fillRect(35, 19, handleLength, 9);
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35 + handleLength - 2, 12, headSize, 26);
         ctx.fillRect(35 + handleLength + headSize - 4, 11, 5, 28);
     } else if (weapon === 'spear') {
-        const shaftLength = Math.max(38, weaponLength * 0.95 + spearThrust * 14);
-        const tipLength = Math.max(16, Math.min(30, shaftLength * 0.18));
+        // Sized so the tip lands on the thrust's reach (finisher included) at full extension.
+        const thrustReach = (isAttacking ? attackRange : visualAttackRange) / bodyScale;
+        const fullThrustX = 28 + 1.45 * 12;
+        let tipLength = 24;
+        let shaftLength = Math.max(38, (thrustReach - fullThrustX - tipLength) * 2);
+        tipLength = Math.max(16, Math.min(30, shaftLength * 0.18));
+        shaftLength = Math.max(38, (thrustReach - fullThrustX - tipLength) * 2);
         const shaftY = 20 - spearThrust * 1.5;
         const shaftX = 28 + spearThrust * 12 - shaftLength * 0.5;
         ctx.fillStyle = "#7b5a3a";
@@ -127,7 +136,8 @@ function drawCharacter(p, color) {
         ctx.fillStyle = "rgba(255,255,255,0.45)";
         ctx.fillRect(shaftX + shaftLength - 3, 21 - spearThrust * 1.5, 4, 4);
     } else if (weapon === 'dual') {
-        const bladeLength = Math.max(18, weaponLength * 0.58);
+        // Blade tips reach the swing's range from the grip.
+        const bladeLength = Math.max(18, (localReach - 26) / 0.94);
         const rightWindup = isAttacking ? (attackPhase === 1 ? 1.0 : (attackPhase === 2 ? -0.35 : 1.05)) : dualPose;
         const leftWindup = isAttacking ? (attackPhase === 1 ? -0.35 : (attackPhase === 2 ? 1.0 : 1.05)) : dualPose;
         const rightTilt = attackPhase === 1 ? 0.58 : (attackPhase === 2 ? -0.35 : 0.72);

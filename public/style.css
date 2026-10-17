@@ -262,6 +262,11 @@
             .weapon-card .weapon-icon svg { width: 26px; height: 26px; }
         }
 
+        /* Short wide screens: all six upgrade cards in one row so the menu doesn't scroll. */
+        @media (max-height: 760px) and (min-width: 900px) {
+            #upgrade-cards { grid-template-columns: repeat(6, minmax(0, 1fr)); width: min(1180px, calc(100vw - 32px)); }
+        }
+
         @media (max-height: 500px) and (orientation: landscape) {
             #hud, #leaderboard { max-height: 118px; overflow: hidden; }
             #chat-container {

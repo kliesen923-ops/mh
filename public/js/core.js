@@ -26,6 +26,9 @@ const COMBO_FINISHER = {
     hammer: { reach: 1.25, width: 1 },
     spear: { reach: 1.35, width: 1.4 },
 };
+// Attack-speed picks shorten the ultimate cooldown (matches the server).
+const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
+const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
 const ULTIMATE_NAMES = {
     sword: '검기 난무',
     hammer: '대지 분쇄',
@@ -108,6 +111,7 @@ function createDefaultUltimate() {
         cooldownEndsAt: 0,
         radius: 0,
         angle: 0,
+        angles: [],
         x: 0,
         y: 0,
         extra: 0,

@@ -77,6 +77,12 @@ function getUltimateState(sourcePlayer) {
     return Object.assign(createDefaultUltimate(), sourcePlayer && sourcePlayer.ultimate ? sourcePlayer.ultimate : {});
 }
 
+function getUltimateCooldownSec(sourcePlayer) {
+    const base = ULTIMATE_PRESETS[normalizeWeapon(sourcePlayer && sourcePlayer.weapon)]?.cooldown || 1.0;
+    const picks = Math.max(0, Math.floor((sourcePlayer && sourcePlayer.upgradeCounts && sourcePlayer.upgradeCounts.speed) || 0));
+    return base * (1 - Math.min(ULTIMATE_MAX_COOLDOWN_CUT, picks * ULTIMATE_COOLDOWN_CUT_PER_SPEED));
+}
+
 function getUltimateSpeedMultiplier(sourcePlayer) {
     const ultimate = getUltimateState(sourcePlayer);
     if (ultimate.active && ultimate.type === 'dual') return 1.9;
@@ -223,5 +229,5 @@ function updateCooldownUI() {
     updateCooldownButton('btn-guard', player.guardCooldown, 1.0);
     updateCooldownButton('btn-wire', player.wireCooldown, SKILL_PRESETS[normalizeSkill(player.skill || selectedSkill)]?.cooldown || 1.0);
     const weapon = normalizeWeapon(player.weapon);
-    updateCooldownButton('btn-ultimate', getUltimateCooldownRemaining(player), ULTIMATE_PRESETS[weapon]?.cooldown || 1.0);
+    updateCooldownButton('btn-ultimate', getUltimateCooldownRemaining(player), getUltimateCooldownSec(player));
 }

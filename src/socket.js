@@ -27,7 +27,7 @@ const {
     createUpgradeCounts,
     createDefaultGearRush,
     createDefaultUltimate,
-    getUltimateConfig,
+    getUltimateCooldownMs,
     clearUltimateState,
 } = require('./game/stats');
 const { sanitizeAction } = require('./game/action');
@@ -143,14 +143,13 @@ function registerSocketHandlers(io) {
             const p = players[socket.id];
             if (!p || p.hp <= 0 || p.isStunned || p.isSelectingLoadout || p.isUpgrading) return;
             const weapon = sanitizeWeapon(p.weapon);
-            const config = getUltimateConfig(weapon);
             const now = Date.now();
             const currentCooldown = Number.isFinite(p.ultimate && p.ultimate.cooldownEndsAt) ? p.ultimate.cooldownEndsAt : 0;
             if (currentCooldown > now) return;
             const applyUltimate = ULTIMATE_HANDLERS[weapon];
             if (!applyUltimate) return;
             applyUltimate(socket.id);
-            p.ultimate.cooldownEndsAt = now + config.cooldownMs;
+            p.ultimate.cooldownEndsAt = now + getUltimateCooldownMs(p);
             io.emit('statsUpdate', players);
         });
 

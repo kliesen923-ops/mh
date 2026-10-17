@@ -392,7 +392,7 @@ function useUltimate() {
         type: weapon,
         startAt: Date.now(),
         endsAt: Date.now() + Math.round(config.duration * 1000),
-        cooldownEndsAt: Date.now() + Math.round(config.cooldown * 1000),
+        cooldownEndsAt: Date.now() + Math.round(getUltimateCooldownSec(player) * 1000),
         radius: weapon === 'spear' ? 180 : 0,
         extra: 0,
     };
