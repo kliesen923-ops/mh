@@ -11,7 +11,7 @@ const {
 const { sanitizeAction } = require('../src/game/action');
 
 test('weapons have distinct base HP', () => {
-    assert.equal(createBaseStatsForWeapon('hammer').hp, 115);
+    assert.equal(createBaseStatsForWeapon('hammer').hp, 120);
     assert.equal(createBaseStatsForWeapon('bow').hp, 90);
     assert.equal(createBaseStatsForWeapon('unknown').hp, 100);
 });
@@ -40,10 +40,23 @@ test('isTargetInWeaponAttack respects reach and arc', () => {
     assert.equal(isTargetInWeaponAttack({ ...attacker, comboStep: 3 }, { x: -60, y: 0 }), true);
 });
 
+test('hammer and spear finishers reach further', () => {
+    const hammer = { weapon: 'hammer', x: 0, y: 0, angle: 0, aAngle: 0, stats: { range: 1 } };
+    assert.equal(isTargetInWeaponAttack({ ...hammer, comboStep: 1 }, { x: 110, y: 0 }), false);
+    assert.equal(isTargetInWeaponAttack({ ...hammer, comboStep: 3 }, { x: 110, y: 0 }), true);
+    assert.equal(isTargetInWeaponAttack({ ...hammer, comboStep: 3 }, { x: -110, y: 0 }), true, 'finisher slam hits all around');
+
+    const spear = { weapon: 'spear', x: 0, y: 0, angle: 0, aAngle: 0, stats: { range: 1.34 } };
+    assert.equal(isTargetInWeaponAttack({ ...spear, comboStep: 1 }, { x: 200, y: 0 }), false);
+    assert.equal(isTargetInWeaponAttack({ ...spear, comboStep: 3 }, { x: 200, y: 0 }), true);
+    assert.equal(isTargetInWeaponAttack({ ...spear, comboStep: 1 }, { x: 100, y: 50 }), false);
+    assert.equal(isTargetInWeaponAttack({ ...spear, comboStep: 3 }, { x: 100, y: 50 }), true, 'finisher thrust is wider');
+});
+
 test('spear hits along a narrow line', () => {
     const attacker = { weapon: 'spear', x: 0, y: 0, angle: 0, stats: { range: 1 } };
     assert.equal(isTargetInWeaponAttack(attacker, { x: 120, y: 10 }), true);
-    assert.equal(isTargetInWeaponAttack(attacker, { x: 60, y: 40 }), false);
+    assert.equal(isTargetInWeaponAttack(attacker, { x: 60, y: 50 }), false);
 });
 
 test('bow never counts as a melee hit', () => {

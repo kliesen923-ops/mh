@@ -15,10 +15,21 @@ const WORLD_MARGIN = 25;
 const BOW_MAX_DISTANCE = 1450;
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
-    hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
-    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 24 },
+    hammer: { reach: 96, arc: Math.PI * 0.5, lineWidth: 22 },
+    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 40 },
     dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
+};
+// The third hit of a combo reaches further (and, for the spear, wider).
+const COMBO_FINISHER = {
+    hammer: { reach: 1.25, width: 1 },
+    spear: { reach: 1.35, width: 1.4 },
+};
+// Knockback (px) and stun (ms) that melee hits apply to mobs. The hammer's finisher
+// pushes less than its reach so stunned mobs stay in range for the next swing.
+const MOB_HIT_IMPACT = {
+    hammer: { knockback: 30, finisherKnockback: 60, finisherStunMs: 600 },
+    spear: { knockback: 18, finisherKnockback: 50, finisherStunMs: 0 },
 };
 const HEAL_CROSS_SPAWN_DELAY_MS = 18000;
 const HEAL_CROSS_LIFETIME_MS = 12000;
@@ -75,6 +86,8 @@ module.exports = {
     WORLD_MARGIN,
     BOW_MAX_DISTANCE,
     ATTACK_PROFILES,
+    COMBO_FINISHER,
+    MOB_HIT_IMPACT,
     HEAL_CROSS_SPAWN_DELAY_MS,
     HEAL_CROSS_LIFETIME_MS,
     HEAL_CROSS_BOUNDS,

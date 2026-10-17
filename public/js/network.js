@@ -17,7 +17,46 @@ socket.on('playerActionUpdate', (data) => {
     if (data.id === myId && data.action.ultimate) {
         player.ultimate = Object.assign(createDefaultUltimate(), data.action.ultimate || {});
     }
+    if (data.action.ultimate) noteUltimateCast(data.id, data.action.ultimate);
 });
+// Shows the ultimate's name over the caster and shakes the screen for big hits nearby.
+function noteUltimateCast(playerId, ultimate) {
+    if (!ultimate || !ultimate.active || !ultimate.startAt || seenUltimateStarts[playerId] === ultimate.startAt) return;
+    seenUltimateStarts[playerId] = ultimate.startAt;
+    const type = normalizeWeapon(ultimate.type);
+    ultimateBanners.push({ playerId, type, text: ULTIMATE_NAMES[type] || '궁극기', life: 1.3, maxLife: 1.3 });
+    const caster = playerId === myId ? player : allPlayers[playerId];
+    const nearby = caster && Math.abs(caster.x - player.x) < canvas.width && Math.abs(caster.y - player.y) < canvas.height;
+    if (nearby && (type === 'hammer' || type === 'bow')) {
+        screenShake.until = Date.now() + (type === 'hammer' ? 380 : 260);
+        screenShake.strength = type === 'hammer' ? 9 : 5;
+    }
+}
+function pushDamageText(x, y, amount, options = {}) {
+    const value = Math.floor(Number(amount) || 0);
+    if (value <= 0) return;
+    // Rapid hits on the same spot add up into one growing number instead of piling up.
+    const recent = damageTexts.find((text) => text.maxLife - text.life < 0.35 && Math.hypot(text.x - x, text.y - y) < 28);
+    if (recent) {
+        recent.value += value;
+        recent.text = String(recent.value);
+        recent.life = recent.maxLife;
+        recent.size = Math.min(30, recent.size + 1.5);
+        if (options.color) recent.color = options.color;
+        return;
+    }
+    damageTexts.push({
+        x: Number(x) || 0,
+        y: Number(y) || 0,
+        value,
+        text: String(value),
+        color: options.color || (options.ultimate ? '#ffb347' : '#ffffff'),
+        size: options.ultimate ? 22 : 15,
+        drift: (Math.random() - 0.5) * 24,
+        life: 0.8,
+        maxLife: 0.8,
+    });
+}
 socket.on('playerStunned', (data) => {
     if(allPlayers[data.id]) {
         allPlayers[data.id].isStunned = data.stunned;
@@ -112,29 +151,34 @@ socket.on('skillChanged', (data) => {
     }
 });
 socket.on('combatEffect', pushCombatEffect);
+// Effects with their own drawing; any other weapon name falls back to a basic slash.
+const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash']);
 function pushCombatEffect(effect) {
     if (!effect) return;
+    const special = SPECIAL_EFFECTS.has(effect.weapon);
+    const life = special ? 0.45 : 0.22;
     combatEffects.push({
         x: Number(effect.x) || 0,
         y: Number(effect.y) || 0,
         angle: Number(effect.angle) || 0,
-        weapon: normalizeWeapon(effect.weapon),
-        life: 0.22,
-        maxLife: 0.22,
+        weapon: special ? effect.weapon : normalizeWeapon(effect.weapon),
+        life,
+        maxLife: life,
     });
+    if (effect.damage) pushDamageText(effect.x, effect.y, effect.damage, { ultimate: effect.ultimate || special });
 }
 socket.on('mobTiers', (data) => {
     mobTiers = Array.isArray(data) ? data : [];
 });
 socket.on('mobs', (data) => {
     const seen = new Set();
-    (Array.isArray(data) ? data : []).forEach(([id, x, y, tier, hpPct, mine]) => {
+    (Array.isArray(data) ? data : []).forEach(([id, x, y, tier, hpPct, mine, stunned]) => {
         seen.add(id);
         const mob = mobs.get(id);
         if (mob) {
-            Object.assign(mob, { tx: x, ty: y, tier, hpPct, mine: mine === 1 });
+            Object.assign(mob, { tx: x, ty: y, tier, hpPct, mine: mine === 1, stunned: stunned === 1 });
         } else {
-            mobs.set(id, { id, x, y, tx: x, ty: y, tier, hpPct, mine: mine === 1, flash: 0, seed: Math.random() * Math.PI * 2 });
+            mobs.set(id, { id, x, y, tx: x, ty: y, tier, hpPct, mine: mine === 1, stunned: stunned === 1, flash: 0, seed: Math.random() * Math.PI * 2 });
         }
     });
     for (const id of mobs.keys()) {
@@ -159,6 +203,7 @@ socket.on('mobKilled', (data) => {
         life: 0.35,
         maxLife: 0.35,
     });
+    pushDamageText(mob ? mob.x : data.x, mob ? mob.y : data.y, data.damage, { ultimate: data.ultimate, color: data.ultimate ? '#ffb347' : '#ffe066' });
     mobs.delete(data.id);
 });
 socket.on('mobDamage', (data) => {

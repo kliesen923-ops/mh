@@ -102,8 +102,31 @@ function clearAllMobs() {
     lastSentCount.clear();
 }
 
+function isUltimateActive(p) {
+    return Boolean(p && p.ultimate && p.ultimate.active);
+}
+
+function isMobStunned(mob, now = Date.now()) {
+    return (mob.stunUntil || 0) > now;
+}
+
+// Pushes a mob away from (fromX, fromY) and/or stuns it.
+function applyMobImpact(mob, impact, now = Date.now()) {
+    if (!impact) return;
+    const knockback = Number(impact.knockback) || 0;
+    if (knockback > 0 && Number.isFinite(impact.fromX) && Number.isFinite(impact.fromY)) {
+        const dx = mob.x - impact.fromX;
+        const dy = mob.y - impact.fromY;
+        const distance = Math.hypot(dx, dy) || 1;
+        mob.x = clampToWorld(mob.x + (dx / distance) * knockback, GAME_WIDTH);
+        mob.y = clampToWorld(mob.y + (dy / distance) * knockback, GAME_HEIGHT);
+    }
+    const stunMs = Number(impact.stunMs) || 0;
+    if (stunMs > 0) mob.stunUntil = Math.max(mob.stunUntil || 0, now + stunMs);
+}
+
 // Any player can damage any mob. A killed mob drops its XP as an orb anyone can pick up.
-function damageMob(mobId, attackerId, damage, angle) {
+function damageMob(mobId, attackerId, damage, angle, impact = null) {
     const mob = getMob(mobId);
     const attacker = players[attackerId];
     const amount = Math.max(1, Math.floor(Number(damage) || 0));
@@ -114,28 +137,30 @@ function damageMob(mobId, attackerId, damage, angle) {
         attacker.lifeMobKills = (attacker.lifeMobKills || 0) + 1;
         // Small heal per kill so long fights are survivable without pickups.
         if (attacker.hp > 0) attacker.hp = Math.min(getMaxHpFromStats(attacker.stats), attacker.hp + 1 + mob.tier);
-        state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId });
+        state.io.emit('mobKilled', { id: mob.id, x: mob.x, y: mob.y, tier: mob.tier, killerId: attackerId, damage: amount, ultimate: isUltimateActive(attacker) });
         dropXpOrb(mob.x, mob.y, mob.xp);
     } else {
-        state.io.emit('mobDamaged', { id: mob.id, x: mob.x, y: mob.y, angle: Number.isFinite(angle) ? angle : 0, weapon: attacker.weapon || 'sword' });
+        applyMobImpact(mob, impact);
+        state.io.emit('mobDamaged', { id: mob.id, x: mob.x, y: mob.y, angle: Number.isFinite(angle) ? angle : 0, weapon: attacker.weapon || 'sword', damage: amount, ultimate: isUltimateActive(attacker) });
     }
     return true;
 }
 
 // Damages every mob passing `test`. `hitKey` prevents hitting the same mob twice with one attack.
-function hitMobs(attackerId, test, damage, angle, hitKey) {
+function hitMobs(attackerId, test, damage, angle, hitKey, impact = null) {
     let hits = 0;
     for (const mob of [...mobs.values()]) {
         if (!test(mob)) continue;
         if (hitKey && hasHitTargetForKey(hitKey, `mob:${mob.id}`)) continue;
-        damageMob(mob.id, attackerId, damage, angle);
+        damageMob(mob.id, attackerId, damage, angle, impact);
         hits++;
     }
     return hits;
 }
 
-function moveMobsForOwner(owner, ownerMobs, dt) {
+function moveMobsForOwner(owner, ownerMobs, dt, now) {
     for (const mob of ownerMobs) {
+        if (isMobStunned(mob, now)) continue;
         const dx = owner.x - mob.x;
         const dy = owner.y - mob.y;
         const distance = Math.hypot(dx, dy);
@@ -174,7 +199,7 @@ function applyContactDamage(ownerId, owner, ownerMobs, now) {
     if (owner.isDodging) return false;
     const contactRange = PLAYER_BODY_RADIUS * Math.max(1, owner.giantScale || 1);
     for (const mob of ownerMobs) {
-        if (now - mob.lastContactAt < MOB_CONTACT_COOLDOWN_MS) continue;
+        if (now - mob.lastContactAt < MOB_CONTACT_COOLDOWN_MS || isMobStunned(mob, now)) continue;
         if (Math.hypot(owner.x - mob.x, owner.y - mob.y) > mob.radius + contactRange) continue;
         mob.lastContactAt = now;
         let damage = mob.damage;
@@ -206,6 +231,7 @@ function emitMobSnapshots() {
                 mob.tier,
                 Math.max(0, Math.round((mob.hp / mob.maxHp) * 100)),
                 mob.ownerId === playerId ? 1 : 0,
+                isMobStunned(mob) ? 1 : 0,
             ]);
         }
         if (visible.length === 0 && !lastSentCount.get(playerId)) continue;
@@ -214,6 +240,24 @@ function emitMobSnapshots() {
     }
     for (const playerId of lastSentCount.keys()) {
         if (!players[playerId]) lastSentCount.delete(playerId);
+    }
+}
+
+// Spear ultimate: a barrier that keeps every mob outside its radius.
+function pushMobsFromBarriers(now) {
+    for (const p of Object.values(players)) {
+        const ult = p && p.ultimate;
+        if (!ult || !ult.active || ult.type !== 'spear' || p.hp <= 0 || now >= (ult.endsAt || 0)) continue;
+        const radius = ult.radius || 180;
+        for (const mob of mobs.values()) {
+            const dx = mob.x - p.x;
+            const dy = mob.y - p.y;
+            const distance = Math.hypot(dx, dy) || 0.01;
+            const edge = radius + mob.radius;
+            if (distance >= edge) continue;
+            mob.x = clampToWorld(p.x + (dx / distance) * edge, GAME_WIDTH);
+            mob.y = clampToWorld(p.y + (dy / distance) * edge, GAME_HEIGHT);
+        }
     }
 }
 
@@ -232,6 +276,7 @@ function tickMobs(now = Date.now(), options = {}) {
         byOwner.get(mob.ownerId).push(mob);
     }
 
+    const active = [];
     for (const [ownerId, owner] of Object.entries(players)) {
         if (!isOwnerActive(owner) || owner.isUpgrading) continue;
         const ownerMobs = byOwner.get(ownerId) || [];
@@ -242,7 +287,11 @@ function tickMobs(now = Date.now(), options = {}) {
             if (mob) ownerMobs.push(mob);
         }
         if (ownerMobs.length === 0) continue;
-        moveMobsForOwner(owner, ownerMobs, dt);
+        moveMobsForOwner(owner, ownerMobs, dt, now);
+        active.push([ownerId, owner, ownerMobs]);
+    }
+    pushMobsFromBarriers(now);
+    for (const [ownerId, owner, ownerMobs] of active) {
         applyContactDamage(ownerId, owner, ownerMobs, now);
     }
 
@@ -261,6 +310,7 @@ module.exports = {
     clearMobsForOwner,
     clearAllMobs,
     damageMob,
+    isMobStunned,
     hitMobs,
     tickMobs,
 };

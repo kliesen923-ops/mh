@@ -319,7 +319,7 @@ function updateAttack(dt) {
         } else {
             player.attackTimer = 0.08 / (player.stats.speed * speedMult);
             socket.emit('playerAction', { attackPhase: 2 });
-            const attackRange = getEffectiveAttackRange(player.weapon, player.stats, player);
+            const attackRange = getStrikeRange(player.weapon, player.stats, player);
             Object.keys(allPlayers).forEach(id => {
                 if(id !== myId && allPlayers[id].hp > 0 && isTargetInAttackArc(allPlayers[id], attackRange)) socket.emit('playerHitTarget', id);
             });
@@ -340,7 +340,7 @@ function isTargetInAttackArc(target, range) {
     if (normalizeWeapon(player.weapon) === 'spear') {
         const endX = player.x + Math.cos(attackAngle) * range;
         const endY = player.y + Math.sin(attackAngle) * range;
-        return distToSegment({ x: player.x, y: player.y }, { x: endX, y: endY }, target) <= profile.lineWidth;
+        return distToSegment({ x: player.x, y: player.y }, { x: endX, y: endY }, target) <= profile.lineWidth * getComboFinisher(player.weapon, player.comboStep).width;
     }
     if (player.comboStep === 3) return true;
     const targetAngle = Math.atan2(dy, dx);

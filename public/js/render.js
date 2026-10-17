@@ -2,7 +2,7 @@ function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, upgradeShield, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
     const profile = getWeaponAttackProfile(weapon);
-    const attackRange = getEffectiveAttackRange(weapon, stats, p);
+    const attackRange = getStrikeRange(weapon, stats, p);
     const visualAttackRange = getVisualAttackRange(weapon, stats, p);
     const weaponLength = Math.max(28, visualAttackRange - 28);
     const bodyScale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
@@ -231,7 +231,7 @@ function drawCharacter(p, color) {
             ctx.moveTo(0, 0);
             ctx.lineTo(tipX, tipY);
             ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.85)":"rgba(255,255,255,0.85)";
-            ctx.lineWidth = profile.lineWidth;
+            ctx.lineWidth = profile.lineWidth * getComboFinisher(weapon, comboStep).width;
             ctx.lineCap = "round";
             ctx.stroke();
             ctx.beginPath();
@@ -249,6 +249,16 @@ function drawCharacter(p, color) {
             ctx.lineWidth = 20;
             ctx.lineCap = "round";
             ctx.stroke();
+            if (weapon === 'hammer' && comboStep === 3) {
+                // Finisher slam: a full shockwave around the hammer.
+                ctx.beginPath();
+                ctx.arc(0, 0, attackRange, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 150, 60, 0.18)";
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255, 190, 90, 0.75)";
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            }
         }
         ctx.restore();
     }
@@ -868,6 +878,7 @@ function drawMobs() {
         ctx.fillStyle = mob.tier >= 4 ? '#c0392b' : '#111';
         ctx.beginPath(); ctx.arc(-r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
+        if (mob.stunned) drawMobStun(mob, r);
         if (mob.hpPct < 100) {
             const w = r * 2;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
@@ -918,9 +929,11 @@ function drawMinimap() {
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     updateCamera();
+    const shake = getScreenShakeOffset();
     ctx.save();
-    ctx.translate(-camera.x, -camera.y);
+    ctx.translate(-camera.x + shake.x, -camera.y + shake.y);
     drawWorldBackground();
+    drawUltimateAreas();
     drawXpOrbs();
     drawHealingCrosses();
     drawGiantPotions();
@@ -931,6 +944,8 @@ function draw() {
     drawAshProjectiles();
     drawBowProjectiles();
     drawDragonProjectiles();
+    drawDamageTexts();
+    drawUltimateBanners();
     ctx.restore();
     if (gameState === 'PLAYING') drawMinimap();
     if(player.hp <= 0 && gameState === 'PLAYING') { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.font = "bold 30px sans-serif"; ctx.textAlign = "center"; ctx.fillText("사망했습니다! 3초 후 부활합니다.", canvas.width/2, canvas.height/2); }
