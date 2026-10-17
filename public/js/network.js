@@ -8,7 +8,8 @@ socket.on('newPlayer', (p) => { allPlayers[p.id] = p; updateLeaderboard(); });
 socket.on('playerMoved', (p) => { 
     if(allPlayers[p.id]) { 
         allPlayers[p.id].x = p.x; allPlayers[p.id].y = p.y; allPlayers[p.id].angle = p.angle; 
-        if(p.id === myId && player.isStunned) { player.x = p.x; player.y = p.y; }
+        // Pulls and teleports (p.forced) move you even while you are free to move.
+        if(p.id === myId && (player.isStunned || p.forced)) { player.x = p.x; player.y = p.y; }
     } 
 });
 socket.on('playerActionUpdate', (data) => {
@@ -31,6 +32,13 @@ function noteUltimateCast(playerId, ultimate) {
     if (nearby && (type === 'hammer' || type === 'bow')) {
         screenShake.until = Date.now() + (type === 'hammer' ? 380 : 260);
         screenShake.strength = type === 'hammer' ? 9 : 5;
+    }
+    if (nearby && type === 'staff') {
+        // Shake when the meteor lands, not when it is called.
+        setTimeout(() => {
+            screenShake.until = Date.now() + 420;
+            screenShake.strength = 10;
+        }, Number(ultimate.extra) || 800);
     }
 }
 function pushDamageText(x, y, amount, options = {}) {
@@ -161,16 +169,19 @@ socket.on('skillChanged', (data) => {
 });
 socket.on('combatEffect', pushCombatEffect);
 // Effects with their own drawing; any other weapon name falls back to a basic slash.
-const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash', 'parry']);
+const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash', 'parry', 'ult-scythe', 'ult-gauntlet', 'meteor']);
+// Drawn their own way too, but their damage numbers look like normal hits.
+const PLAIN_EFFECTS = new Set(['staff', 'burn', 'trap']);
 function pushCombatEffect(effect) {
     if (!effect) return;
     const special = SPECIAL_EFFECTS.has(effect.weapon);
-    const life = special ? 0.45 : 0.22;
+    const plain = PLAIN_EFFECTS.has(effect.weapon);
+    const life = special ? (effect.weapon === 'meteor' ? 0.7 : 0.45) : 0.22;
     combatEffects.push({
         x: Number(effect.x) || 0,
         y: Number(effect.y) || 0,
         angle: Number(effect.angle) || 0,
-        weapon: special ? effect.weapon : normalizeWeapon(effect.weapon),
+        weapon: special || plain ? effect.weapon : normalizeWeapon(effect.weapon),
         life,
         maxLife: life,
     });
@@ -357,6 +368,47 @@ socket.on('bowProjectileResolved', (effect) => {
     bowProjectiles = bowProjectiles.filter((p) => p.id !== resolvedId);
 });
 const CHAT_MAX_LINES = 30;
+socket.on('guardBroken', (data) => {
+    const target = data && (data.id === myId ? player : allPlayers[data.id]);
+    if (!target) return;
+    if (data.id === myId) {
+        player.guardBrokenUntil = Date.now() + (Number(data.ms) || 1000);
+        player.isGuarding = false;
+    }
+    if (allPlayers[data.id]) allPlayers[data.id].isGuarding = false;
+    damageTexts.push({ x: target.x, y: target.y - 24, value: 0, text: '가드 브레이크!', color: '#ff9f43', size: 18, drift: 0, life: 0.9, maxLife: 0.9 });
+});
+socket.on('staffOrb', (orb) => {
+    if (!orb) return;
+    staffOrbs.push(Object.assign({}, orb, { bornAt: Date.now() }));
+});
+socket.on('staffBlast', (blast) => {
+    if (!blast) return;
+    staffOrbs = staffOrbs.filter((orb) => orb.id !== blast.id);
+    staffBlasts.push({ x: blast.x, y: blast.y, radius: blast.radius, bornAt: Date.now() });
+    if (isOnScreen(blast.x, blast.y)) playSound('hit');
+});
+socket.on('fieldState', (data) => {
+    fieldState = {
+        traps: Array.isArray(data && data.traps) ? data.traps : [],
+        zones: Array.isArray(data && data.zones) ? data.zones : [],
+        marks: Array.isArray(data && data.marks) ? data.marks : [],
+    };
+    // Field timestamps are the server's clock; this converts them to ours.
+    fieldState.clockOffset = Number.isFinite(data && data.serverNow) ? Date.now() - data.serverNow : 0;
+    updateSkillButtonLabel();
+});
+socket.on('potionPlaced', (data) => {
+    if (data) fieldFx.push({ kind: 'heal', x: data.x, y: data.y, bornAt: Date.now(), life: 450 });
+});
+socket.on('trapSprung', (data) => {
+    if (data) fieldFx.push({ kind: 'trap', x: data.x, y: data.y, bornAt: Date.now(), life: 500 });
+});
+socket.on('blinked', (data) => {
+    if (!data) return;
+    fieldFx.push({ kind: 'blink', x: data.fromX, y: data.fromY, bornAt: Date.now(), life: 450 });
+    fieldFx.push({ kind: 'blink', x: data.x, y: data.y, bornAt: Date.now(), life: 450 });
+});
 socket.on('chatMessage', (data) => {
     if (!data) return;
     const isSystem = data.id === 'SYSTEM';

@@ -30,18 +30,50 @@ const ATTACK_PROFILES = {
     spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 40 },
     dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
+    scythe: { reach: 105, arc: Math.PI * 0.4, lineWidth: 22 },
+    gauntlet: { reach: 62, arc: Math.PI * 0.5, lineWidth: 18 },
+    // The staff's reach is how far its orb flies.
+    staff: { reach: 380, arc: Math.PI * 0.08, lineWidth: 10 },
 };
 // The third hit of a combo reaches further (and, for the spear, wider).
 const COMBO_FINISHER = {
     hammer: { reach: 1.25, width: 1 },
     spear: { reach: 1.35, width: 1.4 },
+    scythe: { reach: 1.15, width: 1 },
 };
 // Knockback (px) and stun (ms) that melee hits apply to mobs. The hammer's finisher
 // pushes less than its reach so stunned mobs stay in range for the next swing.
 const MOB_HIT_IMPACT = {
     hammer: { knockback: 30, finisherKnockback: 60, finisherStunMs: 600 },
     spear: { knockback: 18, finisherKnockback: 50, finisherStunMs: 0 },
+    // Negative knockback pulls toward the attacker.
+    scythe: { knockback: 0, finisherKnockback: -70, finisherStunMs: 300 },
 };
+// The scythe's third hit drags players to this distance in front of the attacker.
+const SCYTHE_PULL_DISTANCE = 48;
+// The gauntlet's third hit stops the target from guarding for this long.
+const GAUNTLET_GUARD_BREAK_MS = 1000;
+// Staff orbs fly slowly and burst on the first body they touch or at the end of their path,
+// leaving a burning patch behind.
+const STAFF_ORB = {
+    speed: 600,
+    hitRadius: 24,
+    blastRadius: 56,
+    finisherBlastScale: 1.4,
+    damage: 16,
+    finisherDamage: 26,
+    patchRadius: 50,
+    patchMs: 1500,
+    patchTickMs: 500,
+    patchDamage: 4,
+};
+// Secondary skills: cooldowns are checked on the server too (with a little slack for lag).
+const SKILL_COOLDOWN_MS = { wire: 900, ash: 2000, gear: 3000, trap: 6000, blink: 10000, potion: 14000 };
+const SKILL_COOLDOWN_SLACK_MS = 150;
+const TRAP = { maxPerOwner: 2, lifetimeMs: 30000, armMs: 400, radius: 32, rootMs: 1200, mobStunMs: 1500, damage: 6 };
+const BLINK_MARK_MS = 4000;
+// Set down at your feet, like a healing field.
+const HEAL_POTION = { radius: 90, durationMs: 3000, tickMs: 500, healPerTick: 3 };
 // Upgrades that also power up ultimates: each attack-speed pick shortens the cooldown.
 const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
 const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
@@ -137,6 +169,14 @@ module.exports = {
     ATTACK_PROFILES,
     COMBO_FINISHER,
     MOB_HIT_IMPACT,
+    SCYTHE_PULL_DISTANCE,
+    GAUNTLET_GUARD_BREAK_MS,
+    STAFF_ORB,
+    SKILL_COOLDOWN_MS,
+    SKILL_COOLDOWN_SLACK_MS,
+    TRAP,
+    BLINK_MARK_MS,
+    HEAL_POTION,
     ULTIMATE_COOLDOWN_CUT_PER_SPEED,
     ULTIMATE_MAX_COOLDOWN_CUT,
     DRAGON_SPREAD,

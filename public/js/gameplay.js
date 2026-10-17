@@ -319,6 +319,14 @@ function updateAttack(dt) {
                 startBowShot();
                 player.bowShotFired = true;
             }
+        } else if (normalizeWeapon(player.weapon) === 'staff') {
+            // The server flies the orb; one per swing.
+            player.attackTimer = 0.08 / (player.stats.speed * speedMult);
+            socket.emit('playerAction', { attackPhase: 2 });
+            if (!player.bowShotFired) {
+                socket.emit('staffCast', { angle: player.aAngle || player.angle });
+                player.bowShotFired = true;
+            }
         } else {
             player.attackTimer = 0.08 / (player.stats.speed * speedMult);
             socket.emit('playerAction', { attackPhase: 2 });
@@ -358,7 +366,8 @@ function getAngleDiff(a1, a2) {
     return Math.abs(diff);
 }
 
-function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
+function isGuardBroken() { return (player.guardBrokenUntil || 0) > Date.now(); }
+function startGuard() { if (player.hp > 0 && !player.isStunned && player.guardCooldown <= 0 && !isGuardBroken()) { player.isGuarding = true; player.guardActiveTimer = 0; socket.emit('playerAction', { isGuarding: true, guardStartTime: Date.now() }); } }
 function releaseGuard() { if (player.isGuarding) { player.isGuarding = false; player.guardCooldown = 1.0; socket.emit('playerAction', { isGuarding: false }); } }
 function releaseGuardForAction() { if (player.isGuarding) releaseGuard(); }
 function startDodge() { if (player.hp <= 0 || player.isStunned || player.isDodging || isRootedByUltimate() || player.isAttacking || player.dodgeCooldown > 0 || (player.gearRush && player.gearRush.active)) { releaseGuardForAction(); return; } releaseGuardForAction(); player.stats = normalizeStats(player.stats); player.isDodging = true; player.dTimer = 0.2; player.dDX = Math.cos(player.angle); player.dDY = Math.sin(player.angle); player.dodgeCooldown = 1.0; socket.emit('playerAction', { isDodging: true }); }
@@ -480,10 +489,10 @@ function startBowShot() {
         });
     }
 }
-// The hammer ultimate roots its caster until the hit area fades (matches the server).
+// The hammer slam and gauntlet rush root their caster until they end (matches the server).
 function isRootedByUltimate() {
     const ult = getUltimateState(player);
-    return Boolean(ult && ult.active && ult.type === 'hammer' && Date.now() < (ult.endsAt || 0));
+    return Boolean(ult && ult.active && (ult.type === 'hammer' || ult.type === 'gauntlet') && Date.now() < (ult.endsAt || 0));
 }
 function startGearRush() {
     releaseGuardForAction();
@@ -537,7 +546,25 @@ function startWire() {
         startGearRush();
         return;
     }
+    if (selectedSkill === 'trap' || selectedSkill === 'blink' || selectedSkill === 'potion') {
+        useFieldSkill(selectedSkill);
+        return;
+    }
     startWireGrab();
+}
+
+function getOwnBlinkMark() {
+    return fieldState.marks.find((mark) => mark.ownerId === myId) || null;
+}
+
+// Trap, blink mark and heal potion: the server places them; the second blink press returns.
+function useFieldSkill(kind) {
+    releaseGuardForAction();
+    if (player.hp <= 0 || player.isStunned) return;
+    const returning = kind === 'blink' && getOwnBlinkMark();
+    if (!returning && player.wireCooldown > 0) return;
+    if (!returning) player.wireCooldown = getSkillCooldown(kind);
+    socket.emit('useSkill', { kind, angle: player.angle });
 }
 
 function startAshArrow() {

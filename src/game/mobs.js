@@ -147,6 +147,10 @@ function getMob(mobId) {
     return mobs.get(Number(mobId));
 }
 
+function getMobList() {
+    return [...mobs.values()];
+}
+
 function getMobsForOwner(ownerId) {
     return [...mobs.values()].filter((mob) => mob.ownerId === ownerId);
 }
@@ -176,12 +180,14 @@ function isMobStunned(mob, now = Date.now()) {
 function applyMobImpact(mob, impact, now = Date.now()) {
     if (!impact || isBoss(mob)) return;
     const knockback = Number(impact.knockback) || 0;
-    if (knockback > 0 && Number.isFinite(impact.fromX) && Number.isFinite(impact.fromY)) {
+    if (knockback !== 0 && Number.isFinite(impact.fromX) && Number.isFinite(impact.fromY)) {
         const dx = mob.x - impact.fromX;
         const dy = mob.y - impact.fromY;
         const distance = Math.hypot(dx, dy) || 1;
-        mob.x = clampToWorld(mob.x + (dx / distance) * knockback, GAME_WIDTH);
-        mob.y = clampToWorld(mob.y + (dy / distance) * knockback, GAME_HEIGHT);
+        // A negative knockback pulls the mob in, stopping just short of the attacker.
+        const move = knockback > 0 ? knockback : -Math.min(-knockback, Math.max(0, distance - mob.radius - PLAYER_BODY_RADIUS));
+        mob.x = clampToWorld(mob.x + (dx / distance) * move, GAME_WIDTH);
+        mob.y = clampToWorld(mob.y + (dy / distance) * move, GAME_HEIGHT);
     }
     const stunMs = Number(impact.stunMs) || 0;
     if (stunMs > 0) mob.stunUntil = Math.max(mob.stunUntil || 0, now + stunMs);
@@ -388,6 +394,7 @@ module.exports = {
     getMaxMobsForLevel,
     spawnMob,
     getMob,
+    getMobList,
     getMobsForOwner,
     clearMobsForOwner,
     clearAllMobs,

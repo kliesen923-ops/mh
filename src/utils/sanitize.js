@@ -22,6 +22,9 @@ function sanitizeWeapon(value) {
     if (weapon === 'spear') return 'spear';
     if (weapon === 'dual') return 'dual';
     if (weapon === 'bow') return 'bow';
+    if (weapon === 'scythe') return 'scythe';
+    if (weapon === 'gauntlet') return 'gauntlet';
+    if (weapon === 'staff') return 'staff';
     return 'sword';
 }
 
@@ -29,6 +32,9 @@ function sanitizeSkill(value) {
     const skill = String(value || '').trim().toLowerCase();
     if (skill === 'ash') return 'ash';
     if (skill === 'gear') return 'gear';
+    if (skill === 'trap') return 'trap';
+    if (skill === 'blink') return 'blink';
+    if (skill === 'potion') return 'potion';
     return 'wire';
 }
 

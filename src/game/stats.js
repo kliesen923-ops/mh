@@ -16,7 +16,22 @@ function createBaseStatsForWeapon(weapon) {
     if (nextWeapon === 'bow') {
         return { dmg: 1.2, range: 1.0, speed: 0.84, move: 1.08, dodge: 1.0, projectile: 1.0, hp: 90 };
     }
+    if (nextWeapon === 'scythe') {
+        return { dmg: 1.3, range: 1.0, speed: 0.85, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
+    }
+    if (nextWeapon === 'gauntlet') {
+        return { dmg: 0.7, range: 1.0, speed: 1.7, move: 1.05, dodge: 1.0, projectile: 1.0, hp: 95 };
+    }
+    if (nextWeapon === 'staff') {
+        return { dmg: 1.0, range: 1.0, speed: 0.8, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 85 };
+    }
     return { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
+}
+
+// Ranged weapons fire projectiles instead of swinging.
+function isRangedWeapon(weapon) {
+    const nextWeapon = sanitizeWeapon(weapon);
+    return nextWeapon === 'bow' || nextWeapon === 'staff';
 }
 
 function getWeaponAttackProfile(weapon) {
@@ -30,7 +45,7 @@ function getComboFinisher(weapon, comboStep) {
 function isTargetInWeaponAttack(attacker, target) {
     if (!attacker || !target) return false;
     const profile = getWeaponAttackProfile(attacker.weapon);
-    if (sanitizeWeapon(attacker.weapon) === 'bow') return false;
+    if (isRangedWeapon(attacker.weapon)) return false;
     const finisher = getComboFinisher(attacker.weapon, attacker.comboStep);
     const attackAngle = Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle;
     const dx = target.x - attacker.x;
@@ -58,7 +73,7 @@ function getAttackMultiplier(player) {
 
 function getAttackRangeMultiplier(player) {
     const weapon = sanitizeWeapon(player && player.weapon);
-    if (weapon === 'bow') return 1;
+    if (isRangedWeapon(weapon)) return 1;
     const giantScale = Math.max(1, Number.isFinite(player && player.giantScale) ? player.giantScale : 1);
     const ultimate = player && player.ultimate && player.ultimate.active && player.ultimate.type === 'dual' ? 1.45 : 1;
     return giantScale * ultimate;
@@ -105,6 +120,9 @@ function getUltimateConfig(weapon) {
     if (nextWeapon === 'spear') return { cooldownMs: 15000, durationMs: 2200 };
     if (nextWeapon === 'bow') return { cooldownMs: 14000, durationMs: 800 };
     if (nextWeapon === 'dual') return { cooldownMs: 14000, durationMs: 4000 };
+    if (nextWeapon === 'scythe') return { cooldownMs: 13000, durationMs: 900 };
+    if (nextWeapon === 'gauntlet') return { cooldownMs: 12000, durationMs: 700 };
+    if (nextWeapon === 'staff') return { cooldownMs: 15000, durationMs: 1000 };
     return { cooldownMs: 11000, durationMs: 1200 };
 }
 
@@ -113,7 +131,7 @@ function getUltimateConfig(weapon) {
 function getUltimateRangeMultiplier(player) {
     const base = createBaseStatsForWeapon(player && player.weapon).range || 1;
     const current = player && player.stats && Number.isFinite(player.stats.range) ? player.stats.range : base;
-    const giantScale = sanitizeWeapon(player && player.weapon) === 'bow'
+    const giantScale = isRangedWeapon(player && player.weapon)
         ? 1
         : Math.max(1, Number.isFinite(player && player.giantScale) ? player.giantScale : 1);
     return Math.max(1, current / base) * giantScale;
@@ -149,6 +167,7 @@ module.exports = {
     createBaseStatsForWeapon,
     createDefaultStats,
     normalizeStats,
+    isRangedWeapon,
     getWeaponAttackProfile,
     isTargetInWeaponAttack,
     getComboFinisher,

@@ -6,8 +6,10 @@ function sanitizeAction(p, actionData) {
     if (!actionData || typeof actionData !== 'object') return action;
 
     if (typeof actionData.isGuarding === 'boolean') {
-        action.isGuarding = actionData.isGuarding;
-        if (actionData.isGuarding) action.guardStartTime = Date.now();
+        // A broken guard (gauntlet finisher) can't be raised again until it recovers.
+        const guardBroken = actionData.isGuarding && (p.guardBrokenUntil || 0) > Date.now();
+        action.isGuarding = actionData.isGuarding && !guardBroken;
+        if (action.isGuarding) action.guardStartTime = Date.now();
     }
     if (typeof actionData.isAttacking === 'boolean') action.isAttacking = actionData.isAttacking;
     if (typeof actionData.isDodging === 'boolean') action.isDodging = actionData.isDodging;

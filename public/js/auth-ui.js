@@ -11,6 +11,9 @@ function normalizeSkill(value) {
     const skill = String(value || '').trim().toLowerCase();
     if (skill === 'ash') return 'ash';
     if (skill === 'gear') return 'gear';
+    if (skill === 'trap') return 'trap';
+    if (skill === 'blink') return 'blink';
+    if (skill === 'potion') return 'potion';
     return 'wire';
 }
 function getSkillLabel(skill) {
@@ -21,7 +24,10 @@ function getSkillCooldown(skill) {
 }
 function updateSkillButtonLabel() {
     const label = document.getElementById('btn-wire-label');
-    if (label) label.textContent = getSkillLabel(player.skill || selectedSkill);
+    if (!label) return;
+    const skill = normalizeSkill(player.skill || selectedSkill);
+    // A placed blink mark turns the button into "return".
+    label.textContent = skill === 'blink' && getOwnBlinkMark() ? '귀환' : getSkillLabel(skill);
 }
 function setAuthMode(mode) {
     const loginPanel = document.getElementById('login-panel');
@@ -40,6 +46,13 @@ function setAuthError(target, message) {
 function updateLoadoutNote() {
     const note = document.getElementById('loadout-note');
     if (note) note.textContent = `주무기 ${getWeaponLabel(selectedWeapon)} · 보조무기 ${getSkillLabel(selectedSkill)}`;
+    const desc = document.getElementById('loadout-desc');
+    if (desc) {
+        // The card text breaks lines with <br>; join them with a space instead.
+        const describe = (selector) => (document.querySelector(selector)?.querySelector('p')?.innerHTML || '')
+            .replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+        desc.textContent = [describe(`.weapon-card[data-weapon="${selectedWeapon}"]`), describe(`.weapon-card[data-skill="${selectedSkill}"]`)].filter(Boolean).join(' / ');
+    }
 }
 function setWeaponSelection(weapon) {
     selectedWeapon = normalizeWeapon(weapon);
