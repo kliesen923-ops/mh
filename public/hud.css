@@ -1,7 +1,7 @@
 /* In-game HUD: player card (top left), icons + minimap + ranking (top right), boss bar
    (top center), chat (above the joystick), joystick and action buttons. Panels share one
-   glass look. --hud-scale shrinks info panels on small screens; --touch-scale keeps
-   controls big enough to press. Both are set from JS in resize(). */
+   glass look. --hud-scale shrinks info panels on small screens; --touch-scale sizes the
+   controls by screen height. Both are set from JS in resize(). */
 :root {
     --hud-scale: 1;
     --touch-scale: 1;
@@ -167,7 +167,7 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 #chat-container {
     position: absolute;
     left: calc(var(--ui-gap) + var(--safe-left));
-    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 236px * var(--touch-scale));
+    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 262px * var(--touch-scale));
     width: min(320px, 38vw);
     display: flex;
     flex-direction: column;
@@ -197,15 +197,20 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 #chat-input-container { padding: 6px 8px 8px; display: none; }
 #chat-input { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--ui-border); border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: var(--ui-text); outline: none; font-size: 14px; }
 
-/* Joystick: large and set well in from the corner, where the thumb rests naturally */
+/* Touch controls, measured from Zenless Zone Zero's mobile layout on a 591px-tall screen.
+   Both groups scale from their screen corner by --touch-scale (screen height / 591), so sizes
+   and distances from the edges keep the same proportions on every screen. */
 #joy-container {
+    --joy-left: 175px;
+    --joy-bottom: 59px;
     position: absolute;
-    left: calc(96px + var(--safe-left));
-    bottom: calc(44px + var(--safe-bottom));
-    width: 168px;
-    height: 168px;
+    left: calc(var(--joy-left) + var(--safe-left));
+    bottom: calc(var(--joy-bottom) + var(--safe-bottom));
+    width: 190px;
+    height: 190px;
+    box-sizing: border-box;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(8, 10, 16, 0.55) 0 54%, rgba(8, 10, 16, 0.18) 56% 100%);
+    background: radial-gradient(circle, rgba(8, 10, 16, 0.6) 0 77%, rgba(8, 10, 16, 0.16) 78% 100%);
     border: 2px solid rgba(255, 255, 255, 0.28);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
     display: flex;
@@ -214,41 +219,48 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     z-index: 100;
     touch-action: none;
     transform: scale(var(--touch-scale));
-    transform-origin: bottom left;
+    /* The screen's bottom-left corner, so the gap to the edges scales too. */
+    transform-origin: calc(-1 * var(--joy-left)) calc(100% + var(--joy-bottom));
 }
 .joy-ring { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.joy-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.16); stroke-width: 1.2; }
+.joy-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.2); stroke-width: 1.2; }
 .joy-ring path { fill: rgba(255, 255, 255, 0.55); }
 #joy-stick {
     position: absolute;
-    width: 70px;
-    height: 70px;
+    width: 65px;
+    height: 65px;
     box-sizing: border-box;
     border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.5);
+    border: 3px solid rgba(255, 255, 255, 0.45);
     background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 1px, transparent 1.5px) 0 0 / 6px 6px, radial-gradient(circle at 40% 35%, #5a5f6b, #23262e 75%);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
     pointer-events: none;
 }
 
-/* Action buttons, laid out like Zenless Zone Zero's: the big attack button in the middle,
-   the skill below-left, dodge below-right, and guard and the ultimate stacked above dodge.
-   Each button's position is its center offset (--dx right, --dy up) from the attack center. */
+/* Action buttons: attack in the middle, the skill below-left, dodge below-right, and guard and
+   the ultimate stacked above dodge. --cx/--cy are each button's center measured from the
+   screen's right and bottom edges. */
 .action-buttons {
-    --attack-size: 100px;
-    --center-right: 150px;
-    --center-bottom: 104px;
     position: absolute;
-    right: calc(18px + var(--safe-right));
-    bottom: calc(18px + var(--safe-bottom));
-    width: 282px;
-    height: 290px;
+    right: var(--safe-right);
+    bottom: var(--safe-bottom);
+    width: 420px;
+    height: 340px;
     z-index: 100;
     pointer-events: none;
     transform: scale(var(--touch-scale));
     transform-origin: bottom right;
 }
 .action-buttons .btn {
+    --size: 75px;
+    position: absolute;
+    width: var(--size);
+    height: var(--size);
+    right: calc(var(--cx) - var(--size) / 2);
+    bottom: calc(var(--cy) - var(--size) / 2);
+    pointer-events: auto;
+}
+.btn {
     --size: 66px;
     position: absolute;
     width: var(--size);
@@ -304,28 +316,29 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 }
 .btn.cooling { filter: brightness(0.6) saturate(0.6); }
 .btn.cooling::after { opacity: 1; }
-.btn-dodge { --btn-color: #8ef0a8; --size: 70px; --dx: 92px; --dy: -52px; }
-.btn-guard { --btn-color: #7fb2ff; --dx: 92px; --dy: 50px; }
-.action-buttons .btn-ultimate { --btn-color: #c792ff; --dx: 92px; --dy: 146px; }
+.btn-dodge { --btn-color: #8ef0a8; --cx: 188.5px; --cy: 82.5px; }
+.btn-guard { --btn-color: #7fb2ff; --cx: 188.5px; --cy: 191px; }
+.btn-ultimate { --btn-color: #c792ff; --cx: 188.5px; --cy: 298px; }
 .action-buttons .btn-skill {
     --btn-color: #ffb3f0;
-    --size: 74px;
-    --dx: -94px;
-    --dy: -52px;
+    --cx: 375px;
+    --cy: 82.5px;
     border-color: rgba(255, 255, 255, 0.7);
     background: radial-gradient(circle at 50% 45%, #ff7ad9 0, #b44cf0 45%, #3b1f6e 100%);
 }
 .btn-skill .btn-icon { stroke: #fff; }
 .action-buttons .btn-attack {
     --btn-color: #ff7a5c;
-    --size: var(--attack-size);
-    --dx: 0px;
-    --dy: 0px;
+    --size: 92.5px;
+    --cx: 281px;
+    --cy: 135px;
     border-width: 3px;
     background: radial-gradient(circle at 35% 28%, rgba(255, 170, 140, 0.35), rgba(120, 24, 14, 0.85) 65%);
 }
-.btn-attack .btn-icon { width: 34px; height: 34px; stroke: #ffe0d6; }
-.btn-attack .btn-label { font-size: 13px; }
+.action-buttons .btn-icon { width: 30px; height: 30px; }
+.action-buttons .btn-label { font-size: 14px; }
+.btn-attack .btn-icon { width: 40px; height: 40px; stroke: #ffe0d6; }
+.action-buttons .btn-attack .btn-label { font-size: 16px; }
 .btn-ultimate:not(.cooling) { box-shadow: 0 0 18px rgba(199, 146, 255, 0.55), 0 6px 16px rgba(0, 0, 0, 0.45); }
 
 /* Portrait phones: ask to rotate instead of showing a sliver of the arena */
@@ -355,7 +368,11 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     #minimap { height: 90px; }
     #chat-messages { max-height: 72px; font-size: 12px; }
     #chat-container { width: min(280px, 34vw); }
-    /* Ranking beside the minimap rather than below it, clear of the button column */
+}
+
+/* Phone-sized landscape screens: ranking beside the minimap rather than below it, clear of
+   the button column */
+@media (max-height: 700px) and (orientation: landscape) {
     #hud-right {
         width: 408px;
         display: grid;
@@ -369,7 +386,3 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     #leaderboard { grid-area: rank; }
 }
 
-/* Very short screens: slightly smaller controls so the button column stays below the minimap */
-@media (max-height: 380px) and (orientation: landscape) {
-    .action-buttons, #joy-container { scale: 0.85; }
-}
