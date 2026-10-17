@@ -349,6 +349,10 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     background: radial-gradient(circle at 50% 45%, #ff7ad9 0, #b44cf0 45%, #3b1f6e 100%);
 }
 .btn-skill .btn-icon { stroke: #fff; }
+/* Art icons (shared gradients) instead of outlines. */
+.btn-icon.art { stroke: none; fill: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+.action-buttons .btn-icon.art { width: 36px; height: 36px; }
+.action-buttons .btn-attack .btn-icon.art { width: 48px; height: 48px; }
 .action-buttons .btn-attack {
     --btn-color: #ff7a5c;
     --size: 92.5px;

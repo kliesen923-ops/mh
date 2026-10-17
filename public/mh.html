@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="hud.css">
 </head>
 <body>
+    <!-- Gradients shared by every icon on the page (loadout, level-up cards, controls). -->
+    <svg class="icon-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="ic-steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" /><stop offset="0.45" stop-color="#d3dbe8" /><stop offset="1" stop-color="#7d8aa0" /></linearGradient><linearGradient id="ic-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b8" /><stop offset="1" stop-color="#d4930f" /></linearGradient><linearGradient id="ic-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d09a62" /><stop offset="1" stop-color="#6b4226" /></linearGradient><linearGradient id="ic-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffa48a" /><stop offset="1" stop-color="#b3261e" /></linearGradient><linearGradient id="ic-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d6576" /><stop offset="1" stop-color="#262a33" /></linearGradient><linearGradient id="ic-cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8fbff" /><stop offset="0.5" stop-color="#5ad8ff" /><stop offset="1" stop-color="#1f6fb0" /></linearGradient><radialGradient id="ic-pink" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#fff0fb" /><stop offset="0.4" stop-color="#ff7ad9" /><stop offset="1" stop-color="#9b2fd0" /></radialGradient><radialGradient id="ic-violet" cx="0.5" cy="0.5" r="0.6"><stop offset="0" stop-color="#ffffff" /><stop offset="0.45" stop-color="#b9adff" /><stop offset="1" stop-color="#5a46c8" /></radialGradient><linearGradient id="ic-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8bf5b4" /><stop offset="1" stop-color="#129c52" /></linearGradient><linearGradient id="ic-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe2a8" /><stop offset="1" stop-color="#e8590c" /></linearGradient><linearGradient id="ic-blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3f3ff" /><stop offset="0.5" stop-color="#5aaeff" /><stop offset="1" stop-color="#1f4fa8" /></linearGradient><linearGradient id="ic-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb3b3" /><stop offset="1" stop-color="#c0392b" /></linearGradient><linearGradient id="ic-bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbd1" /><stop offset="1" stop-color="#f39c12" /></linearGradient><linearGradient id="ic-teal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d4fff3" /><stop offset="1" stop-color="#16a085" /></linearGradient><radialGradient id="ic-aura" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff8a5c" stop-opacity="0.9" /><stop offset="1" stop-color="#ff3b1f" stop-opacity="0" /></radialGradient></defs></svg>
     <div id="rotate-notice" class="rotate-notice" role="alert">
         <svg class="rotate-icon" viewBox="0 0 48 48" aria-hidden="true">
             <rect x="15" y="6" width="18" height="30" rx="3" />
@@ -60,11 +62,11 @@
     <div id="chat-container" class="game-ui"><div id="chat-messages"></div><div id="chat-input-container"><input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="50"></div></div>
     <div id="joy-container" class="game-ui"><svg class="joy-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="38" /><path d="M50 5l5 6h-10z" /><path d="M50 95l5-6h-10z" /><path d="M5 50l6-5v10z" /><path d="M95 50l-6-5v10z" /></svg><div id="joy-stick"></div></div>
     <div class="action-buttons game-ui">
-        <div class="btn btn-skill" id="btn-wire"><svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c4-1 7-4 8-8" /><path d="M13 11l3-6 3 3-6 3" /><circle cx="5" cy="19" r="1.5" /></svg><span class="btn-label" id="btn-wire-label">땡겨</span></div>
-        <div class="btn btn-dodge" id="btn-dodge"><svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h11" /><path d="M11 7l5 5-5 5" /><path d="M19 6v12" /></svg><span class="btn-label">회피</span></div>
-        <div class="btn btn-guard" id="btn-guard"><svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /></svg><span class="btn-label">방어</span></div>
-        <div class="btn btn-ultimate" id="btn-ultimate"><svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.4L21 9l-5 4.4L17.5 20 12 16.6 6.5 20 8 13.4 3 9l6.4-.6z" /></svg><span class="btn-label">궁극기</span></div>
-        <div class="btn btn-attack" id="btn-attack"><svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L17 7" /><path d="M14 4h6v6" /><path d="M4 14l6 6" /><path d="M3 21l3-3" /></svg><span class="btn-label">공격</span></div>
+        <div class="btn btn-skill" id="btn-wire"><svg class="btn-icon art" viewBox="0 0 24 24" data-follows="skill" aria-hidden="true"><path d="M5 19c4-1 7-4 8-8" /><path d="M13 11l3-6 3 3-6 3" /><circle cx="5" cy="19" r="1.5" /></svg><span class="btn-label" id="btn-wire-label">땡겨</span></div>
+        <div class="btn btn-dodge" id="btn-dodge"><svg class="btn-icon art" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 13 L15 24 L5 35" stroke="#8ef0a8" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.35" /><path d="M15 13 L25 24 L15 35" stroke="#8ef0a8" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.65" /><path d="M25 10 L39 24 L25 38" stroke="url(#ic-teal)" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="btn-label">회피</span></div>
+        <div class="btn btn-guard" id="btn-guard"><svg class="btn-icon art" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3 L41 9 V22 C41 33 33 40 24 45 C15 40 7 33 7 22 V9 Z" fill="url(#ic-blue)" stroke="url(#ic-gold)" stroke-width="2.4" stroke-linejoin="round" /><path d="M24 9 L35 13 V22 C35 30 30 35 24 39 Z" fill="#ffffff" opacity="0.18" /><path d="M24 13 L27 21 L35 22 L29 27 L31 35 L24 31 L17 35 L19 27 L13 22 L21 21 Z" fill="url(#ic-gold)" /></svg><span class="btn-label">방어</span></div>
+        <div class="btn btn-ultimate" id="btn-ultimate"><svg class="btn-icon art" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#c792ff" opacity="0.22" /><path d="M24 2 L28.5 17 L44 15 L32 25 L39 40 L24 31 L9 40 L16 25 L4 15 L19.5 17 Z" fill="url(#ic-violet)" stroke="#ffffff" stroke-width="1" stroke-linejoin="round" /><circle cx="24" cy="23" r="4" fill="#ffffff" /></svg><span class="btn-label">궁극기</span></div>
+        <div class="btn btn-attack" id="btn-attack"><svg class="btn-icon art" viewBox="0 0 24 24" data-follows="weapon" aria-hidden="true"><path d="M5 19L17 7" /><path d="M14 4h6v6" /><path d="M4 14l6 6" /><path d="M3 21l3-3" /></svg><span class="btn-label">공격</span></div>
     </div>
     <div id="rotate-hint" class="game-ui">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M20 9a8 8 0 0 1-3 9" /><path d="M17 15l0 3 3 0" /></svg>
@@ -93,7 +95,6 @@
                 <button id="btn-back-login" class="start-btn" type="button">LOGIN</button>
             </div>
         </div>
-        <svg class="icon-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="ic-steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" /><stop offset="0.45" stop-color="#d3dbe8" /><stop offset="1" stop-color="#7d8aa0" /></linearGradient><linearGradient id="ic-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b8" /><stop offset="1" stop-color="#d4930f" /></linearGradient><linearGradient id="ic-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d09a62" /><stop offset="1" stop-color="#6b4226" /></linearGradient><linearGradient id="ic-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffa48a" /><stop offset="1" stop-color="#b3261e" /></linearGradient><linearGradient id="ic-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d6576" /><stop offset="1" stop-color="#262a33" /></linearGradient><linearGradient id="ic-cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8fbff" /><stop offset="0.5" stop-color="#5ad8ff" /><stop offset="1" stop-color="#1f6fb0" /></linearGradient><radialGradient id="ic-pink" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#fff0fb" /><stop offset="0.4" stop-color="#ff7ad9" /><stop offset="1" stop-color="#9b2fd0" /></radialGradient><radialGradient id="ic-violet" cx="0.5" cy="0.5" r="0.6"><stop offset="0" stop-color="#ffffff" /><stop offset="0.45" stop-color="#b9adff" /><stop offset="1" stop-color="#5a46c8" /></radialGradient><linearGradient id="ic-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8bf5b4" /><stop offset="1" stop-color="#129c52" /></linearGradient></defs></svg>
         <div id="loadout-panel" class="loadout-panel hidden">
             <h2 class="loadout-title">캐릭터 준비</h2>
             <div id="loadout-note" class="loadout-note">외형과 무기를 고르고 게임을 시작하세요.</div>
@@ -237,74 +238,50 @@
         <p>업그레이드를 하나 선택해서 캐릭터를 강화하세요.</p>
         <div id="upgrade-timer">업그레이드 시간: 6초</div>
         <div id="upgrade-cards">
-            <div class="card" onclick="selectUpgrade('dmg')">
+            <div class="card" style="--accent: 255,110,90" onclick="selectUpgrade('dmg')">
                 <div class="upgrade-level-badge" data-upgrade-level="dmg">Lv.1</div>
                 <div class="icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M5 19L19 5" />
-                        <path d="M14 5h5v5" />
-                        <path d="M6 18l4-4" />
-                    </svg>
+                    <svg class="art" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="url(#ic-aura)" /><g transform="rotate(45 24 24)"><path d="M24 3 L27.4 8 L27.4 31 L20.6 31 L20.6 8 Z" fill="url(#ic-steel)" stroke="#5f6b80" stroke-width="0.8" /><path d="M24 8 V30" stroke="#8d99ad" stroke-width="1" /><rect x="14" y="31" width="20" height="4" rx="2" fill="url(#ic-gold)" /><rect x="22" y="35" width="4" height="8" rx="1.5" fill="url(#ic-wood)" /><circle cx="24" cy="45" r="2.6" fill="url(#ic-gold)" /></g><path d="M38 4 v8 M34 8 h8" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" /></svg>
                 </div>
                 <h4>공격력 강화</h4>
                 <p>모든 공격의 피해가 <br><b>20%</b> 증가합니다.</p>
             </div>
-            <div class="card" id="upgrade-range-card" onclick="selectUpgrade('range')">
+            <div class="card" style="--accent: 90,174,255" id="upgrade-range-card" onclick="selectUpgrade('range')">
                 <div class="upgrade-level-badge" data-upgrade-level="range">Lv.1</div>
                 <div class="icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M4 14c4-6 12-6 16 0" />
-                        <path d="M4 10c4-6 12-6 16 0" />
-                        <path d="M4 18c4-6 12-6 16 0" />
-                    </svg>
+                    <svg class="art" viewBox="0 0 48 48"><path d="M8 40 A26 26 0 0 1 40 8" stroke="url(#ic-blue)" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.55" /><path d="M8 40 A19 19 0 0 1 32 14" stroke="url(#ic-blue)" stroke-width="3.6" fill="none" stroke-linecap="round" opacity="0.8" /><path d="M8 40 A12 12 0 0 1 24 22" stroke="url(#ic-blue)" stroke-width="4" fill="none" stroke-linecap="round" /><circle cx="8" cy="40" r="5" fill="url(#ic-gold)" stroke="#8a5a08" stroke-width="0.8" /><path d="M37 4 l6 0 l0 6" stroke="#e3f3ff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
                 </div>
                 <h4 id="upgrade-range-title">사거리 강화</h4>
                 <p id="upgrade-range-desc">공격·궁극기 범위가<br><b>15%</b> 증가합니다.</p>
             </div>
-            <div class="card" onclick="selectUpgrade('speed')">
+            <div class="card" style="--accent: 255,196,60" onclick="selectUpgrade('speed')">
                 <div class="upgrade-level-badge" data-upgrade-level="speed">Lv.1</div>
                 <div class="icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M13 2L4 14h6l-1 8 11-13h-6l-1-7z" />
-                    </svg>
+                    <svg class="art" viewBox="0 0 48 48"><path d="M27 3 L11 27 H22 L18 45 L37 18 H26 L31 3 Z" fill="url(#ic-bolt)" stroke="#fff6c8" stroke-width="1.2" stroke-linejoin="round" /><path d="M4 20 H11 M2 27 H9 M6 34 H13" stroke="#fff3b0" stroke-width="2" stroke-linecap="round" opacity="0.8" /><path d="M41 27 Q41 30 44 30 Q41 30 41 33 Q41 30 38 30 Q41 30 41 27 Z" fill="#fffbd1" /></svg>
                 </div>
                 <h4>공격 속도 강화</h4>
                 <p>공격 속도 <b>25%</b> 증가<br>궁극기 쿨타임 <b>8%</b> 감소</p>
             </div>
-            <div class="card" onclick="selectUpgrade('move')">
+            <div class="card" style="--accent: 70,220,180" onclick="selectUpgrade('move')">
                 <div class="upgrade-level-badge" data-upgrade-level="move">Lv.1</div>
                 <div class="icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M4 14l6-6" />
-                        <path d="M4 8v6h6" />
-                        <path d="M20 10l-6 6" />
-                        <path d="M20 16v-6h-6" />
-                    </svg>
+                    <svg class="art" viewBox="0 0 48 48"><path d="M12 12 C12 10 14 9 16 9 H24 C26 9 27 10 27 12 V28 L38 32 C42 33 43 36 43 38 V40 H9 V36 C9 33 11 31 12 30 Z" fill="url(#ic-teal)" stroke="#0f6b58" stroke-width="1" /><rect x="9" y="38" width="34" height="5" rx="2" fill="url(#ic-dark)" /><path d="M12 14 C4 12 2 18 3 22 C7 19 10 19 12 21 M12 18 C6 18 4 24 6 27 C8 24 10 24 12 25" fill="#ffffff" stroke="#bde8ff" stroke-width="0.8" /><path d="M16 16 H24 M16 21 H24" stroke="#ffffff" stroke-width="1.4" opacity="0.7" stroke-linecap="round" /></svg>
                 </div>
                 <h4>이동 속도 강화</h4>
                 <p>이동 속도가 <br><b>10%</b> 증가합니다.</p>
             </div>
-            <div class="card" onclick="selectUpgrade('dodge')">
+            <div class="card" style="--accent: 110,230,150" onclick="selectUpgrade('dodge')">
                 <div class="upgrade-level-badge" data-upgrade-level="dodge">Lv.1</div>
                 <div class="icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M5 7h7" />
-                        <path d="M12 7l-3-3" />
-                        <path d="M12 7l-3 3" />
-                        <path d="M19 17h-7" />
-                        <path d="M12 17l3-3" />
-                        <path d="M12 17l3 3" />
-                    </svg>
+                    <svg class="art" viewBox="0 0 48 48"><path d="M6 12 L18 24 L6 36" stroke="#8ef0a8" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.35" /><path d="M16 12 L28 24 L16 36" stroke="#8ef0a8" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.65" /><path d="M26 10 L40 24 L26 38" stroke="url(#ic-teal)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round" /><path d="M26 10 L40 24" stroke="#ffffff" stroke-width="1.4" opacity="0.8" stroke-linecap="round" /></svg>
                 </div>
                 <h4>회피 거리 강화</h4>
                 <p>회피 시 이동 거리가 <br><b>15%</b> 증가합니다.</p>
             </div>
-            <div class="card" onclick="selectUpgrade('hp')">
+            <div class="card" style="--accent: 255,110,140" onclick="selectUpgrade('hp')">
                 <div class="upgrade-level-badge" data-upgrade-level="hp">Lv.1</div>
                 <div class="icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
-                    </svg>
+                    <svg class="art" viewBox="0 0 48 48"><path d="M24 43 C10 33 4 25 4 17 C4 10 9 5 15.5 5 C19.5 5 22.5 7.5 24 10.5 C25.5 7.5 28.5 5 32.5 5 C39 5 44 10 44 17 C44 25 38 33 24 43 Z" fill="url(#ic-heart)" stroke="#ffd6d6" stroke-width="1.2" /><ellipse cx="14" cy="14" rx="4" ry="2.6" transform="rotate(-35 14 14)" fill="#ffffff" opacity="0.7" /><rect x="21" y="16" width="6" height="17" rx="1.5" fill="#ffffff" /><rect x="15.5" y="21.5" width="17" height="6" rx="1.5" fill="#ffffff" /></svg>
                 </div>
                 <h4>체력 강화</h4>
                 <p>최대 체력 <b>+20</b><br>체력 <b>20</b> 회복</p>
