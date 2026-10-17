@@ -15,7 +15,7 @@ const {
     BOW_MOB_KNOCKBACK,
     BOW_PIERCE,
 } = require('./config');
-const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
+const { sanitizeWeapon, sanitizeSkill, sanitizeName, sanitizeLook } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
 const { getAccountById } = require('./db');
 const {
@@ -86,6 +86,7 @@ function registerSocketHandlers(io) {
             wire: { active: false, tx: 0, ty: 0 },
             stats: createBaseStatsForWeapon('sword'),
             skill: 'wire',
+            look: sanitizeLook(null),
             lastMoveAt: Date.now(),
             lastWireAt: 0
         };
@@ -123,6 +124,13 @@ function registerSocketHandlers(io) {
             p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
             p.hp = getMaxHpFromStats(p.stats);
             clearUltimateState(p);
+            io.emit('statsUpdate', players);
+        });
+
+        socket.on('setLook', (look) => {
+            const p = players[socket.id];
+            if (!p) return;
+            p.look = sanitizeLook(look);
             io.emit('statsUpdate', players);
         });
 

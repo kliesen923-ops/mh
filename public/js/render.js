@@ -11,8 +11,26 @@ function drawUpright(x, y, draw) {
     ctx.restore();
 }
 
+// Other players' walk cycles come from how their position changes between frames.
+const heroMotion = new Map();
+function isHeroMoving(p) {
+    if (p.id === myId) return (p.animTime || 0) > 0;
+    const now = Date.now();
+    const seen = heroMotion.get(p.id);
+    if (!seen) {
+        heroMotion.set(p.id, { x: p.x, y: p.y, until: 0 });
+        return false;
+    }
+    if (Math.hypot(p.x - seen.x, p.y - seen.y) > 0.5) {
+        seen.until = now + 150;
+        seen.x = p.x;
+        seen.y = p.y;
+    }
+    return now < seen.until;
+}
+
 function drawCharacter(p, color) {
-    const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, upgradeShield, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
+    const { x, y, angle, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, upgradeShield, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
     const profile = getWeaponAttackProfile(weapon);
     const attackRange = getStrikeRange(weapon, stats, p);
@@ -24,9 +42,9 @@ function drawCharacter(p, color) {
     const weaponLength = Math.max(28, localReach - 28);
     const ultimate = getUltimateState(p);
     const dualUltimateActive = weapon === 'dual' && ultimate.active && ultimate.type === 'dual';
-    const nameOffset = 65 * bodyScale;
-    const hpOffset = 60 * bodyScale;
-    const stunOffset = 82 * bodyScale;
+    const nameOffset = 84 * bodyScale;
+    const hpOffset = 78 * bodyScale;
+    const stunOffset = 100 * bodyScale;
     if (p.gearRush && p.gearRush.active) {
         drawGearRush(p);
     } else if(wire && wire.active) {
@@ -72,8 +90,21 @@ function drawCharacter(p, color) {
         ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-hpOffset, 50, 6);
         ctx.fillStyle = isStunned ? "#9b59b6" : (hpRatio > 0.3 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-hpOffset, hpRatio*50, 6);
     });
-    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
+    // Shadow and a ring at the feet: orange for you, blue for everyone else.
+    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = color; ctx.globalAlpha *= 0.85; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    // The body stands upright (3/4 view); the weapon swings at hand height around it,
+    // in front of the body when facing the camera and behind it when facing away.
+    const facing = isAttacking && Number.isFinite(aAngle) ? aAngle : angle;
+    const facingAway = Math.sin(facing) <= -0.25;
+    const drawBody = () => drawUpright(x, y, () => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(bodyScale * HERO_FIGURE_SCALE, bodyScale * HERO_FIGURE_SCALE);
+        drawHeroFigure(ctx, p.look, facing, { moving: isHeroMoving(p), stunned: isStunned });
+        ctx.restore();
+    });
+    if (!facingAway) drawBody();
+    ctx.save(); ctx.translate(x, y - (HERO_HAND_LIFT * HERO_FIGURE_SCALE * bodyScale) / VIEW_Y_SCALE); ctx.scale(bodyScale, bodyScale); ctx.rotate(angle);
     ctx.save(); let sRot = 0.8;
     let spearPose = 0;
     let bowPose = 0;
@@ -118,7 +149,7 @@ function drawCharacter(p, color) {
     const bowThrust = weapon === 'bow' ? (isAttacking ? (attackPhase === 1 ? -1 : (attackPhase === 2 ? 1 : 0.3)) : bowPose) : 0;
     const dualThrust = weapon === 'dual' ? (isAttacking ? (attackPhase === 1 ? -0.95 : (attackPhase === 2 ? 1.05 : 0.2)) : dualPose) : 0;
     ctx.rotate(sRot);
-    ctx.fillStyle = "#ffdbac";
+    ctx.fillStyle = getHeroSkinTone(p.look);
     ctx.fillRect(15 + spearThrust * 7 + bowThrust * 5, 18 - spearThrust * 2 - bowThrust * 1.5, 20 + spearThrust * 5, 10);
     if (weapon === 'hammer') {
         // Head ends at the hammer's reach.
@@ -227,7 +258,9 @@ function drawCharacter(p, color) {
         ctx.fillStyle = comboStep===3?"#f1c40f":"#bdc3c7";
         ctx.fillRect(35,18,weaponLength,10);
     }
-    ctx.restore(); ctx.restore(); ctx.restore();
+    ctx.restore(); ctx.restore();
+    if (facingAway) drawBody();
+    ctx.restore();
     if (isStunned && Number.isFinite(stunEndsAt)) {
         const stunRemaining = Math.max(0, (stunEndsAt - Date.now()) / 1000);
         if (stunRemaining > 0) {
@@ -999,7 +1032,9 @@ function draw() {
     drawHealingCrosses();
     drawGiantPotions();
     drawMobs();
-    Object.values(allPlayers).forEach(p => { if(p.hp > 0) drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"); });
+    // Standing characters overlap, so draw the ones further back (smaller y) first.
+    Object.values(allPlayers).filter(p => p.hp > 0).sort((a, b) => a.y - b.y)
+        .forEach(p => drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"));
     drawHealingTexts();
     drawCombatEffects();
     drawAshProjectiles();

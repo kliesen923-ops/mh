@@ -41,7 +41,23 @@ function sanitizeName(name, fallback) {
     return cleaned.length >= 2 ? cleaned : fallback;
 }
 
+// Character look: hair style, hair color, skin tone and outfit color, each an index.
+// Option lists live in public/js/hero-look.js; these are their counts.
+const LOOK_OPTION_COUNTS = { hair: 3, hairColor: 4, skinColor: 3, outfit: 6 };
+
+function sanitizeLook(value) {
+    const look = value && typeof value === 'object' ? value : {};
+    const result = {};
+    for (const [key, count] of Object.entries(LOOK_OPTION_COUNTS)) {
+        const n = Math.floor(Number(look[key]));
+        result[key] = Number.isFinite(n) ? Math.max(0, Math.min(count - 1, n)) : 0;
+    }
+    return result;
+}
+
 module.exports = {
+    LOOK_OPTION_COUNTS,
+    sanitizeLook,
     sanitizeAccountId,
     sanitizeAccountPassword,
     sanitizeWeapon,

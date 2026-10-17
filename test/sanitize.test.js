@@ -40,3 +40,10 @@ test('sanitizeName replaces spaces, drops symbols and enforces 2..10 chars', () 
     assert.equal(sanitizeName('a', 'fallback'), 'fallback');
     assert.equal(sanitizeName('abcdefghijkl', 'fb'), 'abcdefghij');
 });
+
+test('sanitizeLook clamps each option and defaults bad values to 0', () => {
+    const { sanitizeLook } = require('../src/utils/sanitize');
+    assert.deepEqual(sanitizeLook({ hair: 2, hairColor: 3, skinColor: 1, outfit: 5 }), { hair: 2, hairColor: 3, skinColor: 1, outfit: 5 });
+    assert.deepEqual(sanitizeLook({ hair: 9, hairColor: -1, skinColor: 'x', outfit: 2.7, cape: true }), { hair: 2, hairColor: 0, skinColor: 0, outfit: 2 });
+    assert.deepEqual(sanitizeLook(null), { hair: 0, hairColor: 0, skinColor: 0, outfit: 0 });
+});

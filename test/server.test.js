@@ -542,3 +542,20 @@ test('bow and hammer ultimates fire where the player is facing, not the last att
         assert.ok(Math.abs(fired - Math.PI / 2) < 1e-9, `${weapon} ultimate fired at ${fired}`);
     }
 });
+
+test('players can set their look, and others see it', async () => {
+    const client = await connect();
+    const watcher = await connect();
+    await readyPlayer(client);
+    const seen = new Promise((resolve) => {
+        const onUpdate = (data) => {
+            const look = (data[client.id] || {}).look;
+            if (!look || look.outfit !== 3) return;
+            watcher.off('statsUpdate', onUpdate);
+            resolve(look);
+        };
+        watcher.on('statsUpdate', onUpdate);
+    });
+    client.emit('setLook', { hair: 1, hairColor: 2, skinColor: 2, outfit: 3, extra: 'ignored' });
+    assert.deepEqual(await seen, { hair: 1, hairColor: 2, skinColor: 2, outfit: 3 });
+});
