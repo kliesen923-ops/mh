@@ -509,3 +509,36 @@ test('upgrades carry over to ultimates', async () => {
     assert.equal(ult.angles.length, 3);
     assert.equal(dragons.length, 3);
 });
+
+test('bow and hammer ultimates fire where the player is facing, not the last attack direction', async () => {
+    const client = await connect();
+    const p = await readyPlayer(client);
+    for (const weapon of ['bow', 'hammer']) {
+        const set = new Promise((resolve) => {
+            const onUpdate = (data) => {
+                if ((data[client.id] || {}).weapon !== weapon) return;
+                client.off('statsUpdate', onUpdate);
+                resolve();
+            };
+            client.on('statsUpdate', onUpdate);
+        });
+        client.emit('setWeapon', weapon);
+        await set;
+        // Last attack went right (0), but the player has since turned to face down (PI / 2).
+        Object.assign(p, { x: 2000, y: 900, hp: 9999, aAngle: 0, angle: 0 });
+        p.ultimate.cooldownEndsAt = 0;
+        const cast = new Promise((resolve) => {
+            const onUpdate = (data) => {
+                const me = data[client.id] || {};
+                if (!(me.ultimate && me.ultimate.cooldownEndsAt > 0)) return;
+                client.off('statsUpdate', onUpdate);
+                resolve();
+            };
+            client.on('statsUpdate', onUpdate);
+        });
+        client.emit('useUltimate', { weapon, angle: Math.PI / 2 });
+        await cast;
+        const fired = weapon === 'bow' ? p.ultimate.angles[Math.floor(p.ultimate.angles.length / 2)] : p.ultimate.angle;
+        assert.ok(Math.abs(fired - Math.PI / 2) < 1e-9, `${weapon} ultimate fired at ${fired}`);
+    }
+});

@@ -402,7 +402,7 @@ function useUltimate() {
         extra: 0,
     };
     updateHUD();
-    socket.emit('useUltimate', { weapon });
+    socket.emit('useUltimate', { weapon, angle: player.angle });
 }
 function isAttackHeld() { return attackHoldSources.size > 0; }
 function endAttack() {

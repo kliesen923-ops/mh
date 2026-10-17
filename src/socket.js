@@ -141,9 +141,12 @@ function registerSocketHandlers(io) {
             io.emit('statsUpdate', players);
         });
 
-        socket.on('useUltimate', () => {
+        socket.on('useUltimate', (payloadData) => {
             const p = players[socket.id];
             if (!p || p.hp <= 0 || p.isStunned || p.isSelectingLoadout || p.isUpgrading) return;
+            // Aim where the player faces right now; movement updates can lag a fresh turn.
+            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+            if (Number.isFinite(payload.angle)) p.angle = payload.angle;
             const weapon = sanitizeWeapon(p.weapon);
             const now = Date.now();
             const currentCooldown = Number.isFinite(p.ultimate && p.ultimate.cooldownEndsAt) ? p.ultimate.cooldownEndsAt : 0;
