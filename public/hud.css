@@ -167,7 +167,7 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 #chat-container {
     position: absolute;
     left: calc(var(--ui-gap) + var(--safe-left));
-    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 216px * var(--touch-scale));
+    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 236px * var(--touch-scale));
     width: min(320px, 38vw);
     display: flex;
     flex-direction: column;
@@ -197,17 +197,17 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 #chat-input-container { padding: 6px 8px 8px; display: none; }
 #chat-input { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--ui-border); border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: var(--ui-text); outline: none; font-size: 14px; }
 
-/* Joystick: large and set in from the corner, so the thumb rests on it naturally */
+/* Joystick: large and set well in from the corner, where the thumb rests naturally */
 #joy-container {
     position: absolute;
-    left: calc(56px + var(--safe-left));
-    bottom: calc(36px + var(--safe-bottom));
+    left: calc(96px + var(--safe-left));
+    bottom: calc(44px + var(--safe-bottom));
     width: 168px;
     height: 168px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(10, 12, 20, 0.28) 0 58%, rgba(255, 255, 255, 0.1) 100%);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3), inset 0 0 0 10px rgba(255, 255, 255, 0.03);
+    background: radial-gradient(circle, rgba(8, 10, 16, 0.55) 0 54%, rgba(8, 10, 16, 0.18) 56% 100%);
+    border: 2px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -217,36 +217,47 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     transform-origin: bottom left;
 }
 .joy-ring { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.joy-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 1.5; }
-.joy-ring path { fill: rgba(255, 255, 255, 0.42); }
+.joy-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.16); stroke-width: 1.2; }
+.joy-ring path { fill: rgba(255, 255, 255, 0.55); }
 #joy-stick {
     position: absolute;
-    width: 66px;
-    height: 66px;
+    width: 70px;
+    height: 70px;
     box-sizing: border-box;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.55);
-    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.24) 70%);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 1px, transparent 1.5px) 0 0 / 6px 6px, radial-gradient(circle at 40% 35%, #5a5f6b, #23262e 75%);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
     pointer-events: none;
 }
 
-/* Action buttons: a big attack button in the corner with the others on an arc around it.
+/* Action buttons, laid out like Zenless Zone Zero's: the big attack button in the middle,
+   the skill below-left, dodge below-right, and guard and the ultimate stacked above dodge.
    Each button's position is its center offset (--dx right, --dy up) from the attack center. */
 .action-buttons {
-    --attack-size: 108px;
-    --arc-center: 70px;
+    --attack-size: 100px;
+    --center-right: 150px;
+    --center-bottom: 104px;
     position: absolute;
     right: calc(18px + var(--safe-right));
     bottom: calc(18px + var(--safe-bottom));
-    width: 230px;
-    height: 230px;
+    width: 282px;
+    height: 290px;
     z-index: 100;
     pointer-events: none;
     transform: scale(var(--touch-scale));
     transform-origin: bottom right;
 }
 .action-buttons .btn {
+    --size: 66px;
+    position: absolute;
+    width: var(--size);
+    height: var(--size);
+    right: calc(var(--center-right) - var(--dx, 0px) - var(--size) / 2);
+    bottom: calc(var(--center-bottom) + var(--dy, 0px) - var(--size) / 2);
+    pointer-events: auto;
+}
+.btn {
     --size: 64px;
     position: absolute;
     width: var(--size);
@@ -293,15 +304,24 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 }
 .btn.cooling { filter: brightness(0.6) saturate(0.6); }
 .btn.cooling::after { opacity: 1; }
-.btn-dodge { --btn-color: #8ef0a8; --dx: -116px; --dy: -26px; }
-.btn-guard { --btn-color: #7fb2ff; --dx: -106px; --dy: 52px; }
-.btn-skill { --btn-color: #5ad8ff; --dx: -54px; --dy: 110px; }
-.action-buttons .btn-ultimate { --btn-color: #c792ff; --size: 70px; --dx: 14px; --dy: 122px; }
+.btn-dodge { --btn-color: #8ef0a8; --size: 70px; --dx: 92px; --dy: -52px; }
+.btn-guard { --btn-color: #7fb2ff; --dx: 92px; --dy: 50px; }
+.action-buttons .btn-ultimate { --btn-color: #c792ff; --dx: 92px; --dy: 146px; }
+.action-buttons .btn-skill {
+    --btn-color: #ffb3f0;
+    --size: 74px;
+    --dx: -94px;
+    --dy: -52px;
+    border-color: rgba(255, 255, 255, 0.7);
+    background: radial-gradient(circle at 50% 45%, #ff7ad9 0, #b44cf0 45%, #3b1f6e 100%);
+}
+.btn-skill .btn-icon { stroke: #fff; }
 .action-buttons .btn-attack {
     --btn-color: #ff7a5c;
     --size: var(--attack-size);
     --dx: 0px;
     --dy: 0px;
+    border-width: 3px;
     background: radial-gradient(circle at 35% 28%, rgba(255, 170, 140, 0.35), rgba(120, 24, 14, 0.85) 65%);
 }
 .btn-attack .btn-icon { width: 34px; height: 34px; stroke: #ffe0d6; }
@@ -335,9 +355,21 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     #minimap { height: 90px; }
     #chat-messages { max-height: 72px; font-size: 12px; }
     #chat-container { width: min(280px, 34vw); }
+    /* Ranking beside the minimap rather than below it, clear of the button column */
+    #hud-right {
+        width: 408px;
+        display: grid;
+        grid-template-columns: 200px 200px;
+        grid-template-areas: "icons icons" "rank map";
+        align-items: start;
+        justify-items: end;
+    }
+    .hud-icons { grid-area: icons; }
+    #minimap { grid-area: map; }
+    #leaderboard { grid-area: rank; }
 }
 
-/* Very short screens: the button arc needs the ranking's spot on the right */
+/* Very short screens: slightly smaller controls so the button column stays below the minimap */
 @media (max-height: 380px) and (orientation: landscape) {
-    #leaderboard { display: none; }
+    .action-buttons, #joy-container { scale: 0.85; }
 }
