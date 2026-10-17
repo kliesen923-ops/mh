@@ -108,11 +108,15 @@ function getUltimateConfig(weapon) {
     return { cooldownMs: 11000, durationMs: 1200 };
 }
 
-// Range upgrades grow ultimate areas, relative to the weapon's starting range.
+// Range upgrades grow ultimate areas, relative to the weapon's starting range, and the
+// giant potion grows them the same way it grows basic attack reach (not for the bow).
 function getUltimateRangeMultiplier(player) {
     const base = createBaseStatsForWeapon(player && player.weapon).range || 1;
     const current = player && player.stats && Number.isFinite(player.stats.range) ? player.stats.range : base;
-    return Math.max(1, current / base);
+    const giantScale = sanitizeWeapon(player && player.weapon) === 'bow'
+        ? 1
+        : Math.max(1, Number.isFinite(player && player.giantScale) ? player.giantScale : 1);
+    return Math.max(1, current / base) * giantScale;
 }
 
 // Attack-speed upgrades shorten the ultimate cooldown.

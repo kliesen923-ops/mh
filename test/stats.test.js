@@ -87,3 +87,14 @@ test('sanitizeAction keeps only valid fields and clamps wire distance', () => {
     assert.equal(action.wire.progress, 1);
     assert.deepEqual(sanitizeAction(player, 'garbage'), {});
 });
+
+test('giant potion grows melee ultimate areas like it grows basic attack reach', () => {
+    const { getUltimateRangeMultiplier } = require('../src/game/stats');
+    const hammer = { weapon: 'hammer', stats: { range: 1.0 }, giantScale: 1.9 };
+    assert.ok(Math.abs(getUltimateRangeMultiplier(hammer) - 1.9) < 1e-9);
+    // Range picks and giant stack.
+    assert.ok(Math.abs(getUltimateRangeMultiplier({ ...hammer, stats: { range: 1.15 } }) - 1.15 * 1.9) < 1e-9);
+    // The bow's reach doesn't grow when giant, so neither does its ultimate.
+    assert.equal(getUltimateRangeMultiplier({ weapon: 'bow', stats: { range: 1.0 }, giantScale: 1.9 }), 1);
+    assert.equal(getUltimateRangeMultiplier({ weapon: 'sword', stats: { range: 1.0 } }), 1);
+});
