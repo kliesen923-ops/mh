@@ -75,14 +75,24 @@ function applySwordUltimate(playerId) {
     }, config.durationMs);
 }
 
+const HAMMER_ULT_HALF_ARC = Math.PI / 6;
+
+// The hammer slam plants the caster until its hit area fades.
+function isRootedByUltimate(player, now = Date.now()) {
+    const ult = player && player.ultimate;
+    return Boolean(ult && ult.active && ult.type === 'hammer' && now < (ult.endsAt || 0));
+}
+
 function applyHammerUltimate(playerId) {
     const attacker = players[playerId];
     if (!attacker) return;
     const now = Date.now();
     const config = getUltimateConfig(attacker.weapon);
     const profile = getWeaponAttackProfile(attacker.weapon);
-    const coneRange = Math.max(118, profile.reach * 1.7) * getUltimateRangeMultiplier(attacker);
-    const coneArc = Math.PI * 0.7;
+    // A long, narrow wedge straight ahead: 30° to each side (about 1.3 slices of an
+    // 8-slice pizza), reaching well past a normal swing.
+    const coneRange = Math.max(240, profile.reach * 2.6) * getUltimateRangeMultiplier(attacker);
+    const coneArc = HAMMER_ULT_HALF_ARC;
     // Fire where the player faces, not toward their last basic attack.
     const attackAngle = attacker.angle;
     // Position, direction and size go to clients so they can draw the exact hit area.
@@ -269,6 +279,7 @@ const ULTIMATE_HANDLERS = {
 };
 
 module.exports = {
+    isRootedByUltimate,
     ULTIMATE_HANDLERS,
     broadcastUltimateState,
 };

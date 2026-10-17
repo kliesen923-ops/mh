@@ -559,3 +559,53 @@ test('players can set their look, and others see it', async () => {
     client.emit('setLook', { hair: 1, hairColor: 2, skinColor: 2, outfit: 3, extra: 'ignored' });
     assert.deepEqual(await seen, { hair: 1, hairColor: 2, skinColor: 2, outfit: 3 });
 });
+
+test('hammer ultimate is a long, narrow wedge and roots the caster until it ends', async () => {
+    const attackerClient = await connect();
+    const attacker = await readyPlayer(attackerClient);
+    const targets = [];
+    for (let i = 0; i < 3; i++) targets.push(await readyPlayer(await connect()));
+    const set = new Promise((resolve) => {
+        const onUpdate = (data) => {
+            if ((data[attackerClient.id] || {}).weapon !== 'hammer') return;
+            attackerClient.off('statsUpdate', onUpdate);
+            resolve();
+        };
+        attackerClient.on('statsUpdate', onUpdate);
+    });
+    attackerClient.emit('setWeapon', 'hammer');
+    await set;
+    Object.assign(attacker, { x: 2400, y: 1500, angle: 0, aAngle: 0, hp: 9999 });
+    const [far, offAxis, beside] = targets;
+    Object.assign(far, { x: 2400 + 230, y: 1500, hp: 1000 });                                   // straight ahead, past the old 163 reach
+    Object.assign(offAxis, { x: 2400 + Math.cos(0.45) * 120, y: 1500 + Math.sin(0.45) * 120, hp: 1000 }); // ~26° off: inside
+    Object.assign(beside, { x: 2400, y: 1500 + 100, hp: 1000 });                               // 90° to the side: outside now
+
+    const cast = new Promise((resolve) => {
+        const onUpdate = (data) => {
+            const me = data[attackerClient.id] || {};
+            if (!(me.ultimate && me.ultimate.cooldownEndsAt > 0 && me.ultimate.type === 'hammer')) return;
+            attackerClient.off('statsUpdate', onUpdate);
+            resolve();
+        };
+        attackerClient.on('statsUpdate', onUpdate);
+    });
+    attackerClient.emit('useUltimate', { weapon: 'hammer', angle: 0 });
+    await cast;
+    assert.ok(far.hp < 1000, 'long reach straight ahead');
+    assert.ok(offAxis.hp < 1000, 'inside the narrow wedge');
+    assert.equal(beside.hp, 1000, 'outside the wedge to the side');
+    assert.ok(Math.abs(attacker.ultimate.extra - Math.PI / 6) < 1e-9, 'half-angle sent to clients is 30°');
+    assert.ok(attacker.ultimate.radius >= 240);
+
+    // Movement is ignored while the ultimate is still landing.
+    attacker.lastMoveAt = Date.now() - 1000;
+    attackerClient.emit('playerMovement', { x: 2450, y: 1500, angle: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual([attacker.x, attacker.y], [2400, 1500], 'rooted during the ultimate');
+    attacker.ultimate.endsAt = Date.now() - 1;
+    attacker.lastMoveAt = Date.now() - 1000;
+    attackerClient.emit('playerMovement', { x: 2450, y: 1500, angle: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(attacker.x, 2450, 'free to move once it ends');
+});
