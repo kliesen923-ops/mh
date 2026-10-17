@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { io: connectClient } = require('socket.io-client');
+// Server log lines written mid-test can corrupt the test runner's output stream.
+process.env.QUIET_LOGS = '1';
 const { createServer } = require('../src/app');
 const state = require('../src/game/state');
 const { spawnMob, tickMobs, getMobsForOwner, clearAllMobs } = require('../src/game/mobs');
@@ -454,15 +456,25 @@ test('hammer ultimate stuns the mobs it hits', async () => {
 test('upgrades carry over to ultimates', async () => {
     const client = await connect();
     const p = await readyPlayer(client);
+    // A sword ultimate keeps sending statsUpdate for each slash, so wait for the update
+    // that actually reflects the request rather than whichever arrives next.
+    const nextStats = (predicate) => new Promise((resolve) => {
+        const onUpdate = (data) => {
+            if (!predicate(data[client.id] || {})) return;
+            client.off('statsUpdate', onUpdate);
+            resolve();
+        };
+        client.on('statsUpdate', onUpdate);
+    });
     const useWeapon = async (weapon) => {
-        const set = once(client, 'statsUpdate');
+        const set = nextStats((me) => me.weapon === weapon);
         client.emit('setWeapon', weapon);
         await set;
         Object.assign(p, { x: 1200, y: 1600, hp: 9999, angle: 0, aAngle: 0 });
     };
     const cast = async () => {
         p.ultimate.cooldownEndsAt = 0;
-        const updated = once(client, 'statsUpdate');
+        const updated = nextStats((me) => me.ultimate && me.ultimate.cooldownEndsAt > 0);
         client.emit('useUltimate');
         await updated;
         return p.ultimate;
@@ -496,4 +508,54 @@ test('upgrades carry over to ultimates', async () => {
     client.off('dragonProjectile', onDragon);
     assert.equal(ult.angles.length, 3);
     assert.equal(dragons.length, 3);
+});
+
+test('bow and hammer ultimates fire where the player is facing, not the last attack direction', async () => {
+    const client = await connect();
+    const p = await readyPlayer(client);
+    for (const weapon of ['bow', 'hammer']) {
+        const set = new Promise((resolve) => {
+            const onUpdate = (data) => {
+                if ((data[client.id] || {}).weapon !== weapon) return;
+                client.off('statsUpdate', onUpdate);
+                resolve();
+            };
+            client.on('statsUpdate', onUpdate);
+        });
+        client.emit('setWeapon', weapon);
+        await set;
+        // Last attack went right (0), but the player has since turned to face down (PI / 2).
+        Object.assign(p, { x: 2000, y: 900, hp: 9999, aAngle: 0, angle: 0 });
+        p.ultimate.cooldownEndsAt = 0;
+        const cast = new Promise((resolve) => {
+            const onUpdate = (data) => {
+                const me = data[client.id] || {};
+                if (!(me.ultimate && me.ultimate.cooldownEndsAt > 0)) return;
+                client.off('statsUpdate', onUpdate);
+                resolve();
+            };
+            client.on('statsUpdate', onUpdate);
+        });
+        client.emit('useUltimate', { weapon, angle: Math.PI / 2 });
+        await cast;
+        const fired = weapon === 'bow' ? p.ultimate.angles[Math.floor(p.ultimate.angles.length / 2)] : p.ultimate.angle;
+        assert.ok(Math.abs(fired - Math.PI / 2) < 1e-9, `${weapon} ultimate fired at ${fired}`);
+    }
+});
+
+test('players can set their look, and others see it', async () => {
+    const client = await connect();
+    const watcher = await connect();
+    await readyPlayer(client);
+    const seen = new Promise((resolve) => {
+        const onUpdate = (data) => {
+            const look = (data[client.id] || {}).look;
+            if (!look || look.outfit !== 3) return;
+            watcher.off('statsUpdate', onUpdate);
+            resolve(look);
+        };
+        watcher.on('statsUpdate', onUpdate);
+    });
+    client.emit('setLook', { hair: 1, hairColor: 2, skinColor: 2, outfit: 3, extra: 'ignored' });
+    assert.deepEqual(await seen, { hair: 1, hairColor: 2, skinColor: 2, outfit: 3 });
 });

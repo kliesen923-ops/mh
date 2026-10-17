@@ -26,38 +26,112 @@ function updateSkillButtonLabel() {
 function setAuthMode(mode) {
     const loginPanel = document.getElementById('login-panel');
     const registerPanel = document.getElementById('register-panel');
-    const weaponPanel = document.getElementById('weapon-panel');
-    const skillPanel = document.getElementById('skill-panel');
+    const loadoutPanel = document.getElementById('loadout-panel');
     if (loginPanel) loginPanel.classList.toggle('hidden', mode !== 'login');
     if (registerPanel) registerPanel.classList.toggle('hidden', mode !== 'register');
-    if (weaponPanel) weaponPanel.classList.toggle('hidden', mode !== 'weapon');
-    if (skillPanel) skillPanel.classList.toggle('hidden', mode !== 'skill');
+    if (loadoutPanel) loadoutPanel.classList.toggle('hidden', mode !== 'loadout');
+    document.getElementById('overlay-start')?.classList.toggle('mode-loadout', mode === 'loadout');
 }
 function setAuthError(target, message) {
     const errorEl = document.getElementById(target + '-error');
     if (errorEl) errorEl.textContent = message || '';
 }
-function setWeaponError(message) {
-    const errorEl = document.getElementById('weapon-note');
-    if (errorEl) errorEl.textContent = message || '한손검, 망치, 창, 활 중 하나를 선택하세요.';
-}
-function setSkillError(message) {
-    const errorEl = document.getElementById('skill-note');
-    if (errorEl) errorEl.textContent = message || '땡겨, 입체기동 또는 애쉬궁 중 하나를 선택하세요.';
+// Shows what is picked so far, e.g. "주무기 한손검 · 보조무기 땡겨".
+function updateLoadoutNote() {
+    const note = document.getElementById('loadout-note');
+    if (note) note.textContent = `주무기 ${getWeaponLabel(selectedWeapon)} · 보조무기 ${getSkillLabel(selectedSkill)}`;
 }
 function setWeaponSelection(weapon) {
     selectedWeapon = normalizeWeapon(weapon);
     document.querySelectorAll('.weapon-card').forEach((card) => {
         if (card.dataset.weapon) card.classList.toggle('selected', card.dataset.weapon === selectedWeapon);
     });
-    setWeaponError(`${getWeaponLabel(selectedWeapon)}가 선택되었습니다.`);
+    updateLoadoutNote();
 }
 function setSkillSelection(skill) {
     selectedSkill = normalizeSkill(skill);
     document.querySelectorAll('.weapon-card').forEach((card) => {
         if (card.dataset.skill) card.classList.toggle('selected', card.dataset.skill === selectedSkill);
     });
-    setSkillError(`${getSkillLabel(selectedSkill)}가 선택되었습니다.`);
+    updateLoadoutNote();
+}
+
+// ── Look picker ─────────────────────────────────────────────────────────────────
+
+function loadSavedLook() {
+    try {
+        return normalizeHeroLook(JSON.parse(localStorage.getItem('mh_hero_look') || 'null'));
+    } catch (error) {
+        return normalizeHeroLook(null);
+    }
+}
+let selectedLook = loadSavedLook();
+
+function stepLook(key, delta) {
+    const row = HERO_LOOK_ROWS.find((item) => item.key === key);
+    if (!row) return;
+    const count = row.values.length;
+    selectedLook = normalizeHeroLook(Object.assign({}, selectedLook, { [key]: (selectedLook[key] + delta + count) % count }));
+    try { localStorage.setItem('mh_hero_look', JSON.stringify(selectedLook)); } catch (error) { /* private mode */ }
+    renderLookRows();
+}
+
+// One row per option: label, ◀, current value, ▶. Tapping the value also steps forward.
+function renderLookRows() {
+    const container = document.getElementById('look-rows');
+    if (!container) return;
+    container.textContent = '';
+    HERO_LOOK_ROWS.forEach((row) => {
+        const line = document.createElement('div');
+        line.className = 'look-row';
+        const label = document.createElement('span');
+        label.className = 'look-label';
+        label.textContent = row.label;
+        const prev = document.createElement('button');
+        prev.type = 'button';
+        prev.className = 'look-arrow';
+        prev.textContent = '◀';
+        prev.setAttribute('aria-label', `${row.label} 이전`);
+        prev.addEventListener('click', () => stepLook(row.key, -1));
+        const value = document.createElement('button');
+        value.type = 'button';
+        value.className = 'look-value';
+        value.textContent = row.values[selectedLook[row.key]];
+        value.addEventListener('click', () => stepLook(row.key, 1));
+        const next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'look-arrow';
+        next.textContent = '▶';
+        next.setAttribute('aria-label', `${row.label} 다음`);
+        next.addEventListener('click', () => stepLook(row.key, 1));
+        line.append(label, prev, value, next);
+        container.append(line);
+    });
+}
+
+// The preview turns through all eight directions while the loadout screen is open.
+let lookPreviewFrame = 0;
+function drawLookPreview(now) {
+    const canvasEl = document.getElementById('look-preview');
+    const panel = document.getElementById('loadout-panel');
+    if (!canvasEl || !panel || panel.classList.contains('hidden')) {
+        lookPreviewFrame = 0;
+        return;
+    }
+    const g = canvasEl.getContext('2d');
+    g.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    const facing = Math.PI / 2 - Math.floor(now / 900) * (Math.PI / 4);
+    g.save();
+    g.translate(canvasEl.width / 2, canvasEl.height - 14);
+    g.scale(2, 2);
+    g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    g.beginPath(); g.ellipse(0, 0, 20, 7, 0, 0, Math.PI * 2); g.fill();
+    drawHeroFigure(g, selectedLook, facing, { moving: true, t: now });
+    g.restore();
+    lookPreviewFrame = requestAnimationFrame(drawLookPreview);
+}
+function startLookPreview() {
+    if (!lookPreviewFrame) lookPreviewFrame = requestAnimationFrame(drawLookPreview);
 }
 function formatSurvivalTime(ms) {
     const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
@@ -112,37 +186,18 @@ function showDeathScreen() {
 function hideDeathScreen() {
     document.getElementById('overlay-death')?.classList.add('hidden');
 }
-function showWeaponPanel(auth) {
+// Look, main weapon and secondary skill are all picked on this one screen.
+function showLoadoutPanel(auth) {
     pendingAuth = auth;
     document.getElementById('overlay-start')?.classList.remove('hidden');
-    setAuthMode('weapon');
-    const weaponPanel = document.getElementById('weapon-panel');
-    if (weaponPanel) weaponPanel.classList.remove('hidden');
-    const skillPanel = document.getElementById('skill-panel');
-    if (skillPanel) skillPanel.classList.add('hidden');
-    const loginPanel = document.getElementById('login-panel');
-    const registerPanel = document.getElementById('register-panel');
-    if (loginPanel) loginPanel.classList.add('hidden');
-    if (registerPanel) registerPanel.classList.add('hidden');
+    setAuthMode('loadout');
     setWeaponSelection(normalizeWeapon(auth && auth.weapon ? auth.weapon : selectedWeapon));
+    setSkillSelection(selectedSkill);
+    renderLookRows();
+    startLookPreview();
 }
-function showSkillPanel(auth, weapon) {
-    pendingAuth = Object.assign({}, auth || {}, { weapon: normalizeWeapon(weapon || selectedWeapon) });
-    document.getElementById('overlay-start')?.classList.remove('hidden');
-    setAuthMode('skill');
-    const weaponPanel = document.getElementById('weapon-panel');
-    if (weaponPanel) weaponPanel.classList.add('hidden');
-    const skillPanel = document.getElementById('skill-panel');
-    if (skillPanel) skillPanel.classList.remove('hidden');
-    setSkillSelection('wire');
-}
-function hideWeaponPanel() {
-    const weaponPanel = document.getElementById('weapon-panel');
-    if (weaponPanel) weaponPanel.classList.add('hidden');
-}
-function hideSkillPanel() {
-    const skillPanel = document.getElementById('skill-panel');
-    if (skillPanel) skillPanel.classList.add('hidden');
+function hideLoadoutPanel() {
+    document.getElementById('loadout-panel')?.classList.add('hidden');
 }
 async function postAuth(path, payload) {
     const response = await fetch(path, {
@@ -156,7 +211,7 @@ async function postAuth(path, payload) {
     }
     return data;
 }
-function enterGame(nickname, accountId, weapon, skill) {
+function enterGame(nickname, accountId, weapon, skill, look) {
     document.body.classList.add('in-game');
     currentSession = { id: accountId || '', nickname: nickname || 'Hunter' };
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
@@ -174,10 +229,11 @@ function enterGame(nickname, accountId, weapon, skill) {
     player.skill = normalizeSkill(skill);
     updateSkillButtonLabel();
     socket.emit('setSkill', player.skill);
+    player.look = normalizeHeroLook(look);
+    socket.emit('setLook', player.look);
     socket.emit('setLoadoutReady');
     updateHUD();
-    hideWeaponPanel();
-    hideSkillPanel();
+    hideLoadoutPanel();
     document.getElementById('overlay-start').classList.add('hidden');
     gameState = 'PLAYING';
     requestGameFullscreen();
@@ -191,11 +247,11 @@ async function handleLogin() {
         setAuthError('login', '');
         if (isLocalAuthBypass) {
             const localId = id || 'local-test';
-            showWeaponPanel({ id: localId, nickname: localId });
+            showLoadoutPanel({ id: localId, nickname: localId });
             return;
         }
         const result = await postAuth('/api/auth/login', { id, password });
-        showWeaponPanel(result);
+        showLoadoutPanel(result);
     } catch (error) {
         setAuthError('login', error.message);
     }
@@ -214,7 +270,7 @@ async function handleRegister() {
         const loginPassword = document.getElementById('login-password');
         if (loginId) loginId.value = result.id;
         if (loginPassword) loginPassword.value = '';
-        showWeaponPanel(result);
+        showLoadoutPanel(result);
     } catch (error) {
         setAuthError('register', error.message);
     }
@@ -248,8 +304,7 @@ document.querySelectorAll('.ui-click').forEach((el) => {
 });
 document.getElementById('btn-restart')?.addEventListener('click', () => {
     hideDeathScreen();
-    setWeaponError('');
-    showWeaponPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
+    showLoadoutPanel(currentSession || { id: localStorage.getItem('mh_last_login_id') || '', nickname: player.name || 'Hunter' });
 });
 document.getElementById('btn-back-login')?.addEventListener('click', () => {
     setAuthMode('login');
@@ -268,28 +323,15 @@ document.querySelectorAll('.weapon-card').forEach((card) => {
         }
     });
 });
-document.getElementById('btn-weapon-back')?.addEventListener('click', () => {
+document.getElementById('btn-loadout-back')?.addEventListener('click', () => {
     pendingAuth = null;
-    hideWeaponPanel();
+    hideLoadoutPanel();
     setAuthMode('login');
     setAuthError('login', '');
 });
-document.getElementById('btn-weapon-confirm')?.addEventListener('click', async () => {
+document.getElementById('btn-loadout-start')?.addEventListener('click', () => {
     if (!pendingAuth) return;
-    setWeaponError('');
-    hideWeaponPanel();
-    showSkillPanel(pendingAuth, selectedWeapon);
-});
-document.getElementById('btn-skill-back')?.addEventListener('click', () => {
-    if (!pendingAuth) return;
-    hideSkillPanel();
-    showWeaponPanel(pendingAuth);
-    setSkillError('');
-});
-document.getElementById('btn-skill-confirm')?.addEventListener('click', async () => {
-    if (!pendingAuth) return;
-    setSkillError('');
-    enterGame(pendingAuth.nickname, pendingAuth.id, normalizeWeapon(selectedWeapon), normalizeSkill(selectedSkill));
+    enterGame(pendingAuth.nickname, pendingAuth.id, normalizeWeapon(selectedWeapon), normalizeSkill(selectedSkill), selectedLook);
     pendingAuth = null;
 });
 document.getElementById('login-id')?.addEventListener('keydown', (e) => {

@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { io: connectClient } = require('socket.io-client');
+// Server log lines written mid-test can corrupt the test runner's output stream.
+process.env.QUIET_LOGS = '1';
 const { createServer } = require('../src/app');
 const state = require('../src/game/state');
 const { spawnMob, spawnBoss, tickMobs, getMobsForOwner, clearAllMobs, isBoss } = require('../src/game/mobs');

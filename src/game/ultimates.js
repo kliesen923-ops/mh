@@ -83,7 +83,8 @@ function applyHammerUltimate(playerId) {
     const profile = getWeaponAttackProfile(attacker.weapon);
     const coneRange = Math.max(118, profile.reach * 1.7) * getUltimateRangeMultiplier(attacker);
     const coneArc = Math.PI * 0.7;
-    const attackAngle = attacker.aAngle || attacker.angle;
+    // Fire where the player faces, not toward their last basic attack.
+    const attackAngle = attacker.angle;
     // Position, direction and size go to clients so they can draw the exact hit area.
     attacker.ultimate = {
         active: true,
@@ -176,7 +177,7 @@ function applyBowUltimate(playerId) {
     if (!attacker) return;
     const now = Date.now();
     const config = getUltimateConfig(attacker.weapon);
-    const baseAngle = attacker.aAngle || attacker.angle;
+    const baseAngle = attacker.angle;
     // Projectile upgrades add dragons in a fan; range upgrades widen each one.
     const shots = getBowShotCount(attacker);
     const angles = Array.from({ length: shots }, (_, i) => baseAngle + (i - (shots - 1) / 2) * DRAGON_SPREAD);

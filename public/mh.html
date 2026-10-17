@@ -15,6 +15,16 @@
     <link rel="stylesheet" href="hud.css">
 </head>
 <body>
+    <div id="rotate-notice" class="rotate-notice" role="alert">
+        <svg class="rotate-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="15" y="6" width="18" height="30" rx="3" />
+            <path d="M8 30a16 16 0 0 0 16 12" />
+            <path d="M20 38l4 4-4 4" />
+        </svg>
+        <h2>화면을 가로로 돌려주세요</h2>
+        <p>이 게임은 가로 화면에서만 할 수 있어요.</p>
+        <button id="btn-rotate-landscape" class="start-btn" type="button">가로 전체화면으로 전환</button>
+    </div>
     <div id="hud" class="game-ui hud-panel">
         <div class="hud-head">
             <span id="level-text" class="hud-level">Lv.1</span>
@@ -81,119 +91,121 @@
                 <button id="btn-back-login" class="start-btn" type="button">LOGIN</button>
             </div>
         </div>
-        <div id="weapon-panel" class="weapon-panel hidden">
-            <h2 style="margin: 0; color: #f1c40f;">무기군 선택</h2>
-            <div id="weapon-note">한손검, 쌍검, 망치, 창, 활 중 하나를 선택하세요.</div>
-            <div class="weapon-grid">
-                <div class="weapon-card selected" data-weapon="sword" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M5 19L19 5" />
-                            <path d="M14 5h5v5" />
-                            <path d="M6 18l4-4" />
-                        </svg>
+        <div id="loadout-panel" class="loadout-panel hidden">
+            <h2 class="loadout-title">캐릭터 준비</h2>
+            <div id="loadout-note" class="loadout-note">외형과 무기를 고르고 게임을 시작하세요.</div>
+            <div class="loadout-body">
+                <section class="loadout-look">
+                    <canvas id="look-preview" width="140" height="150" aria-label="캐릭터 미리보기"></canvas>
+                    <div id="look-rows" class="look-rows"></div>
+                </section>
+                <section class="loadout-gear">
+                    <h3>주무기</h3>
+                    <div class="weapon-grid loadout-weapons">
+                        <div class="weapon-card selected" data-weapon="sword" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M5 19L19 5" />
+                                    <path d="M14 5h5v5" />
+                                    <path d="M6 18l4-4" />
+                                </svg>
+                            </div>
+                            <h4>한손검</h4>
+                            <p>공격이 빠르고 균형이 좋습니다.<br>기본형 무기군입니다.</p>
+                        </div>
+                        <div class="weapon-card" data-weapon="dual" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M7 5L4 14l2 1 4-8" />
+                                    <path d="M17 5l3 9-2 1-4-8" />
+                                    <path d="M9 15l-3 4" />
+                                    <path d="M15 15l3 4" />
+                                </svg>
+                            </div>
+                            <h4>쌍검</h4>
+                            <p>공격속도가 매우 빠릅니다.<br>사거리와 한 방은 짧고 가볍습니다.</p>
+                        </div>
+                        <div class="weapon-card" data-weapon="hammer" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M6 5h8l2 2v3h-3l-2-2H7l-1 1H3V7z" />
+                                    <path d="M10 10l-5 5" />
+                                    <path d="M11 9l5 5" />
+                                    <path d="M9 10v8" />
+                                    <path d="M12 10v8" />
+                                </svg>
+                            </div>
+                            <h4>망치</h4>
+                            <p>압도적인 한 방을 내지만<br>공격속도와 사거리가 크게 떨어집니다.</p>
+                        </div>
+                        <div class="weapon-card" data-weapon="spear" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 18L18 4" />
+                                    <path d="M15 4h5v5" />
+                                    <path d="M3 19l4-1 1-4" />
+                                    <path d="M9 13l3 3" />
+                                </svg>
+                            </div>
+                            <h4>창</h4>
+                            <p>휘두르기 없이 길게 찌릅니다.<br>사거리가 길고 선이 좁습니다.</p>
+                        </div>
+                        <div class="weapon-card" data-weapon="bow" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M6 4c6 3 6 13 0 16" />
+                                    <path d="M6 4l10 8" />
+                                    <path d="M6 20l10-8" />
+                                    <path d="M16 12h5" />
+                                </svg>
+                            </div>
+                            <h4>활</h4>
+                            <p>기본공격이 화살 투사체입니다.<br>저스트 가드에 반사됩니다.</p>
+                        </div>
                     </div>
-                    <h4>한손검</h4>
-                    <p>공격이 빠르고 균형이 좋습니다.<br>기본형 무기군입니다.</p>
-                </div>
-                <div class="weapon-card" data-weapon="dual" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M7 5L4 14l2 1 4-8" />
-                            <path d="M17 5l3 9-2 1-4-8" />
-                            <path d="M9 15l-3 4" />
-                            <path d="M15 15l3 4" />
-                        </svg>
+                    <h3>보조무기</h3>
+                    <div class="weapon-grid loadout-skills">
+                        <div class="weapon-card selected" data-skill="wire" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M5 12h9" />
+                                    <path d="M12 8l4 4-4 4" />
+                                    <path d="M3 12c2-4 6-6 10-6" />
+                                </svg>
+                            </div>
+                            <h4>땡겨</h4>
+                            <p>전방으로 손을 뻗어<br>대상을 끌어옵니다.</p>
+                        </div>
+                        <div class="weapon-card" data-skill="ash" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 20L20 4" />
+                                    <path d="M14 5h5v5" />
+                                    <path d="M8 16l2-2" />
+                                    <path d="M10 14l2-2" />
+                                </svg>
+                            </div>
+                            <h4>애쉬궁</h4>
+                            <p>파란 수정화살을 날려<br>맞은 적을 경직시킵니다.</p>
+                        </div>
+                        <div class="weapon-card" data-skill="gear" role="button" tabindex="0">
+                            <div class="weapon-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 12h6" />
+                                    <path d="M14 12h6" />
+                                    <path d="M10 8l4 4-4 4" />
+                                    <path d="M6 6l12 12" />
+                                </svg>
+                            </div>
+                            <h4>입체기동</h4>
+                            <p>특수 와이어 2개로<br>전방으로 빠르게 이동합니다.</p>
+                        </div>
                     </div>
-                    <h4>쌍검</h4>
-                    <p>공격속도가 매우 빠릅니다.<br>사거리와 한 방은 짧고 가볍습니다.</p>
-                </div>
-                <div class="weapon-card" data-weapon="hammer" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M6 5h8l2 2v3h-3l-2-2H7l-1 1H3V7z" />
-                            <path d="M10 10l-5 5" />
-                            <path d="M11 9l5 5" />
-                            <path d="M9 10v8" />
-                            <path d="M12 10v8" />
-                        </svg>
-                    </div>
-                    <h4>망치</h4>
-                    <p>압도적인 한 방을 내지만<br>공격속도와 사거리가 크게 떨어집니다.</p>
-                </div>
-                <div class="weapon-card" data-weapon="spear" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M4 18L18 4" />
-                            <path d="M15 4h5v5" />
-                            <path d="M3 19l4-1 1-4" />
-                            <path d="M9 13l3 3" />
-                        </svg>
-                    </div>
-                    <h4>창</h4>
-                    <p>휘두르기 없이 길게 찌릅니다.<br>사거리가 길고 선이 좁습니다.</p>
-                </div>
-                <div class="weapon-card" data-weapon="bow" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M6 4c6 3 6 13 0 16" />
-                            <path d="M6 4l10 8" />
-                            <path d="M6 20l10-8" />
-                            <path d="M16 12h5" />
-                        </svg>
-                    </div>
-                    <h4>활</h4>
-                    <p>기본공격이 화살 투사체입니다.<br>저스트 가드에 반사됩니다.</p>
-                </div>
+                </section>
             </div>
             <div class="start-actions">
-                <button id="btn-weapon-confirm" class="start-btn" type="button">시작하기</button>
-                <button id="btn-weapon-back" class="start-btn" type="button">뒤로</button>
-            </div>
-        </div>
-        <div id="skill-panel" class="weapon-panel hidden">
-            <h2 style="margin: 0; color: #f1c40f;">보조스킬 선택</h2>
-            <div id="skill-note">땡겨, 입체기동 또는 애쉬궁 중 하나를 선택하세요.</div>
-            <div class="weapon-grid">
-                <div class="weapon-card selected" data-skill="wire" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M5 12h9" />
-                            <path d="M12 8l4 4-4 4" />
-                            <path d="M3 12c2-4 6-6 10-6" />
-                        </svg>
-                    </div>
-                    <h4>땡겨</h4>
-                    <p>전방으로 손을 뻗어<br>대상을 끌어옵니다.</p>
-                </div>
-                <div class="weapon-card" data-skill="ash" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M4 20L20 4" />
-                            <path d="M14 5h5v5" />
-                            <path d="M8 16l2-2" />
-                            <path d="M10 14l2-2" />
-                        </svg>
-                    </div>
-                    <h4>애쉬궁</h4>
-                    <p>파란 수정화살을 날려<br>맞은 적을 경직시킵니다.</p>
-                </div>
-                <div class="weapon-card" data-skill="gear" role="button" tabindex="0">
-                    <div class="weapon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M4 12h6" />
-                            <path d="M14 12h6" />
-                            <path d="M10 8l4 4-4 4" />
-                            <path d="M6 6l12 12" />
-                        </svg>
-                    </div>
-                    <h4>입체기동</h4>
-                    <p>특수 와이어 2개로<br>전방으로 빠르게 이동합니다.</p>
-                </div>
-            </div>
-            <div class="start-actions">
-                <button id="btn-skill-confirm" class="start-btn" type="button">시작하기</button>
-                <button id="btn-skill-back" class="start-btn" type="button">뒤로</button>
+                <button id="btn-loadout-start" class="start-btn" type="button">게임 시작</button>
+                <button id="btn-loadout-back" class="start-btn" type="button">뒤로</button>
             </div>
         </div>
     </div>
@@ -301,6 +313,7 @@
     <script src="js/hud.js"></script>
     <script src="js/gameplay.js"></script>
     <script src="js/input.js"></script>
+    <script src="js/hero-look.js"></script>
     <script src="js/render.js"></script>
     <script src="js/ultimate-fx.js"></script>
     <script src="js/boss-fx.js"></script>

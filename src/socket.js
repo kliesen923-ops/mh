@@ -15,7 +15,7 @@ const {
     BOW_MOB_KNOCKBACK,
     BOW_PIERCE,
 } = require('./config');
-const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
+const { sanitizeWeapon, sanitizeSkill, sanitizeName, sanitizeLook } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
 const { getAccountById } = require('./db');
 const {
@@ -45,7 +45,7 @@ const { players } = state;
 
 function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
-        console.log('새 플레이어 연결:', socket.id);
+        if (!process.env.QUIET_LOGS) console.log('새 플레이어 연결:', socket.id);
         const spawnPoint = randomWorldPoint();
 
         players[socket.id] = {
@@ -86,6 +86,7 @@ function registerSocketHandlers(io) {
             wire: { active: false, tx: 0, ty: 0 },
             stats: createBaseStatsForWeapon('sword'),
             skill: 'wire',
+            look: sanitizeLook(null),
             lastMoveAt: Date.now(),
             lastWireAt: 0
         };
@@ -126,6 +127,13 @@ function registerSocketHandlers(io) {
             io.emit('statsUpdate', players);
         });
 
+        socket.on('setLook', (look) => {
+            const p = players[socket.id];
+            if (!p) return;
+            p.look = sanitizeLook(look);
+            io.emit('statsUpdate', players);
+        });
+
         socket.on('setSkill', (skill) => {
             const p = players[socket.id];
             if (!p) return;
@@ -141,9 +149,12 @@ function registerSocketHandlers(io) {
             io.emit('statsUpdate', players);
         });
 
-        socket.on('useUltimate', () => {
+        socket.on('useUltimate', (payloadData) => {
             const p = players[socket.id];
             if (!p || p.hp <= 0 || p.isStunned || p.isSelectingLoadout || p.isUpgrading) return;
+            // Aim where the player faces right now; movement updates can lag a fresh turn.
+            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
+            if (Number.isFinite(payload.angle)) p.angle = payload.angle;
             const weapon = sanitizeWeapon(p.weapon);
             const now = Date.now();
             const currentCooldown = Number.isFinite(p.ultimate && p.ultimate.cooldownEndsAt) ? p.ultimate.cooldownEndsAt : 0;

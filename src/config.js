@@ -11,8 +11,10 @@ const MAX_NAME_LENGTH = 10;
 const GAME_WIDTH = 3840;
 const GAME_HEIGHT = 1920;
 const WORLD_MARGIN = 25;
-// Longest straight line inside the widest view (1536x640); arrows fly to the screen edge.
-const BOW_MAX_DISTANCE = 1700;
+// Longest straight line inside the widest view, measured in world units: 1536 wide and
+// 640 / 0.7 tall because the tilted ground shows more world vertically (~1790).
+// Arrows fly to the screen edge.
+const BOW_MAX_DISTANCE = 1850;
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
     hammer: { reach: 96, arc: Math.PI * 0.5, lineWidth: 22 },

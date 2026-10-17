@@ -47,4 +47,18 @@ updateFullscreenButton();
 document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
 if (!document.documentElement.requestFullscreen && !document.documentElement.webkitRequestFullscreen) {
     document.getElementById('btn-fullscreen')?.classList.add('hidden');
+    // iPhone Safari can't lock the orientation; players rotate the phone themselves.
+    document.getElementById('btn-rotate-landscape')?.classList.add('hidden');
+}
+
+// Portrait is blocked by the notice in style.css. On Android, fullscreen lets us lock
+// to landscape even with auto-rotate off.
+document.getElementById('btn-rotate-landscape')?.addEventListener('click', () => {
+    if (isFullscreen()) lockLandscape();
+    else enterFullscreen();
+});
+if (screen.orientation && screen.orientation.addEventListener) {
+    screen.orientation.addEventListener('change', () => {
+        if (isFullscreen()) lockLandscape();
+    });
 }

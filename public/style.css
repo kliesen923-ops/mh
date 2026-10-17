@@ -70,10 +70,30 @@
         #btn-signup { background: #e67e22; }
         #btn-register { background: #e74c3c; }
         #btn-back-login { background: #2c3e50; }
-        #btn-weapon-confirm, #btn-skill-confirm { background: #2ecc71; }
-        #btn-weapon-back, #btn-skill-back { background: #2c3e50; }
-        .weapon-panel { display: flex; flex-direction: column; align-items: center; width: min(720px, calc(100vw - 24px)); }
-        .weapon-panel.hidden { display: none; }
+        #btn-loadout-start { background: #2ecc71; }
+        #btn-loadout-back { background: #2c3e50; }
+        .loadout-panel { display: flex; flex-direction: column; align-items: center; width: min(1000px, calc(100vw - 24px)); }
+        .loadout-title { margin: 0; color: #f1c40f; }
+        .loadout-body { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; width: 100%; margin-bottom: 12px; }
+        .loadout-look { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; background: rgba(255,255,255,0.04); }
+        #look-preview { width: 140px; height: 150px; }
+        .look-rows { display: grid; gap: 6px; width: 100%; }
+        .look-row { display: grid; grid-template-columns: 70px 30px minmax(0, 1fr) 30px; align-items: center; gap: 6px; }
+        .look-label { font-size: 13px; color: #bbb; }
+        .look-arrow, .look-value { height: 32px; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; cursor: pointer; padding: 0; }
+        .look-value { font-weight: 700; }
+        .look-arrow:active, .look-value:active { background: rgba(241,196,15,0.25); }
+        .loadout-gear { display: flex; flex-direction: column; min-width: 0; }
+        .loadout-gear h3 { margin: 0 0 6px; font-size: 14px; color: #f1c40f; }
+        .loadout-gear .weapon-grid { width: 100%; margin: 0 0 12px; }
+        .loadout-gear .loadout-weapons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        .loadout-gear .loadout-skills { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .loadout-gear .weapon-card { min-height: 0; padding: 10px 6px; gap: 5px; }
+        .loadout-gear .weapon-card .weapon-icon { width: 46px; height: 46px; }
+        .loadout-gear .weapon-card .weapon-icon svg { width: 24px; height: 24px; }
+        .loadout-gear .weapon-card h4 { font-size: 15px; }
+        .loadout-gear .weapon-card p { font-size: 11px; line-height: 1.35; }
+        .loadout-panel.hidden { display: none; }
         .weapon-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -82,11 +102,6 @@
             margin: 18px auto 16px;
             justify-content: center;
         }
-        #weapon-panel .weapon-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            width: min(860px, 100%);
-        }
-        #skill-panel .weapon-grid { width: min(420px, 100%); }
         .weapon-card {
             min-height: 200px;
             border: 2px solid rgba(255,255,255,0.18);
@@ -128,7 +143,7 @@
             stroke-linecap: round;
             stroke-linejoin: round;
         }
-        #weapon-note { min-height: 18px; color: #ddd; font-size: 12px; margin-bottom: 2px; text-align: center; }
+        .loadout-note { min-height: 18px; color: #ddd; font-size: 13px; margin: 4px 0 10px; text-align: center; }
         @media (max-width: 700px), (max-height: 500px) {
             #upgrade-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; width: min(860px, 95%); }
             .card { max-width: 140px; height: 164px; padding: 9px; border-radius: 8px; }
@@ -168,9 +183,9 @@
             .card h4 { margin: 0 0 4px 0; }
             .death-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .death-stat:last-child { grid-column: 1 / -1; }
-            .weapon-panel { width: min(400px, calc(100vw - 24px)); }
+            .loadout-body { grid-template-columns: 1fr; }
+            .loadout-gear .loadout-weapons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
             .weapon-grid { width: min(360px, 100%); }
-            #weapon-panel .weapon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(360px, 100%); }
             .weapon-card { min-height: 138px; align-items: center; text-align: center; }
             .weapon-card .weapon-icon { width: 54px; height: 54px; }
             .weapon-card .weapon-icon svg { width: 26px; height: 26px; }
@@ -196,12 +211,26 @@
             .card p { font-size: 11px; margin: 0; }
             .overlay { padding: 8px 0; }
             .overlay h1 { font-size: 22px; margin: 4px 0 8px; }
-            .weapon-panel { width: calc(100vw - 24px); }
-            .weapon-panel h2 { font-size: 18px; }
-            #weapon-note, #skill-note { font-size: 12px; }
+            .loadout-panel { width: calc(100vw - 24px); }
+            /* The big game title would push the start button off short screens. */
+            #overlay-start.mode-loadout > h1 { display: none; }
+            .loadout-title { font-size: 17px; }
+            .loadout-note { margin: 2px 0 6px; font-size: 12px; }
+            .loadout-body { grid-template-columns: 250px minmax(0, 1fr); gap: 10px; margin-bottom: 6px; }
+            .loadout-look { flex-direction: row; align-items: center; gap: 6px; padding: 6px; }
+            #look-preview { width: 76px; height: 82px; flex: 0 0 auto; }
+            .look-rows { gap: 4px; }
+            .look-row { grid-template-columns: 52px 24px minmax(0, 1fr) 24px; gap: 3px; }
+            .look-label { font-size: 11px; }
+            .look-arrow, .look-value { height: 26px; font-size: 11px; }
+            .loadout-gear h3 { font-size: 12px; margin-bottom: 3px; }
+            .loadout-gear .weapon-grid { margin-bottom: 6px; gap: 6px; }
+            .loadout-gear .weapon-card { padding: 5px 4px; gap: 2px; }
+            .loadout-gear .weapon-card .weapon-icon { width: 30px; height: 30px; }
+            .loadout-gear .weapon-card .weapon-icon svg { width: 18px; height: 18px; }
+            .loadout-gear .weapon-card h4 { font-size: 12px; }
+            .loadout-gear .weapon-card p { display: none; }
             .weapon-grid { margin: 8px auto; gap: 8px; }
-            #weapon-panel .weapon-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); width: min(900px, 100%); }
-            #skill-panel .weapon-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(600px, 100%); }
             .weapon-card { min-height: 0; padding: 8px 6px; gap: 4px; }
             .weapon-card .weapon-icon { width: 40px; height: 40px; }
             .weapon-card .weapon-icon svg { width: 22px; height: 22px; }
@@ -211,4 +240,14 @@
             .start-btn { padding: 10px 18px; font-size: 14px; }
             .card { height: auto; min-height: 150px; padding: 10px 6px; }
         }
-    
+
+        /* Portrait phones get a full-screen notice instead of the game. */
+        .rotate-notice { display: none; position: fixed; inset: 0; z-index: 5000; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; box-sizing: border-box; background: #0b0b0d; color: white; text-align: center; }
+        .rotate-notice h2 { margin: 0; font-size: 22px; color: #f1c40f; }
+        .rotate-notice p { margin: 0; font-size: 15px; color: #ccc; }
+        .rotate-icon { width: 96px; height: 96px; fill: none; stroke: #f1c40f; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; animation: rotate-hint 2.4s ease-in-out infinite; }
+        @keyframes rotate-hint { 0%, 25% { transform: rotate(0deg); } 55%, 100% { transform: rotate(-90deg); } }
+        #btn-rotate-landscape { margin-top: 12px; background: #2ecc71; }
+        @media (orientation: portrait) and (pointer: coarse) {
+            .rotate-notice { display: flex; }
+        }

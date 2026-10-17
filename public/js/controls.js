@@ -7,7 +7,7 @@ function setMouseAimFromPoint(clientX, clientY) {
     const scaleX = rect.width / canvas.width;
     const scaleY = rect.height / canvas.height;
     const worldX = (clientX - rect.left) / Math.max(0.0001, scaleX) + camera.x;
-    const worldY = (clientY - rect.top) / Math.max(0.0001, scaleY) + camera.y;
+    const worldY = (clientY - rect.top) / Math.max(0.0001, scaleY) / VIEW_Y_SCALE + camera.y;
     const dx = worldX - player.x;
     const dy = worldY - player.y;
     if (dx === 0 && dy === 0) return;
