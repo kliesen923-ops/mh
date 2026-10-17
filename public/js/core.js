@@ -142,10 +142,24 @@ const player = {
     skill: 'wire'
 };
 
+// The view is always GAME_HEIGHT tall; its width follows the screen's aspect ratio
+// (within limits) so phones get no black bars at the sides.
+const MIN_VIEW_ASPECT = 1.6;
+const MAX_VIEW_ASPECT = 2.4;
 function resize() {
-    canvas.width = GAME_WIDTH;
+    const screenW = Math.max(1, window.innerWidth);
+    const screenH = Math.max(1, window.innerHeight);
+    const aspect = Math.max(MIN_VIEW_ASPECT, Math.min(MAX_VIEW_ASPECT, screenW / screenH));
     canvas.height = GAME_HEIGHT;
-    const scale = Math.max(0.1, Math.min(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT, 1));
+    canvas.width = Math.round(GAME_HEIGHT * aspect);
+    const cssWidth = Math.min(screenW, screenH * aspect);
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssWidth / aspect}px`;
+    const scale = Math.max(0.1, Math.min(screenW / GAME_WIDTH, screenH / GAME_HEIGHT, 1));
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
     document.documentElement.style.setProperty('--game-ui-scale', String(scale));
+    document.documentElement.style.setProperty('--hud-scale', String(Math.max(0.62, scale)));
+    // Touch controls stay large enough to press comfortably.
+    document.documentElement.style.setProperty('--touch-scale', String(coarse ? Math.max(0.82, Math.min(1, scale * 1.3)) : Math.max(0.7, scale)));
 }
 window.addEventListener('resize', resize); resize();

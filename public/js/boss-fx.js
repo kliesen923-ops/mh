@@ -113,27 +113,21 @@ function drawBossSlams() {
     });
 }
 
-// Screen-space health bar for the player's own boss, under the minimap.
-function drawBossBar() {
+// Health bar for the player's own boss at the top of the screen (HTML, see hud.css).
+let shownBossBar = '';
+function updateBossBar() {
     let boss = null;
     mobs.forEach((mob) => { if (mob.boss && mob.mine) boss = mob; });
+    const bar = document.getElementById('boss-bar');
+    if (!bar) return;
+    const state = boss ? `${boss.id}:${boss.hpPct}:${bossLevels[boss.id] || ''}` : '';
+    if (state === shownBossBar) return;
+    shownBossBar = state;
+    bar.classList.toggle('hidden', !boss);
     if (!boss) return;
-    const w = 360;
-    const x = (canvas.width - w) / 2;
-    const y = 206;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(x - 4, y - 18, w + 8, 34);
-    ctx.fillStyle = '#3a0d0d';
-    ctx.fillRect(x, y, w, 10);
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(x, y, w * Math.max(0, boss.hpPct) / 100, 10);
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#f1c40f';
     const level = bossLevels[boss.id];
-    ctx.fillText(level ? `보스 Lv.${level}` : '보스', canvas.width / 2, y - 4);
-    ctx.restore();
+    document.getElementById('boss-bar-name').textContent = level ? `보스 Lv.${level}` : '보스';
+    document.getElementById('boss-bar-fill').style.width = `${Math.max(0, boss.hpPct)}%`;
 }
 
 function drawAnnouncements() {

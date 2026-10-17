@@ -1,0 +1,322 @@
+/* In-game HUD: player card (top left), icons + minimap + ranking (top right), boss bar
+   (top center), chat (above the joystick), joystick and action buttons. Panels share one
+   glass look. --hud-scale shrinks info panels on small screens; --touch-scale keeps
+   controls big enough to press. Both are set from JS in resize(). */
+:root {
+    --hud-scale: 1;
+    --touch-scale: 1;
+    --ui-bg: rgba(14, 16, 26, 0.62);
+    --ui-bg-strong: rgba(14, 16, 26, 0.82);
+    --ui-border: rgba(255, 255, 255, 0.12);
+    --ui-text: #f2f3f7;
+    --ui-muted: #9aa0b4;
+    --ui-gold: #f5c84c;
+    --ui-hp: #3ddc84;
+    --ui-hp-low: #ff5a5a;
+    --ui-xp: #5ad8ff;
+    --ui-radius: 14px;
+    --ui-gap: 14px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+}
+
+body:not(.in-game) .game-ui { visibility: hidden; }
+
+.hud-panel {
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: var(--ui-text);
+    box-sizing: border-box;
+}
+
+/* Player card */
+#hud {
+    position: absolute;
+    top: calc(var(--ui-gap) + var(--safe-top));
+    left: calc(var(--ui-gap) + var(--safe-left));
+    width: 230px;
+    padding: 12px 14px;
+    z-index: 500;
+    pointer-events: none;
+    transform: scale(var(--hud-scale));
+    transform-origin: top left;
+    font-size: 13px;
+}
+.hud-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.hud-level {
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--ui-gold);
+    color: #1b1406;
+    font-size: 12px;
+    font-weight: 800;
+}
+.hud-name { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-toggle {
+    flex: none;
+    pointer-events: auto;
+    padding: 3px 8px;
+    border: 1px solid var(--ui-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--ui-muted);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+.hud-toggle[aria-expanded="true"] { color: var(--ui-gold); border-color: rgba(245, 200, 76, 0.5); }
+.hud-bar {
+    position: relative;
+    height: 16px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.hud-bar.hud-xp { height: 10px; margin-bottom: 0; }
+.hud-fill { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: inherit; transition: width 0.2s; }
+.hud-hp .hud-fill { background: linear-gradient(90deg, #22b866, var(--ui-hp)); }
+#hud.hp-low .hud-hp .hud-fill { background: linear-gradient(90deg, #c0392b, var(--ui-hp-low)); }
+.hud-xp .hud-fill { width: 0%; background: linear-gradient(90deg, #3a8fdc, var(--ui-xp)); }
+.hud-bar-text {
+    position: relative;
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 16px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.hud-xp .hud-bar-text { font-size: 9px; line-height: 10px; color: #e6f8ff; }
+.hud-stats { display: none; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--ui-border); font-size: 12px; }
+#hud.show-stats .hud-stats { display: grid; }
+.hud-stats > div { display: flex; justify-content: space-between; gap: 6px; color: var(--ui-muted); }
+.hud-stats b { color: var(--ui-gold); font-weight: 700; }
+
+/* Top right column: icon buttons, minimap, ranking */
+#hud-right {
+    position: absolute;
+    top: calc(var(--ui-gap) + var(--safe-top));
+    right: calc(var(--ui-gap) + var(--safe-right));
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    z-index: 500;
+    pointer-events: none;
+    transform: scale(var(--hud-scale));
+    transform-origin: top right;
+}
+.hud-icons { display: flex; gap: 8px; }
+.hud-icon {
+    pointer-events: auto;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-bg);
+    color: var(--ui-text);
+    cursor: pointer;
+}
+.hud-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hud-icon.off { color: var(--ui-muted); }
+#minimap { display: block; width: 200px; height: 100px; padding: 0; margin: 0; }
+#leaderboard { width: 200px; padding: 10px 12px; font-size: 13px; }
+#leaderboard h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--ui-muted); }
+.rank-row { display: flex; align-items: center; gap: 7px; padding: 3px 0; }
+.rank-row + .rank-row { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.rank-pos { width: 14px; text-align: center; font-weight: 800; color: var(--ui-muted); }
+.rank-row:nth-child(1) .rank-pos { color: var(--ui-gold); }
+.rank-row:nth-child(2) .rank-pos { color: #d7dce6; }
+.rank-row:nth-child(3) .rank-pos { color: #d79a62; }
+.rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-level { font-size: 11px; font-weight: 700; color: var(--ui-gold); }
+.rank-kills { min-width: 34px; text-align: right; font-size: 11px; color: var(--ui-muted); }
+.rank-row.me { color: #ffd9a8; }
+.rank-row.me .rank-name { font-weight: 700; }
+.rank-gap { text-align: center; color: var(--ui-muted); font-size: 11px; line-height: 10px; }
+
+/* Boss bar */
+#boss-bar {
+    position: absolute;
+    top: calc(var(--ui-gap) + var(--safe-top));
+    left: 50%;
+    width: 420px;
+    transform: translateX(-50%) scale(var(--hud-scale));
+    transform-origin: top center;
+    z-index: 450;
+    pointer-events: none;
+    text-align: center;
+}
+.boss-bar-label { margin-bottom: 4px; font-size: 13px; font-weight: 800; color: #ffb4a8; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.boss-bar-track { height: 12px; border-radius: 999px; background: rgba(40, 6, 6, 0.8); border: 1px solid rgba(255, 120, 100, 0.45); overflow: hidden; box-shadow: 0 0 16px rgba(231, 76, 60, 0.35); }
+#boss-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #8e1b12, #ff5a46); transition: width 0.15s; }
+
+/* Chat: only the text floats over the game until the input is opened */
+#chat-container {
+    position: absolute;
+    left: calc(var(--ui-gap) + var(--safe-left));
+    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 150px * var(--touch-scale));
+    width: min(320px, 38vw);
+    display: flex;
+    flex-direction: column;
+    z-index: 200;
+    pointer-events: none;
+    border-radius: var(--ui-radius);
+}
+#chat-container.active { background: var(--ui-bg-strong); border: 1px solid var(--ui-border); pointer-events: auto; }
+#chat-messages {
+    max-height: 120px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 6px 8px;
+    color: var(--ui-text);
+    font-size: 13px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+#chat-container.active #chat-messages { overflow-y: auto; }
+.chat-line { animation: chat-fade 9s forwards; }
+.chat-line b { margin-right: 4px; color: var(--ui-gold); }
+.chat-line.system b { color: #ff8a7a; }
+#chat-container.active .chat-line { animation: none; opacity: 1; }
+@keyframes chat-fade { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+#chat-input-container { padding: 6px 8px 8px; display: none; }
+#chat-input { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--ui-border); border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: var(--ui-text); outline: none; font-size: 14px; }
+
+/* Joystick */
+#joy-container {
+    position: absolute;
+    left: calc(28px + var(--safe-left));
+    bottom: calc(28px + var(--safe-bottom));
+    width: 124px;
+    height: 124px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.04) 0 55%, rgba(255, 255, 255, 0.1) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transform: scale(var(--touch-scale));
+    transform-origin: bottom left;
+}
+#joy-stick {
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.22));
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+/* Action buttons */
+.action-buttons {
+    position: absolute;
+    right: calc(24px + var(--safe-right));
+    bottom: calc(24px + var(--safe-bottom));
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 12px;
+    align-items: center;
+    justify-items: center;
+    z-index: 100;
+    transform: scale(var(--touch-scale));
+    transform-origin: bottom right;
+}
+.btn {
+    --cooldown-progress: 0;
+    --btn-color: rgba(255, 255, 255, 0.45);
+    position: relative;
+    width: 68px;
+    height: 68px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 2px solid var(--btn-color);
+    background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.16), rgba(16, 18, 28, 0.78) 62%);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), inset 0 0 14px rgba(255, 255, 255, 0.04);
+    color: var(--ui-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: transform 0.08s, filter 0.15s;
+}
+.btn:active { transform: scale(0.93); }
+.btn-icon { width: 24px; height: 24px; fill: none; stroke: var(--btn-color); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+.btn::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: conic-gradient(var(--ui-gold) 0 calc(var(--cooldown-progress) * 1turn), transparent 0);
+    transform: rotate(-90deg);
+    opacity: 0;
+    pointer-events: none;
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+    transition: opacity 0.12s linear;
+}
+.btn.cooling { filter: brightness(0.6) saturate(0.6); }
+.btn.cooling::after { opacity: 1; }
+.btn-skill { --btn-color: #5ad8ff; }
+.btn-dodge { --btn-color: #8ef0a8; }
+.btn-guard { --btn-color: #7fb2ff; }
+.btn-ultimate { --btn-color: #c792ff; grid-column: 1; grid-row: 2; }
+.btn-attack {
+    --btn-color: #ff7a5c;
+    width: 96px;
+    height: 96px;
+    grid-column: 2 / span 2;
+    grid-row: 2;
+    background: radial-gradient(circle at 35% 28%, rgba(255, 170, 140, 0.35), rgba(120, 24, 14, 0.85) 65%);
+}
+.btn-attack .btn-icon { width: 34px; height: 34px; stroke: #ffe0d6; }
+.btn-attack .btn-label { font-size: 13px; }
+.btn-ultimate:not(.cooling) { box-shadow: 0 0 18px rgba(199, 146, 255, 0.55), 0 6px 16px rgba(0, 0, 0, 0.45); }
+
+/* Portrait phones: ask to rotate instead of showing a sliver of the arena */
+#rotate-hint {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(8, 9, 14, 0.94);
+    color: var(--ui-text);
+    font-size: 17px;
+    font-weight: 700;
+}
+#rotate-hint svg { width: 64px; height: 64px; fill: none; stroke: var(--ui-gold); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; animation: rotate-nudge 1.6s ease-in-out infinite; }
+@keyframes rotate-nudge { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) {
+    body.in-game #rotate-hint { display: flex; }
+}
+
+/* Short landscape screens (phones): tighter gaps and a shorter ranking */
+@media (max-height: 500px) and (orientation: landscape) {
+    :root { --ui-gap: 10px; }
+    #minimap { height: 90px; }
+    #chat-messages { max-height: 72px; font-size: 12px; }
+    #chat-container { width: min(280px, 34vw); }
+}

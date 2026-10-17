@@ -2,38 +2,6 @@
         :root { --game-ui-scale: 1; }
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; touch-action: none; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
         canvas { display: block; background: #1a1a1a; width: min(100vw, 200vh); height: min(50vw, 100vh); margin: auto; }
-        #hud { position: absolute; top: calc(20px * var(--game-ui-scale)); left: calc(20px * var(--game-ui-scale)); width: 182px; background: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 8px; color: white; font-size: 13px; z-index: 500; pointer-events: none; transform: scale(var(--game-ui-scale)); transform-origin: top left; }
-        #hp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: bold; }
-        #hp-bar { width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
-        #hp-fill { height: 100%; width: 100%; background: linear-gradient(to right, #2ecc71, #f1c40f); transition: width 0.2s; }
-        #xp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 12px; font-weight: bold; color: #5ad8ff; }
-        #xp-bar { width: 100%; height: 6px; background: #333; border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
-        #xp-fill { height: 100%; width: 0%; background: linear-gradient(to right, #3a9bdc, #5ad8ff); transition: width 0.2s; }
-        #damage-readout { color: #ddd; line-height: 1.35; display: grid; gap: 2px; }
-        #damage-readout b { color: #f1c40f; }
-        #leaderboard { position: absolute; top: calc(20px * var(--game-ui-scale)); right: calc(20px * var(--game-ui-scale)); width: 210px; max-width: calc(100vw - 40px); box-sizing: border-box; background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 8px; color: white; font-size: 14px; z-index: 500; pointer-events: none; transform: scale(var(--game-ui-scale)); transform-origin: top right; }
-        #leaderboard h3 { margin: 0 0 10px 0; font-size: 16px; color: #f1c40f; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .score-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .score-table th:nth-child(2), .score-table th:nth-child(3), .score-table td:nth-child(2), .score-table td:nth-child(3) { width: 36px; }
-        .score-table th { color: #f1c40f; font-size: 11px; font-weight: bold; text-align: right; padding: 0 0 6px 6px; border-bottom: 1px solid rgba(255,255,255,0.18); }
-        .score-table th:first-child { text-align: left; padding-left: 0; }
-        .score-table td { padding: 5px 0 0 6px; text-align: right; }
-        .score-table td:first-child { padding-left: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .score-table .name-cell { display: flex; align-items: center; min-width: 0; }
-        .score-table .name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .level-badge { background: #f1c40f; color: black; padding: 0 5px; border-radius: 4px; font-weight: bold; margin-right: 5px; font-size: 11px; }
-        #chat-container { position: absolute; bottom: 20px; left: 20px; width: 300px; height: 180px; background: rgba(0, 0, 0, 0.4); border-radius: 8px; display: flex; flex-direction: column; z-index: 200; pointer-events: none; }
-        #chat-container.active { background: rgba(0, 0, 0, 0.7); pointer-events: auto; }
-        #chat-messages { flex: 1; overflow-y: auto; padding: 10px; color: white; font-size: 13px; text-shadow: 1px 1px 1px black; }
-        #chat-input-container { padding: 8px; display: none; }
-        #chat-input { width: 100%; background: rgba(255, 255, 255, 0.2); border: 1px solid #555; color: white; padding: 5px 10px; border-radius: 4px; outline: none; box-sizing: border-box; }
-        .action-buttons { position: absolute; bottom: 50px; right: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; z-index: 100; }
-        .btn { --cooldown-progress: 0; position: relative; width: 70px; height: 70px; background: rgba(40,40,40,0.7); border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .btn::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; background: conic-gradient(#f1c40f 0 calc(var(--cooldown-progress) * 1turn), transparent 0); transform: rotate(-90deg); transform-origin: center; opacity: 0; pointer-events: none; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); transition: opacity 0.12s linear; }
-        .btn.cooling { filter: brightness(0.72); }
-        .btn.cooling::after { opacity: 1; }
-        #btn-attack { background: rgba(192, 57, 43, 0.7); width: 90px; height: 90px; grid-column: 2 / span 2; grid-row: 2; }
-        #btn-ultimate { background: rgba(155, 89, 182, 0.78); grid-column: 1; grid-row: 2; }
         .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: safe center; z-index: 1000; color: white; overflow-y: auto; box-sizing: border-box; }
         body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
         input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
@@ -56,8 +24,6 @@
         .death-top-entry.me { border-color: #e67e22; color: #fff; }
         .death-top-entry b { color: #f1c40f; }
         .hidden { display: none !important; }
-        #btn-fullscreen { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.5); color: white; font-size: 20px; line-height: 1; padding: 0; z-index: 600; cursor: pointer; }
-        #btn-sound { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: calc(50% - 50px); transform: translateX(-50%); width: 40px; height: 40px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.5); color: white; font-size: 18px; line-height: 1; padding: 0; z-index: 600; cursor: pointer; }
         #upgrade-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 20px; width: min(960px, 95%); justify-items: center; }
         .card { position: relative; width: 100%; max-width: 180px; height: 220px; background: linear-gradient(135deg, #2c3e50, #000); border: 3px solid #f1c40f; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; padding: 15px; text-align: center; box-sizing: border-box; }
         .upgrade-level-badge { position: absolute; top: 10px; right: 10px; min-width: 36px; padding: 2px 7px; border-radius: 999px; background: rgba(241, 196, 15, 0.95); color: #111; font-size: 11px; font-weight: 800; line-height: 1.2; box-sizing: border-box; }
@@ -86,8 +52,6 @@
             stroke-linejoin: round;
         }
         #upgrade-timer { font-size: 24px; color: #e74c3c; font-weight: bold; margin-top: 20px; text-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
-        #joy-container { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; border: 2px solid rgba(255,255,255,0.2); }
-        #joy-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; position: absolute; pointer-events: none; }
         #nickname-input { width: min(260px, calc(100vw - 40px)); margin: 14px 0; padding: 12px 14px; border: 1px solid #555; border-radius: 8px; background: rgba(255,255,255,0.12); color: white; outline: none; font-size: 16px; text-align: center; box-sizing: border-box; }
         #nickname-input:focus { border-color: #f1c40f; box-shadow: 0 0 0 2px rgba(241,196,15,0.2); }
         #nickname-input::placeholder { color: rgba(255,255,255,0.55); }
@@ -166,52 +130,6 @@
         }
         #weapon-note { min-height: 18px; color: #ddd; font-size: 12px; margin-bottom: 2px; text-align: center; }
         @media (max-width: 700px), (max-height: 500px) {
-            #hud {
-                top: calc(10px * var(--game-ui-scale) + env(safe-area-inset-top));
-                left: calc(10px * var(--game-ui-scale));
-                width: min(156px, calc(50vw - 18px));
-                padding: 9px;
-                font-size: 11px;
-            }
-            #hp-row { margin-bottom: 5px; }
-            #hp-bar { height: 8px; margin-bottom: 7px; }
-            #damage-readout { line-height: 1.35; }
-            #leaderboard {
-                top: calc(10px * var(--game-ui-scale) + env(safe-area-inset-top));
-                right: calc(10px * var(--game-ui-scale));
-                width: min(168px, calc(50vw - 18px));
-                padding: 9px;
-                font-size: 11px;
-            }
-            #leaderboard h3 { font-size: 12px; margin-bottom: 6px; padding-bottom: 4px; }
-            .level-badge { font-size: 9px; padding: 0 4px; margin-right: 3px; }
-            .score-table th { font-size: 10px; padding-bottom: 4px; }
-            .score-table td { padding-top: 4px; }
-            #chat-container {
-                left: 10px;
-                bottom: calc(176px + env(safe-area-inset-bottom));
-                width: calc(100vw - 20px);
-                height: 88px;
-                border-radius: 6px;
-                z-index: 90;
-            }
-            #chat-messages { padding: 7px; font-size: 11px; }
-            #chat-input-container { padding: 6px; }
-            #joy-container {
-                left: 18px;
-                bottom: calc(22px + env(safe-area-inset-bottom));
-                width: 104px;
-                height: 104px;
-            }
-            #joy-stick { width: 42px; height: 42px; }
-            .action-buttons {
-                right: 16px;
-                bottom: calc(22px + env(safe-area-inset-bottom));
-                gap: 10px;
-            }
-            .btn { width: 58px; height: 58px; font-size: 12px; border-width: 2px; }
-            #btn-attack { width: 76px; height: 76px; font-size: 14px; }
-            #btn-ultimate { width: 58px; height: 58px; font-size: 12px; }
             #upgrade-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; width: min(860px, 95%); }
             .card { max-width: 140px; height: 164px; padding: 9px; border-radius: 8px; }
             .upgrade-level-badge { top: 8px; right: 8px; min-width: 32px; padding: 2px 6px; font-size: 9px; }
@@ -229,21 +147,6 @@
         }
 
         @media (max-width: 700px) and (orientation: portrait) {
-            #hud { width: min(156px, calc(50vw - 18px)); }
-            #leaderboard { width: min(158px, calc(50vw - 18px)); }
-            #chat-container {
-                bottom: calc(158px + env(safe-area-inset-bottom));
-                height: 82px;
-            }
-            #joy-container {
-                width: 96px;
-                height: 96px;
-                left: 16px;
-            }
-            .btn { width: 54px; height: 54px; }
-            #btn-attack { width: 72px; height: 72px; }
-            #btn-ultimate { width: 54px; height: 54px; }
-            .action-buttons { right: 12px; gap: 8px; }
             #upgrade-cards {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
                 width: min(320px, calc(100vw - 32px));
@@ -279,22 +182,6 @@
         }
 
         @media (max-height: 500px) and (orientation: landscape) {
-            #hud, #leaderboard { max-height: 118px; overflow: hidden; }
-            #chat-container {
-                left: 140px;
-                bottom: calc(14px + env(safe-area-inset-bottom));
-                width: clamp(160px, calc(100vw - 420px), 300px);
-                height: 96px;
-            }
-            #joy-container {
-                left: 18px;
-                bottom: calc(18px + env(safe-area-inset-bottom));
-            }
-            .action-buttons {
-                right: 18px;
-                bottom: calc(18px + env(safe-area-inset-bottom));
-                gap: 10px;
-            }
             .death-title { font-size: 30px; }
             .death-cause { font-size: 13px; margin-top: 2px; }
             .death-stats { margin: 10px 0 8px; gap: 8px; }

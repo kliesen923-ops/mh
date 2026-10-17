@@ -20,8 +20,8 @@ function getSkillCooldown(skill) {
     return SKILL_PRESETS[normalizeSkill(skill)]?.cooldown || SKILL_PRESETS.wire.cooldown;
 }
 function updateSkillButtonLabel() {
-    const btn = document.getElementById('btn-wire');
-    if (btn) btn.textContent = getSkillLabel(player.skill || selectedSkill);
+    const label = document.getElementById('btn-wire-label');
+    if (label) label.textContent = getSkillLabel(player.skill || selectedSkill);
 }
 function setAuthMode(mode) {
     const loginPanel = document.getElementById('login-panel');
@@ -157,6 +157,7 @@ async function postAuth(path, payload) {
     return data;
 }
 function enterGame(nickname, accountId, weapon, skill) {
+    document.body.classList.add('in-game');
     currentSession = { id: accountId || '', nickname: nickname || 'Hunter' };
     if (accountId) localStorage.setItem('mh_last_login_id', accountId);
     if (accountId) socket.emit('setAccount', accountId);
@@ -235,6 +236,16 @@ document.getElementById('btn-signup')?.addEventListener('click', () => {
     setAuthError('register', '');
 });
 document.getElementById('btn-register')?.addEventListener('click', handleRegister);
+document.getElementById('btn-stats')?.addEventListener('click', (e) => {
+    const hud = document.getElementById('hud');
+    const open = !hud.classList.contains('show-stats');
+    hud.classList.toggle('show-stats', open);
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+});
+// HUD buttons sit over the arena; keep their clicks from starting an attack.
+document.querySelectorAll('.ui-click').forEach((el) => {
+    ['mousedown', 'pointerdown', 'touchstart'].forEach((type) => el.addEventListener(type, (e) => e.stopPropagation()));
+});
 document.getElementById('btn-restart')?.addEventListener('click', () => {
     hideDeathScreen();
     setWeaponError('');
