@@ -58,8 +58,10 @@ const SKILL_PRESETS = {
 const STAFF_ORB_DAMAGE = 16;
 const STAFF_ORB_FINISHER_DAMAGE = 26;
 const BLINK_MARK_SEC = 4;
-// How far the ash arrow flies (matches the server's PROJECTILES.ash).
+// How far the ash arrow and arrows fly, and arrow speed (match the server's PROJECTILES).
 const ASH_RANGE = 900;
+const BOW_RANGE = 1000;
+const BOW_SPEED = 1300;
 const ULTIMATE_PRESETS = {
     sword: { cooldown: 11.0, duration: 1.2 },
     hammer: { cooldown: 13.0, duration: 0.7 },

@@ -72,6 +72,7 @@ socket.on('playerStunned', (data) => {
         allPlayers[data.id].stunEndsAt = data.stunned ? (data.stunEndsAt || (Date.now() + (data.stunMs || 0))) : 0;
     }
     if(data.id === myId) {
+        if (data.stunned && !player.isStunned) cancelActionsOnStun();
         player.isStunned = data.stunned;
         player.stunEndsAt = data.stunned ? (data.stunEndsAt || (Date.now() + (data.stunMs || 0))) : 0;
     }
@@ -176,12 +177,14 @@ function pushCombatEffect(effect) {
     if (!effect) return;
     const special = SPECIAL_EFFECTS.has(effect.weapon);
     const plain = PLAIN_EFFECTS.has(effect.weapon);
-    const life = special ? (effect.weapon === 'meteor' ? 0.7 : 0.45) : 0.22;
+    const weaponKey = special || plain ? effect.weapon : normalizeWeapon(effect.weapon);
+    const life = special ? (effect.weapon === 'meteor' ? 0.7 : 0.45) : (HIT_LIFE[weaponKey] || 0.22);
+    if (effect.damage && !special && !plain) spawnHitParticles({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: Number(effect.angle) || 0, weapon: weaponKey });
     combatEffects.push({
         x: Number(effect.x) || 0,
         y: Number(effect.y) || 0,
         angle: Number(effect.angle) || 0,
-        weapon: special || plain ? effect.weapon : normalizeWeapon(effect.weapon),
+        weapon: weaponKey,
         life,
         maxLife: life,
     });
@@ -339,13 +342,19 @@ socket.on('bowProjectile', (effect) => {
         endX: Number(effect.endX) || 0,
         endY: Number(effect.endY) || 0,
         angle: Math.atan2((Number(effect.endY) || 0) - (Number(effect.startY) || 0), (Number(effect.endX) || 0) - (Number(effect.startX) || 0)),
-        duration: Math.max(0.18, Math.min(0.8, (Number(effect.duration) || 400) / 1000)),
+        duration: Math.max(0.06, (Number(effect.duration) || 400) / 1000),
         progress: 0,
         reflected: Boolean(effect.reflected),
     };
-    const existingIndex = bowProjectiles.findIndex((p) => p.id === projectile.id);
-    if (existingIndex >= 0) bowProjectiles[existingIndex] = projectile;
-    else bowProjectiles.push(projectile);
+    // Our own arrows are already flying (drawn when we shot); keep them where they are.
+    const existing = bowProjectiles.find((p) => p.id === projectile.id);
+    if (existing) {
+        existing.endX = projectile.endX;
+        existing.endY = projectile.endY;
+        existing.duration = projectile.duration;
+    } else {
+        bowProjectiles.push(projectile);
+    }
 });
 socket.on('dragonProjectile', (effect) => {
     if (!effect) return;
@@ -377,7 +386,8 @@ socket.on('guardBroken', (data) => {
         player.isGuarding = false;
     }
     if (allPlayers[data.id]) allPlayers[data.id].isGuarding = false;
-    damageTexts.push({ x: target.x, y: target.y - 24, value: 0, text: '가드 브레이크!', color: '#ff9f43', size: 18, drift: 0, life: 0.9, maxLife: 0.9 });
+    // The text only when a raised guard was actually broken.
+    if (data.wasGuarding) damageTexts.push({ x: target.x, y: target.y - 24, value: 0, text: '가드 브레이크!', color: '#ff9f43', size: 18, drift: 0, life: 0.9, maxLife: 0.9 });
 });
 socket.on('staffOrb', (orb) => {
     if (!orb) return;

@@ -207,10 +207,6 @@ function update(dt) {
     if (player.isGuarding) { player.guardActiveTimer += dt; if (player.guardActiveTimer >= GUARD_DURATION_SEC) releaseGuard(); }
     
     updateCombatReadouts();
-    updateCombatEffects(dt);
-    updateAshProjectiles(dt);
-    updateBowProjectiles(dt);
-    updateDragonProjectiles(dt);
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
@@ -239,7 +235,34 @@ function update(dt) {
     }
     if(prev.x !== player.x || prev.y !== player.y || prev.angle !== player.angle) socket.emit('playerMovement', { x: player.x, y: player.y, angle: player.angle });
     if(player.isAttacking) updateAttack(dt);
+}
+
+// Effects and projectiles keep moving whatever the player is doing (stunned, picking an
+// upgrade, chatting); only the player's own actions pause.
+function updateVisuals(dt) {
+    updateCombatEffects(dt);
+    updateAshProjectiles(dt);
+    updateBowProjectiles(dt);
+    updateDragonProjectiles(dt);
     updateHealingTexts(dt);
+}
+
+// Being stunned cuts off whatever the player was doing, cleanly.
+function cancelActionsOnStun() {
+    if (player.isAttacking || player.attackPhase) {
+        player.isAttacking = false;
+        player.attackPhase = 0;
+        player.bowShotFired = false;
+        socket.emit('playerAction', { isAttacking: false, attackPhase: 0 });
+    }
+    if (player.gearRush && player.gearRush.active) {
+        player.gearRush.active = false;
+        socket.emit('playerAction', { gearRush: { active: false } });
+    }
+    if (player.isDodging) player.isDodging = false;
+    if (player.isGuarding) player.isGuarding = false;
+    if (player.wire.active) endWire();
+    player.moveDir = { x: 0, y: 0 };
 }
 
 function updateAttack(dt) {
@@ -389,8 +412,42 @@ function triggerDualRushSlash() {
 function startBowShot() {
     releaseGuardForAction();
     if(player.isDodging || player.hp <= 0 || player.isStunned) return;
-    // The server fires the volley (and its arrows come back as bowProjectile events).
-    socket.emit('playerBowShot', { angle: player.aAngle || player.angle });
+    // Drawn right away; the server flies the same arrows (same ids) and decides the hits.
+    const angle = player.aAngle || player.angle;
+    const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
+    const shots = 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)) + getBowProjectileBonus(player);
+    const spread = Math.min(0.24, Math.max(0.05, 0.05 + (shots - 1) * 0.035));
+    const shotId = (Date.now() % 1e9).toString(36) + Math.random().toString(36).slice(2, 6);
+    for (let i = 0; i < shots; i++) {
+        const shotAngle = angle + (i - (shots - 1) / 2) * spread;
+        const end = getShotEnd(player.x, player.y, shotAngle, BOW_RANGE);
+        bowProjectiles.push({
+            id: `${myId}:${shotId}:${i}`,
+            originId: myId,
+            startX: player.x,
+            startY: player.y,
+            endX: end.x,
+            endY: end.y,
+            angle: shotAngle,
+            duration: Math.max(0.06, Math.hypot(end.x - player.x, end.y - player.y) / BOW_SPEED),
+            progress: 0,
+            reflected: false,
+        });
+    }
+    socket.emit('playerBowShot', { angle, shotId });
+}
+
+// Where a straight shot stops at the world's edge (matches the server's shotEnd).
+function getShotEnd(x, y, angle, range) {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    let t = range;
+    if (dx > 0) t = Math.min(t, (WORLD_WIDTH - 25 - x) / dx);
+    if (dx < 0) t = Math.min(t, (25 - x) / dx);
+    if (dy > 0) t = Math.min(t, (WORLD_HEIGHT - 25 - y) / dy);
+    if (dy < 0) t = Math.min(t, (25 - y) / dy);
+    t = Math.max(1, t);
+    return { x: x + dx * t, y: y + dy * t };
 }
 // The hammer slam and gauntlet rush root their caster until they end (matches the server).
 function isRootedByUltimate() {

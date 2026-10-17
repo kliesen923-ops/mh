@@ -43,7 +43,7 @@ function launch(kind, ownerId, startX, startY, angle, options = {}) {
     const end = options.end || shotEnd(startX, startY, angle, config.range);
     const distance = Math.max(1, Math.hypot(end.x - startX, end.y - startY));
     const projectile = {
-        id: createProjectileId(kind),
+        id: options.id || createProjectileId(kind),
         kind,
         ownerId,
         startX,
@@ -79,13 +79,14 @@ function launch(kind, ownerId, startX, startY, angle, options = {}) {
 }
 
 // A volley in a fan, one more arrow per projectile upgrade (two more while giant).
-function fireBowVolley(ownerId, angle) {
+function fireBowVolley(ownerId, angle, shotId = '') {
     const owner = players[ownerId];
     if (!owner) return [];
     const giantBonus = owner.giantScale > 1 ? 2 : 0;
     const shots = getBowShotCount(owner) + giantBonus;
     const spread = Math.min(0.24, Math.max(0.05, 0.05 + (shots - 1) * 0.035));
-    return Array.from({ length: shots }, (_, i) => launch('bow', ownerId, owner.x, owner.y, angle + (i - (shots - 1) / 2) * spread));
+    return Array.from({ length: shots }, (_, i) => launch('bow', ownerId, owner.x, owner.y, angle + (i - (shots - 1) / 2) * spread,
+        shotId ? { id: `${ownerId}:${shotId}:${i}` } : {}));
 }
 
 function fireSkillShot(kind, ownerId, angle) {

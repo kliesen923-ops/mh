@@ -59,9 +59,10 @@ function applyFinisherToPlayer(attacker, weapon, targetId, target, now) {
         }
     } else if (weapon === 'gauntlet') {
         // Breaks the guard: it drops now and can't be raised again for a moment.
+        const wasGuarding = isGuardActive(target, now);
         target.isGuarding = false;
         target.guardBrokenUntil = now + GAUNTLET_GUARD_BREAK_MS;
-        state.io.emit('guardBroken', { id: targetId, until: target.guardBrokenUntil, ms: GAUNTLET_GUARD_BREAK_MS });
+        state.io.emit('guardBroken', { id: targetId, until: target.guardBrokenUntil, ms: GAUNTLET_GUARD_BREAK_MS, wasGuarding });
     }
 }
 
@@ -257,7 +258,9 @@ function registerSocketHandlers(io) {
             if (!attacker.isAttacking || attacker.attackPhase !== 2) return;
             if (hasHitTargetThisAttack(socket.id, 'bow-shot')) return;
             const angle = Number.isFinite(payload.angle) ? payload.angle : (Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle);
-            fireBowVolley(socket.id, angle);
+            // The client's shot id lets it match its own drawn arrows to the server's.
+            const shotId = String(payload.shotId || '').replace(/[^a-z0-9]/gi, '').slice(0, 16);
+            fireBowVolley(socket.id, angle, shotId);
         });
 
         socket.on('playerHitTarget', (targetId) => {
