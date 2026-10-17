@@ -167,7 +167,7 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 #chat-container {
     position: absolute;
     left: calc(var(--ui-gap) + var(--safe-left));
-    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 150px * var(--touch-scale));
+    bottom: calc(var(--ui-gap) + var(--safe-bottom) + 216px * var(--touch-scale));
     width: min(320px, 38vw);
     display: flex;
     flex-direction: column;
@@ -197,46 +197,63 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 #chat-input-container { padding: 6px 8px 8px; display: none; }
 #chat-input { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--ui-border); border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: var(--ui-text); outline: none; font-size: 14px; }
 
-/* Joystick */
+/* Joystick: large and set in from the corner, so the thumb rests on it naturally */
 #joy-container {
     position: absolute;
-    left: calc(28px + var(--safe-left));
-    bottom: calc(28px + var(--safe-bottom));
-    width: 124px;
-    height: 124px;
+    left: calc(56px + var(--safe-left));
+    bottom: calc(36px + var(--safe-bottom));
+    width: 168px;
+    height: 168px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.04) 0 55%, rgba(255, 255, 255, 0.1) 100%);
-    border: 2px solid rgba(255, 255, 255, 0.16);
+    background: radial-gradient(circle, rgba(10, 12, 20, 0.28) 0 58%, rgba(255, 255, 255, 0.1) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3), inset 0 0 0 10px rgba(255, 255, 255, 0.03);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
+    touch-action: none;
     transform: scale(var(--touch-scale));
     transform-origin: bottom left;
 }
+.joy-ring { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.joy-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 1.5; }
+.joy-ring path { fill: rgba(255, 255, 255, 0.42); }
 #joy-stick {
     position: absolute;
-    width: 52px;
-    height: 52px;
+    width: 66px;
+    height: 66px;
+    box-sizing: border-box;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.22));
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.24) 70%);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
     pointer-events: none;
 }
 
-/* Action buttons */
+/* Action buttons: a big attack button in the corner with the others on an arc around it.
+   Each button's position is its center offset (--dx right, --dy up) from the attack center. */
 .action-buttons {
+    --attack-size: 108px;
+    --arc-center: 70px;
     position: absolute;
-    right: calc(24px + var(--safe-right));
-    bottom: calc(24px + var(--safe-bottom));
-    display: grid;
-    grid-template-columns: repeat(3, auto);
-    gap: 12px;
-    align-items: center;
-    justify-items: center;
+    right: calc(18px + var(--safe-right));
+    bottom: calc(18px + var(--safe-bottom));
+    width: 230px;
+    height: 230px;
     z-index: 100;
+    pointer-events: none;
     transform: scale(var(--touch-scale));
     transform-origin: bottom right;
+}
+.action-buttons .btn {
+    --size: 64px;
+    position: absolute;
+    width: var(--size);
+    height: var(--size);
+    right: calc(var(--arc-center) - var(--dx, 0px) - var(--size) / 2);
+    bottom: calc(var(--arc-center) + var(--dy, 0px) - var(--size) / 2);
+    pointer-events: auto;
 }
 .btn {
     --cooldown-progress: 0;
@@ -276,16 +293,15 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 }
 .btn.cooling { filter: brightness(0.6) saturate(0.6); }
 .btn.cooling::after { opacity: 1; }
-.btn-skill { --btn-color: #5ad8ff; }
-.btn-dodge { --btn-color: #8ef0a8; }
-.btn-guard { --btn-color: #7fb2ff; }
-.btn-ultimate { --btn-color: #c792ff; grid-column: 1; grid-row: 2; }
-.btn-attack {
+.btn-dodge { --btn-color: #8ef0a8; --dx: -116px; --dy: -26px; }
+.btn-guard { --btn-color: #7fb2ff; --dx: -106px; --dy: 52px; }
+.btn-skill { --btn-color: #5ad8ff; --dx: -54px; --dy: 110px; }
+.action-buttons .btn-ultimate { --btn-color: #c792ff; --size: 70px; --dx: 14px; --dy: 122px; }
+.action-buttons .btn-attack {
     --btn-color: #ff7a5c;
-    width: 96px;
-    height: 96px;
-    grid-column: 2 / span 2;
-    grid-row: 2;
+    --size: var(--attack-size);
+    --dx: 0px;
+    --dy: 0px;
     background: radial-gradient(circle at 35% 28%, rgba(255, 170, 140, 0.35), rgba(120, 24, 14, 0.85) 65%);
 }
 .btn-attack .btn-icon { width: 34px; height: 34px; stroke: #ffe0d6; }
@@ -319,4 +335,9 @@ body:not(.in-game) .game-ui { visibility: hidden; }
     #minimap { height: 90px; }
     #chat-messages { max-height: 72px; font-size: 12px; }
     #chat-container { width: min(280px, 34vw); }
+}
+
+/* Very short screens: the button arc needs the ranking's spot on the right */
+@media (max-height: 380px) and (orientation: landscape) {
+    #leaderboard { display: none; }
 }
