@@ -323,20 +323,39 @@ body:not(.in-game) .game-ui { visibility: hidden; }
 .btn:active { transform: scale(0.93); }
 .btn-icon { width: 24px; height: 24px; fill: none; stroke: var(--btn-color); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+/* Cooldown: a ring and a dark cover over the time left, both starting at 12 o'clock and
+   clearing clockwise, with the seconds left in the middle. */
+.btn::before {
+    content: attr(data-cd);
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: conic-gradient(transparent 0 calc((1 - var(--cooldown-progress)) * 1turn), rgba(0, 0, 0, 0.55) 0);
+    color: #fff;
+    font-size: 26px;
+    font-weight: 900;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+.btn.cooling::before { opacity: 1; }
 .btn::after {
     content: "";
     position: absolute;
     inset: -6px;
     border-radius: 50%;
-    background: conic-gradient(var(--ui-gold) 0 calc(var(--cooldown-progress) * 1turn), transparent 0);
-    transform: rotate(-90deg);
+    background: conic-gradient(transparent 0 calc((1 - var(--cooldown-progress)) * 1turn), var(--ui-gold) 0);
     opacity: 0;
     pointer-events: none;
     -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
     mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
     transition: opacity 0.12s linear;
 }
-.btn.cooling { filter: brightness(0.6) saturate(0.6); }
+.btn.cooling .btn-icon, .btn.cooling .btn-label { opacity: 0.35; }
 .btn.cooling::after { opacity: 1; }
 .btn-dodge { --btn-color: #8ef0a8; --cx: 188.5px; --cy: 82.5px; }
 .btn-guard { --btn-color: #7fb2ff; --cx: 188.5px; --cy: 191px; }
