@@ -1,3 +1,16 @@
+// The world is drawn on a ground plane tilted away from the camera, like a MOBA view:
+// draw() squashes world y by VIEW_Y_SCALE, so circles on the ground (attack ranges,
+// ultimate areas) show as ellipses while hit checks stay true circles in world space.
+// Things that stand up off the ground (text, health bars, mobs) go through drawUpright.
+function drawUpright(x, y, draw) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, 1 / VIEW_Y_SCALE);
+    ctx.translate(-x, -y);
+    draw();
+    ctx.restore();
+}
+
 function drawCharacter(p, color) {
     const { x, y, angle, animTime, isDodging, isGuarding, guardActiveTimer, isAttacking, isStunned, upgradeShield, comboStep, attackPhase, hp, name, aAngle, wire, stats, stunEndsAt } = p;
     const weapon = normalizeWeapon(p.weapon);
@@ -39,7 +52,7 @@ function drawCharacter(p, color) {
     if (ultimate.active) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.scale(bodyScale, bodyScale * VIEW_Y_SCALE);
+        ctx.scale(bodyScale, bodyScale);
         const pulse = 1 + Math.sin((Date.now() - (ultimate.startAt || 0)) / 80) * 0.04;
         ctx.globalAlpha = 0.35;
         ctx.shadowBlur = 20;
@@ -52,13 +65,15 @@ function drawCharacter(p, color) {
         ctx.restore();
     }
     if(isGuarding) { const isPerfect = (guardActiveTimer < JUST_GUARD_WINDOW_SEC); ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.arc(0, 0, 45, -Math.PI/3, Math.PI/3); ctx.strokeStyle = isPerfect ? "rgba(0, 200, 255, 0.9)" : "rgba(52, 152, 219, 0.3)"; ctx.lineWidth = isPerfect ? 8 : 3; ctx.stroke(); ctx.fillStyle = isPerfect ? "rgba(0, 200, 255, 0.2)" : "rgba(52, 152, 219, 0.05)"; ctx.lineTo(0,0); ctx.fill(); ctx.restore(); }
-    ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (upgradeShield) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name, x, y - nameOffset);
+    ctx.save(); if (isDodging) ctx.globalAlpha = 0.2; if (upgradeShield) { ctx.globalAlpha = 0.5; ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; } ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; drawUpright(x, y, () => ctx.fillText(name, x, y - nameOffset));
     const maxHp = getMaxHpFromStats(stats);
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
-    ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-hpOffset, 50, 6);
-    ctx.fillStyle = isStunned ? "#9b59b6" : (hpRatio > 0.3 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-hpOffset, hpRatio*50, 6);
-    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale * VIEW_Y_SCALE); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale * VIEW_Y_SCALE); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
+    drawUpright(x, y, () => {
+        ctx.fillStyle = "#444"; ctx.fillRect(x-25, y-hpOffset, 50, 6);
+        ctx.fillStyle = isStunned ? "#9b59b6" : (hpRatio > 0.3 ? "#2ecc71" : "#e74c3c"); ctx.fillRect(x-25, y-hpOffset, hpRatio*50, 6);
+    });
+    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(x, y); ctx.scale(bodyScale, bodyScale); const leg = Math.sin(animTime || 0); ctx.fillStyle = "#34495e"; ctx.fillRect(-15, (leg>0?-8:8), 10, 25); ctx.fillRect(5, (leg<0?-8:8), 10, 25); ctx.rotate(angle); ctx.fillStyle = isStunned ? "#9b59b6" : color; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.fillStyle = "#ffdbac"; ctx.beginPath(); ctx.arc(0,-12,14,0,Math.PI*2); ctx.fill();
     ctx.save(); let sRot = 0.8;
     let spearPose = 0;
     let bowPose = 0;
@@ -224,15 +239,16 @@ function drawCharacter(p, color) {
             ctx.strokeStyle = "rgba(0,0,0,0.65)";
             ctx.fillStyle = "#ffffff";
             const label = `${stunRemaining.toFixed(1)}초`;
-            ctx.strokeText(label, x, y - stunOffset);
-            ctx.fillText(label, x, y - stunOffset);
+            drawUpright(x, y, () => {
+                ctx.strokeText(label, x, y - stunOffset);
+                ctx.fillText(label, x, y - stunOffset);
+            });
             ctx.restore();
         }
     }
     if(isAttacking && attackPhase === 2) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.scale(1, VIEW_Y_SCALE);
         const ba = aAngle || angle;
         if (weapon === 'spear') {
             const tipX = Math.cos(ba) * attackRange;
@@ -280,7 +296,6 @@ function drawCombatEffects() {
         const alpha = t;
         ctx.save();
         ctx.translate(effect.x, effect.y);
-        ctx.scale(1, VIEW_Y_SCALE);
         ctx.globalAlpha = alpha;
         if (effect.weapon === 'hammer') {
             const burst = 20 + (1 - t) * 34;
@@ -513,7 +528,6 @@ function drawDragonProjectiles() {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(effect.angle);
-        ctx.scale(1, VIEW_Y_SCALE);
         ctx.globalAlpha = 0.95 - p * 0.25;
         ctx.shadowColor = effect.reflected ? 'rgba(255, 120, 120, 0.95)' : 'rgba(70, 220, 255, 0.98)';
         ctx.shadowBlur = 30;
@@ -549,7 +563,6 @@ function drawHealingCrosses() {
         if (!blink) return;
         ctx.save();
         ctx.translate(Number(cross.x) || 0, (Number(cross.y) || 0) + bob);
-        ctx.scale(1, VIEW_Y_SCALE);
         ctx.globalAlpha = remaining <= 3000 ? Math.max(0.25, lifeRatio) : 1;
         ctx.shadowColor = 'rgba(80, 255, 120, 0.85)';
         ctx.shadowBlur = 18;
@@ -586,7 +599,6 @@ function drawGiantPotions() {
         const y = Number(potion.y) || 0;
         ctx.save();
         ctx.translate(x, y + bob);
-        ctx.scale(1, VIEW_Y_SCALE);
         ctx.globalAlpha = remaining <= 3000 ? Math.max(0.25, lifeRatio) : 1;
         ctx.shadowColor = 'rgba(255, 255, 255, 0.18)';
         ctx.shadowBlur = 12;
@@ -680,8 +692,10 @@ function drawHealingTexts() {
         ctx.fillStyle = effect.color || '#46e06a';
         const x = target.x;
         const y = target.y - 78 - rise;
-        ctx.strokeText(effect.text, x, y);
-        ctx.fillText(effect.text, x, y);
+        drawUpright(target.x, target.y, () => {
+            ctx.strokeText(effect.text, x, y);
+            ctx.fillText(effect.text, x, y);
+        });
         ctx.restore();
     });
 }
@@ -691,7 +705,7 @@ function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
     ctx.save();
     ctx.translate(tipX, tipY);
     ctx.rotate(angle);
-    ctx.scale(crystalScale, crystalScale * VIEW_Y_SCALE);
+    ctx.scale(crystalScale, crystalScale);
     ctx.shadowColor = 'rgba(90, 180, 255, 0.75)';
     ctx.shadowBlur = 18;
     ctx.strokeStyle = 'rgba(160, 230, 255, 0.95)';
@@ -729,7 +743,6 @@ function drawBowArrow(originX, originY, tipX, tipY, angle, progress, reflected) 
     ctx.save();
     ctx.translate(tipX, tipY);
     ctx.rotate(angle);
-    ctx.scale(1, VIEW_Y_SCALE);
     ctx.shadowColor = reflected ? 'rgba(255, 120, 120, 0.9)' : 'rgba(255, 210, 120, 0.9)';
     ctx.shadowBlur = 14;
     ctx.strokeStyle = reflected ? 'rgba(255, 180, 160, 1)' : 'rgba(240, 200, 145, 1)';
@@ -767,7 +780,7 @@ function drawWireHand(tipX, tipY, angle, progress) {
     ctx.save();
     ctx.translate(tipX, tipY);
     ctx.rotate(angle);
-    ctx.scale(palmScale, palmScale * VIEW_Y_SCALE);
+    ctx.scale(palmScale, palmScale);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.shadowColor = 'rgba(255, 214, 140, 0.35)';
@@ -803,21 +816,27 @@ function drawWireHand(tipX, tipY, angle, progress) {
     ctx.fill();
     ctx.restore();
 }
+// How much of the world fits on screen; the tilted ground shows more of it vertically.
+function getViewWorldHeight() {
+    return canvas.height / VIEW_Y_SCALE;
+}
+
 function updateCamera() {
+    const viewHeight = getViewWorldHeight();
     camera.x = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, player.x - canvas.width / 2));
-    camera.y = Math.max(0, Math.min(WORLD_HEIGHT - canvas.height, player.y - canvas.height / 2));
+    camera.y = Math.max(0, Math.min(WORLD_HEIGHT - viewHeight, player.y - viewHeight / 2));
 }
 
 function drawWorldBackground() {
     const left = camera.x;
     const top = camera.y;
     const right = camera.x + canvas.width;
-    const bottom = camera.y + canvas.height;
+    const bottom = camera.y + getViewWorldHeight();
     ctx.lineWidth = 1;
     ctx.strokeStyle = "#333";
     for (let x = Math.floor(left / 80) * 80; x <= right; x += 80) { ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); }
     ctx.strokeStyle = "#262626";
-    for (let y = Math.floor(top / 56) * 56; y <= bottom; y += 56) { ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke(); }
+    for (let y = Math.floor(top / 80) * 80; y <= bottom; y += 80) { ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke(); }
     ctx.strokeStyle = "rgba(231, 76, 60, 0.7)";
     ctx.lineWidth = 6;
     ctx.strokeRect(3, 3, WORLD_WIDTH - 6, WORLD_HEIGHT - 6);
@@ -825,7 +844,7 @@ function drawWorldBackground() {
 
 function drawXpOrbs() {
     const now = Date.now();
-    const visible = (orb) => orb.x > camera.x - 30 && orb.x < camera.x + canvas.width + 30 && orb.y > camera.y - 30 && orb.y < camera.y + canvas.height + 30;
+    const visible = (orb) => orb.x > camera.x - 30 && orb.x < camera.x + canvas.width + 30 && orb.y > camera.y - 30 && orb.y < camera.y + getViewWorldHeight() + 30;
     xpOrbs.forEach((orb) => {
         if (visible(orb)) drawXpGem(orb.x, orb.y + Math.sin(now / 250 + orb.x) * 3, orb.value, 1);
     });
@@ -842,6 +861,7 @@ function drawXpGem(x, y, value, scale) {
     const size = (6 + Math.min(6, value)) * scale;
     ctx.save();
     ctx.translate(x, y);
+    ctx.scale(1, 1 / VIEW_Y_SCALE);
     ctx.shadowColor = '#5ad8ff';
     ctx.shadowBlur = 12;
     ctx.fillStyle = '#5ad8ff';
@@ -863,43 +883,47 @@ function drawXpGem(x, y, value, scale) {
     ctx.restore();
 }
 
+function drawMob(mob, now) {
+    const tier = mobTiers[mob.tier] || { color: '#2ecc71', radius: 16 };
+    const r = tier.radius || 16;
+    const wobble = 1 + Math.sin(now / 140 + mob.seed) * 0.06;
+    ctx.save();
+    ctx.translate(mob.x, mob.y);
+    ctx.globalAlpha = mob.mine ? 1 : 0.6;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.beginPath(); ctx.ellipse(0, r * 0.75, r * 0.95, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.scale(wobble, (2 - wobble) * 0.9);
+    ctx.fillStyle = mob.flash > 0 ? '#ffffff' : tier.color;
+    ctx.strokeStyle = mob.tier === mobTiers.length - 1 ? '#f1c40f' : 'rgba(0, 0, 0, 0.55)';
+    ctx.lineWidth = mob.tier === mobTiers.length - 1 ? 3 : 2;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    const target = mob.mine ? player : null;
+    const look = target ? Math.atan2(target.y - mob.y, target.x - mob.x) : 0;
+    const ex = Math.cos(look) * r * 0.25;
+    const ey = Math.sin(look) * r * 0.25;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-r * 0.32 + ex, -r * 0.15 + ey, r * 0.24, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex, -r * 0.15 + ey, r * 0.24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = mob.tier >= 4 ? '#c0392b' : '#111';
+    ctx.beginPath(); ctx.arc(-r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (mob.stunned) drawMobStun(mob, r);
+    if (mob.hpPct < 100) {
+        const w = r * 2;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(mob.x - w / 2, mob.y - r - 10, w, 4);
+        ctx.fillStyle = tier.color === '#2c2c2c' ? '#f1c40f' : tier.color;
+        ctx.fillRect(mob.x - w / 2, mob.y - r - 10, w * Math.max(0, mob.hpPct) / 100, 4);
+    }
+}
+
 function drawMobs() {
     const now = Date.now();
     mobs.forEach((mob) => {
         if (mob.boss) {
-            drawBoss(mob);
+            drawUpright(mob.x, mob.y, () => drawBoss(mob));
             return;
         }
-        const tier = mobTiers[mob.tier] || { color: '#2ecc71', radius: 16 };
-        const r = tier.radius || 16;
-        const wobble = 1 + Math.sin(now / 140 + mob.seed) * 0.06;
-        ctx.save();
-        ctx.translate(mob.x, mob.y);
-        ctx.globalAlpha = mob.mine ? 1 : 0.6;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.beginPath(); ctx.ellipse(0, r * 0.75, r * 0.95, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.scale(wobble, (2 - wobble) * 0.9);
-        ctx.fillStyle = mob.flash > 0 ? '#ffffff' : tier.color;
-        ctx.strokeStyle = mob.tier === mobTiers.length - 1 ? '#f1c40f' : 'rgba(0, 0, 0, 0.55)';
-        ctx.lineWidth = mob.tier === mobTiers.length - 1 ? 3 : 2;
-        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        const target = mob.mine ? player : null;
-        const look = target ? Math.atan2(target.y - mob.y, target.x - mob.x) : 0;
-        const ex = Math.cos(look) * r * 0.25;
-        const ey = Math.sin(look) * r * 0.25;
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(-r * 0.32 + ex, -r * 0.15 + ey, r * 0.24, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex, -r * 0.15 + ey, r * 0.24, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = mob.tier >= 4 ? '#c0392b' : '#111';
-        ctx.beginPath(); ctx.arc(-r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.arc(r * 0.32 + ex * 1.3, -r * 0.15 + ey * 1.3, r * 0.11, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        if (mob.stunned) drawMobStun(mob, r);
-        if (mob.hpPct < 100) {
-            const w = r * 2;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(mob.x - w / 2, mob.y - r - 10, w, 4);
-            ctx.fillStyle = tier.color === '#2c2c2c' ? '#f1c40f' : tier.color;
-            ctx.fillRect(mob.x - w / 2, mob.y - r - 10, w * Math.max(0, mob.hpPct) / 100, 4);
-        }
+        drawUpright(mob.x, mob.y, () => drawMob(mob, now));
     });
     mobDeathEffects.forEach((effect) => {
         const p = Math.max(0, effect.life / effect.maxLife);
@@ -938,7 +962,7 @@ function drawMinimap() {
     ctx.fillRect(x, y, w - pad * 2, h - pad * 2);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x + camera.x * sx, y + camera.y * sy, canvas.width * sx, canvas.height * sy);
+    ctx.strokeRect(x + camera.x * sx, y + camera.y * sy, canvas.width * sx, getViewWorldHeight() * sy);
     ctx.fillStyle = '#5ad8ff';
     xpOrbs.forEach((orb) => ctx.fillRect(x + orb.x * sx - 1, y + orb.y * sy - 1, 2, 2));
     ctx.fillStyle = '#46e06a';
@@ -966,7 +990,8 @@ function draw() {
     updateCamera();
     const shake = getScreenShakeOffset();
     ctx.save();
-    ctx.translate(-camera.x + shake.x, -camera.y + shake.y);
+    ctx.translate(-camera.x + shake.x, -camera.y * VIEW_Y_SCALE + shake.y);
+    ctx.scale(1, VIEW_Y_SCALE);
     drawWorldBackground();
     drawUltimateAreas();
     drawBossSlams();

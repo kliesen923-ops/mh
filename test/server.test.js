@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { io: connectClient } = require('socket.io-client');
+// Server log lines written mid-test can corrupt the test runner's output stream.
+process.env.QUIET_LOGS = '1';
 const { createServer } = require('../src/app');
 const state = require('../src/game/state');
 const { spawnMob, tickMobs, getMobsForOwner, clearAllMobs } = require('../src/game/mobs');
@@ -454,15 +456,25 @@ test('hammer ultimate stuns the mobs it hits', async () => {
 test('upgrades carry over to ultimates', async () => {
     const client = await connect();
     const p = await readyPlayer(client);
+    // A sword ultimate keeps sending statsUpdate for each slash, so wait for the update
+    // that actually reflects the request rather than whichever arrives next.
+    const nextStats = (predicate) => new Promise((resolve) => {
+        const onUpdate = (data) => {
+            if (!predicate(data[client.id] || {})) return;
+            client.off('statsUpdate', onUpdate);
+            resolve();
+        };
+        client.on('statsUpdate', onUpdate);
+    });
     const useWeapon = async (weapon) => {
-        const set = once(client, 'statsUpdate');
+        const set = nextStats((me) => me.weapon === weapon);
         client.emit('setWeapon', weapon);
         await set;
         Object.assign(p, { x: 1200, y: 1600, hp: 9999, angle: 0, aAngle: 0 });
     };
     const cast = async () => {
         p.ultimate.cooldownEndsAt = 0;
-        const updated = once(client, 'statsUpdate');
+        const updated = nextStats((me) => me.ultimate && me.ultimate.cooldownEndsAt > 0);
         client.emit('useUltimate');
         await updated;
         return p.ultimate;

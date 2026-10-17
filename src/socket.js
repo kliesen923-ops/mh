@@ -45,7 +45,7 @@ const { players } = state;
 
 function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
-        console.log('새 플레이어 연결:', socket.id);
+        if (!process.env.QUIET_LOGS) console.log('새 플레이어 연결:', socket.id);
         const spawnPoint = randomWorldPoint();
 
         players[socket.id] = {

@@ -197,7 +197,9 @@ function drawUltimateBanners() {
         const pop = age < 0.15 ? 1.5 - (age / 0.15) * 0.5 : 1;
         const scale = Math.max(1, caster.giantScale || 1);
         ctx.save();
-        ctx.translate(caster.x, caster.y - 92 * scale - age * 14);
+        ctx.translate(caster.x, caster.y);
+        ctx.scale(1, 1 / VIEW_Y_SCALE);
+        ctx.translate(0, -92 * scale - age * 14);
         ctx.scale(pop, pop);
         ctx.globalAlpha = Math.min(1, banner.life / 0.3);
         ctx.font = 'bold 22px sans-serif';
@@ -218,6 +220,9 @@ function drawDamageTexts() {
         const x = text.x + text.drift * (1 - p);
         const y = text.y - 30 - (1 - p) * 34;
         ctx.save();
+        ctx.translate(text.x, text.y);
+        ctx.scale(1, 1 / VIEW_Y_SCALE);
+        ctx.translate(-text.x, -text.y);
         ctx.globalAlpha = Math.min(1, p * 2);
         ctx.font = `bold ${text.size}px sans-serif`;
         ctx.textAlign = 'center';

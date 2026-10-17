@@ -557,7 +557,7 @@ function getRayCanvasEdge(originX, originY, angle) {
     const left = camera.x;
     const top = camera.y;
     const right = camera.x + canvas.width;
-    const bottom = camera.y + canvas.height;
+    const bottom = camera.y + canvas.height / VIEW_Y_SCALE;
     const candidates = [];
     const pushCandidate = (t) => {
         if (!Number.isFinite(t) || t <= 0) return;
