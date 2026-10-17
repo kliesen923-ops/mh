@@ -80,6 +80,7 @@ test('melee hit damages and a lethal hit kills, scatters XP and respawns', async
     Object.assign(target, { x: 350, y: 300, hp: 100 });
 
     const swing = async () => {
+        Object.assign(state.players[attackerClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
         attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
         attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
         const updated = once(attackerClient, 'statsUpdate');
@@ -192,6 +193,7 @@ test('mobs deal contact damage, and a killed mob drops XP to pick up', async () 
     const killed = once(ownerClient, 'mobKilled');
     const dropped = once(ownerClient, 'xpOrbsAdded');
     biter.hp = 1;
+    Object.assign(state.players[ownerClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
     ownerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
     ownerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
     ownerClient.emit('mobHit', biter.id);
@@ -269,6 +271,7 @@ test('players can be hit again once the upgrade shield runs out', async () => {
     Object.assign(target, { x: 2650, y: 1400, hp: 100, isUpgrading: true });
 
     const swing = () => {
+        Object.assign(state.players[attackerClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
         attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
         attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
         attackerClient.emit('playerHitTarget', targetClient.id);
@@ -328,6 +331,7 @@ test('picking a loadout before the respawn timer still leaves the player active'
     Object.assign(victim, { x: 3050, y: 300, hp: 5 });
 
     const died = once(victimClient, 'playerDied');
+    Object.assign(state.players[attackerClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
     attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
     attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
     attackerClient.emit('playerHitTarget', victimClient.id);
@@ -357,6 +361,7 @@ test('the victim gets a record of the life that just ended', async () => {
     const mob = spawnMob(victimClient.id, { x: 480, y: 1700, tier: 0 });
     mob.hp = 1;
     victim.angle = 0;
+    Object.assign(state.players[victimClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
     victimClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
     victimClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
     const mobDown = once(victimClient, 'mobKilled');
@@ -366,6 +371,7 @@ test('the victim gets a record of the life that just ended', async () => {
 
     victim.hp = 5;
     const summary = once(victimClient, 'deathSummary');
+    Object.assign(state.players[killerClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
     killerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
     killerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
     killerClient.emit('playerHitTarget', victimClient.id);
@@ -393,6 +399,7 @@ test('hammer hits knock mobs back, and the finisher stuns them', async () => {
 
     const mob = spawnMob(client.id, { x: 1060, y: 600, tier: 5 });
     const swing = async (comboStep) => {
+        Object.assign(state.players[client.id], { serverCombo: comboStep - 1, lastAttackAt: 0 });
         client.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep, aAngle: 0 });
         client.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep, aAngle: 0 });
         const damaged = once(client, 'mobDamaged');
@@ -616,6 +623,7 @@ test('weapon matchups: just guard parries melee, hammer finisher stuns, dual bla
     const attacker = await readyPlayer(attackerClient);
     const target = await readyPlayer(targetClient);
     const swing = async (comboStep) => {
+        Object.assign(state.players[attackerClient.id], { serverCombo: comboStep - 1, lastAttackAt: 0 });
         attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep, aAngle: 0 });
         attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep, aAngle: 0 });
         attackerClient.emit('playerHitTarget', targetClient.id);

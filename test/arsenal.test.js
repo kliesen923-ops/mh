@@ -58,6 +58,7 @@ async function readyPair(weapon, skill) {
 }
 
 async function swing(client, comboStep, targetId) {
+    Object.assign(state.players[client.id], { serverCombo: comboStep - 1, lastAttackAt: 0 });
     client.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep, aAngle: 0 });
     client.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep, aAngle: 0 });
     if (targetId) client.emit('playerHitTarget', targetId);
@@ -101,6 +102,7 @@ test('the gauntlet finisher breaks a guard and blocks raising it again', async (
 test('a staff orb bursts on the first body it reaches and leaves a burning patch', async () => {
     const { attackerClient, target } = await readyPair('staff');
     Object.assign(target, { x: 450, y: 300 });
+    Object.assign(state.players[attackerClient.id], { serverCombo: 1 - 1, lastAttackAt: 0 });
     attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
     attackerClient.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep: 1, aAngle: 0 });
     const orb = once(attackerClient, 'staffOrb');

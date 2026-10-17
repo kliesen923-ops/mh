@@ -17,6 +17,7 @@ const { getMaxMobTier, pickMobTier } = require('./tiers');
 const { getMaxHpFromStats } = require('./stats');
 const { updateXpOrbs, dropXpOrb, scatterXp } = require('./xpOrbs');
 const { markStatsDirty, flushStats } = require('./sync');
+const { isGuardActive, isDodgeActive } = require('./defense');
 
 const { players } = state;
 const mobs = new Map();
@@ -123,9 +124,9 @@ function updateBoss(boss, ownerId, owner, now) {
         boss.slamAt = 0;
         boss.nextSlamAt = now + BOSS.slamCooldownMs;
         state.io.emit('bossSlamHit', { id: boss.id, x: boss.x, y: boss.y, radius: BOSS.slamRadius });
-        if (owner.isDodging || Math.hypot(owner.x - boss.x, owner.y - boss.y) > BOSS.slamRadius) return false;
+        if (isDodgeActive(owner) || Math.hypot(owner.x - boss.x, owner.y - boss.y) > BOSS.slamRadius) return false;
         let damage = boss.slamDamage;
-        if (owner.isGuarding && getAngleDiff(owner.angle, Math.atan2(boss.y - owner.y, boss.x - owner.x)) < Math.PI / 3) damage = Math.floor(damage * 0.5);
+        if (isGuardActive(owner) && getAngleDiff(owner.angle, Math.atan2(boss.y - owner.y, boss.x - owner.x)) < Math.PI / 3) damage = Math.floor(damage * 0.5);
         owner.hp -= damage;
         state.io.to(ownerId).emit('mobDamage', { amount: damage });
         markStatsDirty();
@@ -272,7 +273,7 @@ function moveMobsForOwner(owner, ownerMobs, dt, now) {
 
 // Returns true if the owner died from contact damage.
 function applyContactDamage(ownerId, owner, ownerMobs, now) {
-    if (owner.isDodging) return false;
+    if (isDodgeActive(owner)) return false;
     const contactRange = PLAYER_BODY_RADIUS * Math.max(1, owner.giantScale || 1);
     for (const mob of ownerMobs) {
         if (now - mob.lastContactAt < MOB_CONTACT_COOLDOWN_MS || isMobStunned(mob, now)) continue;
@@ -280,7 +281,7 @@ function applyContactDamage(ownerId, owner, ownerMobs, now) {
         mob.lastContactAt = now;
         let damage = mob.damage;
         const angleToMob = Math.atan2(mob.y - owner.y, mob.x - owner.x);
-        if (owner.isGuarding && getAngleDiff(owner.angle, angleToMob) < Math.PI / 3) damage = Math.floor(damage * 0.5);
+        if (isGuardActive(owner) && getAngleDiff(owner.angle, angleToMob) < Math.PI / 3) damage = Math.floor(damage * 0.5);
         if (damage <= 0) continue;
         owner.hp -= damage;
         state.io.to(ownerId).emit('mobDamage', { amount: damage });

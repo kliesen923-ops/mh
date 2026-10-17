@@ -1,5 +1,15 @@
 const { sanitizeSkill } = require('../utils/sanitize');
 const { createDefaultGearRush } = require('./stats');
+const { createProjectileId } = require('../utils/geometry');
+const { getUltimateSpeedMultiplier, grantMoveBudget } = require('./movement');
+const { GUARD_DURATION_MS, SKILL_COOLDOWN_MS, SKILL_COOLDOWN_SLACK_MS } = require('../config');
+
+// Fraction of the client's own timings the server insists on (room for lag and frame jitter).
+const TIMING_SLACK = 0.75;
+const GUARD_COOLDOWN_MS = 1000;
+const DODGE_COOLDOWN_MS = 1000;
+const DODGE_DISTANCE = 160;
+const RUSH_DISTANCE = 340;
 
 function sanitizeAction(p, actionData) {
     const action = {};
@@ -78,4 +88,85 @@ function sanitizeAction(p, actionData) {
     return action;
 }
 
-module.exports = { sanitizeAction };
+// Server-side check of secondary skill cooldowns.
+function trySpendSkill(p, kind, now) {
+    const cooldownMs = SKILL_COOLDOWN_MS[kind] || 0;
+    const last = (p.skillUsedAt && p.skillUsedAt[kind]) || 0;
+    if (now - last < cooldownMs - SKILL_COOLDOWN_SLACK_MS) return false;
+    p.skillUsedAt = Object.assign({}, p.skillUsedAt, { [kind]: now });
+    return true;
+}
+
+// Shortest time between two attack swings at this attack speed (the client's swing is
+// 0.12s wind-up plus at least 0.2s of strike and recovery, the latter sped up by the dual ultimate).
+function getMinAttackIntervalMs(p) {
+    const speed = Math.max(0.1, p.stats && Number.isFinite(p.stats.speed) ? p.stats.speed : 1);
+    return ((0.12 + 0.2 / getUltimateSpeedMultiplier(p)) / speed) * 1000 * TIMING_SLACK;
+}
+
+// Applies the server's timing rules to a sanitized action: drops starts that come too soon,
+// numbers the combo itself, and fixes where a rush starts. Updates p's bookkeeping fields.
+function enforceActionRules(p, action, now = Date.now()) {
+    if (action.isAttacking === true && action.attackPhase === 1) {
+        if (now - (p.lastAttackAt || 0) < getMinAttackIntervalMs(p)) {
+            delete action.isAttacking;
+            delete action.attackPhase;
+            delete action.comboStep;
+            delete action.aAngle;
+        } else {
+            p.lastAttackAt = now;
+            p.serverCombo = ((p.serverCombo || 0) % 3) + 1;
+            action.comboStep = p.serverCombo;
+        }
+    } else {
+        delete action.comboStep;
+    }
+
+    if (action.isGuarding === true && !p.isGuarding) {
+        if (now < (p.guardReadyAt || 0)) {
+            delete action.isGuarding;
+            delete action.guardStartTime;
+        } else {
+            p.guardReadyAt = now + (GUARD_DURATION_MS + GUARD_COOLDOWN_MS) * TIMING_SLACK;
+        }
+    } else if (action.isGuarding === true) {
+        // Already guarding: a repeat doesn't restart the guard window.
+        delete action.isGuarding;
+        delete action.guardStartTime;
+    } else if (action.isGuarding === false && p.isGuarding) {
+        p.guardReadyAt = Math.min(p.guardReadyAt || 0, now + GUARD_COOLDOWN_MS * TIMING_SLACK);
+    }
+
+    if (action.isDodging === true) {
+        if (p.isDodging || now < (p.dodgeReadyAt || 0)) {
+            delete action.isDodging;
+        } else {
+            action.dodgeStartAt = now;
+            p.dodgeReadyAt = now + DODGE_COOLDOWN_MS * TIMING_SLACK;
+            const dodge = p.stats && Number.isFinite(p.stats.dodge) ? p.stats.dodge : 1;
+            grantMoveBudget(p, DODGE_DISTANCE * dodge);
+        }
+    }
+
+    if (action.gearRush) {
+        const wasActive = Boolean(p.gearRush && p.gearRush.active);
+        if (action.gearRush.active && !wasActive) {
+            // A new rush: only with the rush skill, off cooldown, from where the player stands.
+            if (sanitizeSkill(p.skill) !== 'gear' || !trySpendSkill(p, 'gear', now)) {
+                delete action.gearRush;
+            } else {
+                action.gearRush.startX = p.x;
+                action.gearRush.startY = p.y;
+                p.rushId = createProjectileId('rush');
+                p.rushSlashes = 0;
+                grantMoveBudget(p, RUSH_DISTANCE);
+            }
+        } else if (action.gearRush.active && wasActive) {
+            // Mid-rush updates can't redirect it.
+            Object.assign(action.gearRush, { startX: p.gearRush.startX, startY: p.gearRush.startY, tx: p.gearRush.tx, ty: p.gearRush.ty });
+        }
+    }
+    return action;
+}
+
+module.exports = { sanitizeAction, enforceActionRules, trySpendSkill };

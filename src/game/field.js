@@ -7,6 +7,7 @@ const { getAttackMultiplier, getMaxHpFromStats } = require('./stats');
 const { damagePlayerFrom, stunPlayer } = require('./combat');
 const { getMobList, hitMobs } = require('./mobs');
 const { markStatsDirty } = require('./sync');
+const { tickProjectiles, clearProjectilesForOwner, clearProjectiles } = require('./projectiles');
 
 const { players } = state;
 let orbs = [];
@@ -282,6 +283,7 @@ function updateMarks(now) {
 // ── Tick ────────────────────────────────────────────────────────────────────────
 
 function tickField(now = Date.now()) {
+    tickProjectiles(now);
     updateOrbs(now);
     const changed = [updateZones(now), updateTraps(now), updateMarks(now)].some(Boolean);
     if (changed) emitFieldState();
@@ -289,6 +291,7 @@ function tickField(now = Date.now()) {
 
 // Drops everything a player left on the map (on disconnect).
 function clearFieldForOwner(ownerId) {
+    clearProjectilesForOwner(ownerId);
     orbs = orbs.filter((orb) => orb.ownerId !== ownerId);
     zones = zones.filter((zone) => zone.ownerId !== ownerId);
     traps = traps.filter((trap) => trap.ownerId !== ownerId);
@@ -297,6 +300,7 @@ function clearFieldForOwner(ownerId) {
 }
 
 function clearField() {
+    clearProjectiles();
     orbs = [];
     zones = [];
     traps = [];

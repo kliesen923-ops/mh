@@ -368,6 +368,7 @@ socket.on('bowProjectileResolved', (effect) => {
     bowProjectiles = bowProjectiles.filter((p) => p.id !== resolvedId);
 });
 const CHAT_MAX_LINES = 30;
+socket.on('skillShotEnd', (data) => onSkillShotEnd(data));
 socket.on('guardBroken', (data) => {
     const target = data && (data.id === myId ? player : allPlayers[data.id]);
     if (!target) return;

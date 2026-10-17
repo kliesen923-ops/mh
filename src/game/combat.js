@@ -1,5 +1,6 @@
 const state = require('./state');
-const { JUST_GUARD_WINDOW_MS, SWORD_JUST_GUARD_WINDOW_MS, BOW_ARROW_DAMAGE } = require('../config');
+const { JUST_GUARD_WINDOW_MS, SWORD_JUST_GUARD_WINDOW_MS } = require('../config');
+const { isGuardActive } = require('./defense');
 const { sanitizeWeapon } = require('../utils/sanitize');
 const { getAngleDiff, createProjectileId, randomWorldPoint } = require('../utils/geometry');
 const { GAME_WIDTH, GAME_HEIGHT } = require('../config');
@@ -21,7 +22,7 @@ const { players } = state;
 
 // True while the target is inside the just-guard window of a guard it just raised.
 function isJustGuarding(target, now = Date.now()) {
-    if (!target || !target.isGuarding) return false;
+    if (!isGuardActive(target, now)) return false;
     const windowMs = sanitizeWeapon(target.weapon) === 'sword' ? SWORD_JUST_GUARD_WINDOW_MS : JUST_GUARD_WINDOW_MS;
     return (now - (target.guardStartTime || 0)) < windowMs;
 }
@@ -42,7 +43,7 @@ function damagePlayerFrom(attackerId, targetId, amount, fromX, fromY, effectWeap
     if (!target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) return false;
     const angleToSource = Math.atan2(fromY - target.y, fromX - target.x);
     let damage = Math.max(1, Math.floor(amount));
-    if (target.isGuarding && getAngleDiff(target.angle, angleToSource) < Math.PI / 3) damage = Math.max(1, Math.floor(damage * 0.5));
+    if (isGuardActive(target) && getAngleDiff(target.angle, angleToSource) < Math.PI / 3) damage = Math.max(1, Math.floor(damage * 0.5));
     target.hp -= damage;
     state.io.emit('combatEffect', { x: target.x, y: target.y, angle: angleToSource + Math.PI, weapon: effectWeapon, damage });
     if (target.hp <= 0) resolveKill(attackerId, targetId);
@@ -133,208 +134,6 @@ function resolveKill(attackerId, targetId) {
     }, 3000);
 }
 
-function applyBowImpact(attackerId, targetId, payload, reflected) {
-    const finalAttacker = players[attackerId];
-    const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
-
-    const now = Date.now();
-    const startX = Number.isFinite(payload.startX) ? payload.startX : finalAttacker.x;
-    const startY = Number.isFinite(payload.startY) ? payload.startY : finalAttacker.y;
-    const endX = Number.isFinite(payload.endX) ? payload.endX : finalTarget.x;
-    const endY = Number.isFinite(payload.endY) ? payload.endY : finalTarget.y;
-    const projectileId = String(payload.projectileId || createProjectileId('bow'));
-    const attackRange = getWeaponAttackProfile(finalAttacker.weapon).reach * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.range) ? finalAttacker.stats.range : 1) * getAttackRangeMultiplier(finalAttacker);
-    if (Math.hypot(finalTarget.x - endX, finalTarget.y - endY) > 26) return;
-
-    const angle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
-    const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
-    const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
-    let damage = Math.floor(BOW_ARROW_DAMAGE * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
-    if (shouldReflectFromSpearUltimate(finalTarget, startX, startY) && !reflected) {
-        const reflectedId = createProjectileId('bowr');
-        const reflectedPayload = {
-            projectileId: reflectedId,
-            startX: finalTarget.x,
-            startY: finalTarget.y,
-            endX: finalAttacker.x,
-            endY: finalAttacker.y,
-            angle: Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x),
-            maxDistance: Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y)),
-        };
-        state.io.emit('bowProjectileResolved', { projectileId });
-        state.io.emit('bowProjectile', {
-            projectileId: reflectedId,
-            originId: targetId,
-            startX: reflectedPayload.startX,
-            startY: reflectedPayload.startY,
-            endX: reflectedPayload.endX,
-            endY: reflectedPayload.endY,
-            angle: reflectedPayload.angle,
-            reflected: true,
-            duration: Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))),
-        });
-        setTimeout(() => applyBowImpact(targetId, attackerId, reflectedPayload, true), Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))));
-        return;
-    }
-    if (isFacingAttacker && isJustGuarding(finalTarget, now) && !reflected) {
-        const reflectedId = createProjectileId('bowr');
-        const reflectedPayload = {
-            projectileId: reflectedId,
-            startX: finalTarget.x,
-            startY: finalTarget.y,
-            endX: finalAttacker.x,
-            endY: finalAttacker.y,
-            angle: Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x),
-            maxDistance: Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y)),
-        };
-        state.io.emit('bowProjectileResolved', { projectileId });
-        state.io.emit('bowProjectile', {
-            projectileId: reflectedId,
-            originId: targetId,
-            startX: reflectedPayload.startX,
-            startY: reflectedPayload.startY,
-            endX: reflectedPayload.endX,
-            endY: reflectedPayload.endY,
-            angle: reflectedPayload.angle,
-            reflected: true,
-            duration: Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))),
-        });
-        setTimeout(() => applyBowImpact(targetId, attackerId, reflectedPayload, true), Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))));
-        return;
-    }
-
-    if (finalTarget.isGuarding && isFacingAttacker) {
-        damage = Math.floor(damage * 0.5);
-    }
-
-    state.io.emit('bowProjectileResolved', { projectileId });
-    state.io.emit('combatEffect', {
-        x: finalTarget.x,
-        y: finalTarget.y,
-        angle,
-        weapon: 'bow',
-        damage,
-    });
-    finalTarget.hp -= damage;
-    if (finalTarget.hp <= 0) resolveKill(attackerId, targetId);
-    state.io.emit('statsUpdate', players);
-}
-
-function emitAshProjectile(originId, impactId, startX, startY, endX, endY, reflected) {
-    state.io.emit('ashProjectile', {
-        originId,
-        impactId,
-        startX,
-        startY,
-        endX,
-        endY,
-        reflected: Boolean(reflected),
-        duration: Math.max(140, Math.min(700, Math.round(Math.hypot(endX - startX, endY - startY) * 1.15))),
-    });
-}
-
-function applyAshImpact(attackerId, targetId, payload, reflected) {
-    const finalAttacker = players[attackerId];
-    const finalTarget = players[targetId];
-    if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout || finalTarget.isStunned) return;
-
-    const now = Date.now();
-    const wireProgress = Number.isFinite(payload.progress)
-        ? Math.max(0, Math.min(1, payload.progress))
-        : Math.max(0, Math.min(1, finalAttacker.wire && Number.isFinite(finalAttacker.wire.progress) ? finalAttacker.wire.progress : 1));
-    const wireTx = Number.isFinite(payload.tx)
-        ? payload.tx
-        : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.tx) ? finalAttacker.wire.tx : finalAttacker.x);
-    const wireTy = Number.isFinite(payload.ty)
-        ? payload.ty
-        : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.ty) ? finalAttacker.wire.ty : finalAttacker.y);
-    const maxDistance = Number.isFinite(payload.maxDistance)
-        ? Math.max(1, payload.maxDistance)
-        : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.maxDistance) ? finalAttacker.wire.maxDistance : 500);
-    const wireTip = {
-        x: finalAttacker.x + (wireTx - finalAttacker.x) * wireProgress,
-        y: finalAttacker.y + (wireTy - finalAttacker.y) * wireProgress
-    };
-    if (Math.hypot(finalTarget.x - wireTip.x, finalTarget.y - wireTip.y) > 28) return;
-    finalAttacker.lastWireAt = now;
-
-    const distanceTravelled = Math.max(0, Math.min(maxDistance, maxDistance * wireProgress));
-    const ratio = maxDistance > 0 ? distanceTravelled / maxDistance : 0;
-    let stunMs = Math.round((0.3 + (ratio * 1.7)) * 1000);
-    stunMs = Math.max(300, Math.min(2000, stunMs));
-    const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
-    const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
-
-    if (shouldReflectFromSpearUltimate(finalTarget, finalAttacker.x, finalAttacker.y) && !reflected) {
-        const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
-        const reflectedPayload = {
-            targetId: attackerId,
-            progress: 0,
-            tx: finalAttacker.x,
-            ty: finalAttacker.y,
-            maxDistance: reflectDistance,
-            kind: 'ash',
-            reflectedFrom: targetId,
-        };
-        state.io.emit('combatEffect', {
-            x: finalTarget.x,
-            y: finalTarget.y,
-            angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
-            weapon: 'ash',
-        });
-        emitAshProjectile(targetId, attackerId, finalTarget.x, finalTarget.y, finalAttacker.x, finalAttacker.y, true);
-        setTimeout(() => {
-            applyAshImpact(targetId, attackerId, reflectedPayload, true);
-        }, Math.max(140, Math.min(700, Math.round(reflectDistance * 1.15))));
-        return;
-    }
-
-    if (isFacingAttacker && isJustGuarding(finalTarget, now)) {
-        const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
-        const reflectedPayload = {
-            targetId: attackerId,
-            progress: 0,
-            tx: finalAttacker.x,
-            ty: finalAttacker.y,
-            maxDistance: reflectDistance,
-            kind: 'ash',
-            reflectedFrom: targetId,
-        };
-        state.io.emit('combatEffect', {
-            x: finalTarget.x,
-            y: finalTarget.y,
-            angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
-            weapon: 'ash',
-        });
-        emitAshProjectile(targetId, attackerId, finalTarget.x, finalTarget.y, finalAttacker.x, finalAttacker.y, true);
-        setTimeout(() => {
-            applyAshImpact(targetId, attackerId, reflectedPayload, true);
-        }, Math.max(140, Math.min(700, Math.round(reflectDistance * 1.15))));
-        return;
-    }
-
-    if (finalTarget.isGuarding && isFacingAttacker) {
-        stunMs = Math.round(stunMs * 0.5);
-    }
-
-    const stunEndsAt = Date.now() + stunMs;
-    state.io.emit('combatEffect', {
-        x: finalTarget.x,
-        y: finalTarget.y,
-        angle: Math.atan2(finalTarget.y - finalAttacker.y, finalTarget.x - finalAttacker.x),
-        weapon: 'ash',
-    });
-    finalTarget.isStunned = true;
-    state.io.emit('playerStunned', { id: targetId, stunned: true, stunEndsAt, stunMs });
-    setTimeout(() => {
-        if (players[targetId]) {
-            players[targetId].isStunned = false;
-            state.io.emit('playerStunned', { id: targetId, stunned: false, stunEndsAt: 0 });
-        }
-    }, stunMs);
-}
-
 function shouldReflectFromSpearUltimate(finalTarget, projectileStartX, projectileStartY) {
     if (!finalTarget || !finalTarget.ultimate || !finalTarget.ultimate.active || finalTarget.ultimate.type !== 'spear') return false;
     if (Date.now() >= Number(finalTarget.ultimate.endsAt || 0)) return false;
@@ -348,8 +147,5 @@ module.exports = {
     damagePlayerFrom,
     stunPlayer,
     resolveKill,
-    applyBowImpact,
-    applyAshImpact,
-    emitAshProjectile,
     shouldReflectFromSpearUltimate,
 };
