@@ -118,8 +118,15 @@ function drawSpearUltimateArea(ult, elapsed, remain) {
 }
 
 function drawBowUltimateArea(ult, originX, originY, elapsed, remain) {
-    const angle = ult.angle || 0;
-    const halfWidth = ult.radius || 54;
+    const angles = Array.isArray(ult.angles) && ult.angles.length ? ult.angles : [ult.angle || 0];
+    angles.forEach((angle) => {
+        ctx.save();
+        drawDragonBeam(angle, ult.radius || 54, originX, originY, elapsed, remain);
+        ctx.restore();
+    });
+}
+
+function drawDragonBeam(angle, halfWidth, originX, originY, elapsed, remain) {
     const len = rayToWorldEdge(originX, originY, angle);
     const grow = Math.min(1, elapsed / 160);
     ctx.rotate(angle);

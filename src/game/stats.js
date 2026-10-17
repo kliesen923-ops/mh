@@ -1,4 +1,4 @@
-const { ATTACK_PROFILES, COMBO_FINISHER } = require('../config');
+const { ATTACK_PROFILES, COMBO_FINISHER, ULTIMATE_COOLDOWN_CUT_PER_SPEED, ULTIMATE_MAX_COOLDOWN_CUT } = require('../config');
 const { sanitizeWeapon } = require('../utils/sanitize');
 const { getAngleDiff, distToSegment } = require('../utils/geometry');
 
@@ -108,6 +108,26 @@ function getUltimateConfig(weapon) {
     return { cooldownMs: 11000, durationMs: 1200 };
 }
 
+// Range upgrades grow ultimate areas, relative to the weapon's starting range.
+function getUltimateRangeMultiplier(player) {
+    const base = createBaseStatsForWeapon(player && player.weapon).range || 1;
+    const current = player && player.stats && Number.isFinite(player.stats.range) ? player.stats.range : base;
+    return Math.max(1, current / base);
+}
+
+// Attack-speed upgrades shorten the ultimate cooldown.
+function getUltimateCooldownMs(player) {
+    const config = getUltimateConfig(player && player.weapon);
+    const picks = Math.max(0, Math.floor((player && player.upgradeCounts && player.upgradeCounts.speed) || 0));
+    return Math.round(config.cooldownMs * (1 - Math.min(ULTIMATE_MAX_COOLDOWN_CUT, picks * ULTIMATE_COOLDOWN_CUT_PER_SPEED)));
+}
+
+// Same count as normal bow volleys: one extra per projectile upgrade.
+function getBowShotCount(player) {
+    const projectile = player && player.stats && Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
+    return 1 + Math.max(0, Math.floor((projectile - 0.999) / 0.2));
+}
+
 function clearUltimateState(player) {
     if (!player) return;
     player.ultimate = createDefaultUltimate();
@@ -135,5 +155,8 @@ module.exports = {
     createDefaultGearRush,
     createDefaultUltimate,
     getUltimateConfig,
+    getUltimateRangeMultiplier,
+    getUltimateCooldownMs,
+    getBowShotCount,
     clearUltimateState,
 };

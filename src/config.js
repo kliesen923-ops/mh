@@ -31,6 +31,11 @@ const MOB_HIT_IMPACT = {
     hammer: { knockback: 30, finisherKnockback: 60, finisherStunMs: 600 },
     spear: { knockback: 18, finisherKnockback: 50, finisherStunMs: 0 },
 };
+// Upgrades that also power up ultimates: each attack-speed pick shortens the cooldown.
+const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
+const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
+// Angle between the bow ultimate's dragons when projectile upgrades add more.
+const DRAGON_SPREAD = 0.16;
 const HEAL_CROSS_SPAWN_DELAY_MS = 18000;
 const HEAL_CROSS_LIFETIME_MS = 12000;
 const HEAL_CROSS_BOUNDS = { xMin: 120, xMax: GAME_WIDTH - 120, yMin: 110, yMax: GAME_HEIGHT - 110 };
@@ -88,6 +93,9 @@ module.exports = {
     ATTACK_PROFILES,
     COMBO_FINISHER,
     MOB_HIT_IMPACT,
+    ULTIMATE_COOLDOWN_CUT_PER_SPEED,
+    ULTIMATE_MAX_COOLDOWN_CUT,
+    DRAGON_SPREAD,
     HEAL_CROSS_SPAWN_DELAY_MS,
     HEAL_CROSS_LIFETIME_MS,
     HEAL_CROSS_BOUNDS,

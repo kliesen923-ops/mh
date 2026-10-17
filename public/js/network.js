@@ -90,7 +90,7 @@ function showUpgradeUI() {
     if (rangeCard && rangeTitle && rangeDesc) {
         rangeCard.setAttribute('onclick', isBow ? "selectUpgrade('projectile')" : "selectUpgrade('range')");
         rangeTitle.textContent = isBow ? '투사체 증가' : '사거리 강화';
-        rangeDesc.innerHTML = isBow ? '활의 화살이<br><b>부채꼴 멀티샷</b>으로 늘어납니다.' : '공격의 도달 범위가 <br><b>15%</b> 증가합니다.';
+        rangeDesc.innerHTML = isBow ? '화살이 <b>1발</b> 늘고<br>용의 화살도 <b>1발</b> 추가' : '공격·궁극기 범위가<br><b>15%</b> 증가합니다.';
     }
     
     Object.keys(keys).forEach(k => keys[k] = false);
