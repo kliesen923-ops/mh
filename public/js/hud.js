@@ -220,12 +220,16 @@ function updateHUD() {
     updateCombatReadouts();
 }
 
+// remaining and duration in seconds. The ring and the dark cover clear clockwise as the
+// cooldown runs down, and whole seconds left show in the middle.
 function updateCooldownButton(id, remaining, duration) {
     const el = document.getElementById(id);
     if (!el) return;
     const progress = duration > 0 ? Math.max(0, Math.min(1, remaining / duration)) : 0;
     el.style.setProperty('--cooldown-progress', progress.toFixed(3));
     el.classList.toggle('cooling', remaining > 0);
+    const seconds = remaining >= 1 ? String(Math.ceil(remaining)) : '';
+    if (el.dataset.cd !== seconds) el.dataset.cd = seconds;
 }
 
 function updateCooldownUI() {
@@ -233,5 +237,6 @@ function updateCooldownUI() {
     updateCooldownButton('btn-guard', player.guardCooldown, GUARD_COOLDOWN_SEC);
     updateCooldownButton('btn-wire', player.wireCooldown, SKILL_PRESETS[normalizeSkill(player.skill || selectedSkill)]?.cooldown || 1.0);
     const weapon = normalizeWeapon(player.weapon);
-    updateCooldownButton('btn-ultimate', getUltimateCooldownRemaining(player), getUltimateCooldownSec(player));
+    // The remaining time comes in milliseconds.
+    updateCooldownButton('btn-ultimate', getUltimateCooldownRemaining(player) / 1000, getUltimateCooldownSec(player));
 }
