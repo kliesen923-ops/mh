@@ -198,3 +198,20 @@ test('dual-blade rush slashes only count along the rush, ten per rush', async ()
     await wait(60);
     assert.equal(p.rushSlashes, 10);
 });
+
+test('an ultimate stays on cooldown after it ends', async () => {
+    const { client, p } = await ready('hammer');
+    client.emit('useUltimate', { angle: 0 });
+    await wait(40);
+    const firstStart = p.ultimate.startAt;
+    const cooldownEndsAt = p.ultimate.cooldownEndsAt;
+    assert.ok(cooldownEndsAt > Date.now() + 10000, 'the hammer cooldown is 13s');
+    // The slam lasts 0.7s; once it ends the cooldown must still be running.
+    await wait(800);
+    assert.equal(p.ultimate.active, false);
+    assert.equal(p.ultimate.cooldownEndsAt, cooldownEndsAt);
+    client.emit('useUltimate', { angle: 0 });
+    await wait(40);
+    assert.equal(p.ultimate.active, false, 'a second cast during the cooldown is refused');
+    assert.notEqual(p.ultimate.startAt, firstStart + 1);
+});

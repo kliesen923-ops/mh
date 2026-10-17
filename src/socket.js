@@ -148,7 +148,7 @@ function registerSocketHandlers(io) {
             p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
             // Full health only when picking a loadout; switching mid-game is no free heal.
             p.hp = p.isSelectingLoadout ? getMaxHpFromStats(p.stats) : Math.min(p.hp, getMaxHpFromStats(p.stats));
-            clearUltimateState(p);
+            clearUltimateState(p, { resetCooldown: p.isSelectingLoadout });
             io.emit('statsUpdate', players);
         });
 

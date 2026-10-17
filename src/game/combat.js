@@ -104,7 +104,7 @@ function resolveKill(attackerId, targetId) {
     target.isUpgrading = false;
     target.upgradeShield = false;
     target.isSelectingLoadout = true;
-    clearUltimateState(target);
+    clearUltimateState(target, { resetCooldown: true });
     target.gearRush = createDefaultGearRush();
     target.giantActive = false;
     target.giantScale = 1;
@@ -122,7 +122,7 @@ function resolveKill(attackerId, targetId) {
             players[targetId].isStunned = false;
             players[targetId].isGuarding = false;
             players[targetId].gearRush = createDefaultGearRush();
-            clearUltimateState(players[targetId]);
+            clearUltimateState(players[targetId], { resetCooldown: true });
             players[targetId].giantActive = false;
             players[targetId].giantScale = 1;
             players[targetId].giantAttackMult = 1;

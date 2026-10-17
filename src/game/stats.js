@@ -150,9 +150,12 @@ function getBowShotCount(player) {
     return 1 + Math.max(0, Math.floor((projectile - 0.999) / 0.2));
 }
 
-function clearUltimateState(player) {
+// Ends the ultimate. Its cooldown keeps running unless resetCooldown (death, new loadout).
+function clearUltimateState(player, { resetCooldown = false } = {}) {
     if (!player) return;
+    const cooldownEndsAt = player.ultimate && Number.isFinite(player.ultimate.cooldownEndsAt) ? player.ultimate.cooldownEndsAt : 0;
     player.ultimate = createDefaultUltimate();
+    if (!resetCooldown) player.ultimate.cooldownEndsAt = cooldownEndsAt;
 }
 
 function createDefaultStats() {
