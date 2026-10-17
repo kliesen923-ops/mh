@@ -146,6 +146,8 @@ const player = {
 // (within limits) so phones get no black bars at the sides.
 const MIN_VIEW_ASPECT = 1.6;
 const MAX_VIEW_ASPECT = 2.4;
+// Screen height the touch control layout (hud.css) is measured against.
+const CONTROLS_DESIGN_HEIGHT = 591;
 function resize() {
     const screenW = Math.max(1, window.innerWidth);
     const screenH = Math.max(1, window.innerHeight);
@@ -159,7 +161,9 @@ function resize() {
     const coarse = window.matchMedia('(pointer: coarse)').matches;
     document.documentElement.style.setProperty('--game-ui-scale', String(scale));
     document.documentElement.style.setProperty('--hud-scale', String(Math.max(0.62, scale)));
-    // Touch controls stay large enough to press comfortably.
-    document.documentElement.style.setProperty('--touch-scale', String(coarse ? Math.max(0.82, Math.min(1, scale * 1.3)) : Math.max(0.7, scale)));
+    // Touch controls are laid out for a 591px-tall screen and scale with the screen height, so
+    // their size and distance from the edges stay the same share of the screen (and so about
+    // the same distance from the thumbs on any phone). Capped so tablets and PCs don't get huge buttons.
+    document.documentElement.style.setProperty('--touch-scale', String(Math.max(0.5, Math.min(1, screenH / CONTROLS_DESIGN_HEIGHT))));
 }
 window.addEventListener('resize', resize); resize();
