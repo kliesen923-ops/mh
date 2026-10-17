@@ -398,6 +398,8 @@ function useUltimate() {
         cooldownEndsAt: Date.now() + Math.round(getUltimateCooldownSec(player) * 1000),
         radius: weapon === 'spear' ? 180 : 0,
         extra: 0,
+        // Shown right away for the cooldown; the server's copy replaces it with the real area.
+        predicted: true,
     };
     updateHUD();
     socket.emit('useUltimate', { weapon, angle: player.angle });
