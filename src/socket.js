@@ -1,26 +1,18 @@
 const state = require('./game/state');
 const {
-    MAX_MOVE_SPEED,
-    MOVE_TOLERANCE,
-    WIRE_COOLDOWN_MS,
-    WIRE_STUN_MS,
     PARRY_STAGGER_MS,
     HAMMER_FINISHER_PLAYER_STUN_MS,
     DUAL_FLANK_DAMAGE_MULT,
-    BOW_ARROW_DAMAGE,
     SCYTHE_PULL_DISTANCE,
     GAUNTLET_GUARD_BREAK_MS,
-    SKILL_COOLDOWN_MS,
-    SKILL_COOLDOWN_SLACK_MS,
     MAX_CHAT_LENGTH,
     GAME_WIDTH,
     GAME_HEIGHT,
     WORLD_MARGIN,
     MOB_TIERS,
-    BOW_MAX_DISTANCE,
     MOB_HIT_IMPACT,
-    BOW_MOB_KNOCKBACK,
-    BOW_PIERCE,
+    DUAL_RUSH_SLASH_COUNT,
+    RUSH_PATH_SLACK,
 } = require('./config');
 const { sanitizeWeapon, sanitizeSkill, sanitizeName, sanitizeLook } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
@@ -40,9 +32,12 @@ const {
     getUltimateCooldownMs,
     clearUltimateState,
 } = require('./game/stats');
-const { sanitizeAction } = require('./game/action');
+const { sanitizeAction, enforceActionRules, trySpendSkill } = require('./game/action');
+const { applyMovement } = require('./game/movement');
 const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayerHits } = require('./game/hits');
-const { resolveKill, applyBowImpact, applyAshImpact, isJustGuarding, stunPlayer, forcePlayerPosition } = require('./game/combat');
+const { resolveKill, isJustGuarding, stunPlayer, forcePlayerPosition } = require('./game/combat');
+const { isGuardActive } = require('./game/defense');
+const { fireBowVolley, fireSkillShot } = require('./game/projectiles');
 const { castStaffOrb, placeHealPotion, placeTrap, getBlinkMark, placeBlinkMark, clearBlinkMark, getFieldState, clearFieldForOwner } = require('./game/field');
 const { ULTIMATE_HANDLERS, isRootedByUltimate } = require('./game/ultimates');
 const { getHealingCrossList, getGiantPotionList } = require('./game/pickups');
@@ -64,19 +59,11 @@ function applyFinisherToPlayer(attacker, weapon, targetId, target, now) {
         }
     } else if (weapon === 'gauntlet') {
         // Breaks the guard: it drops now and can't be raised again for a moment.
+        const wasGuarding = isGuardActive(target, now);
         target.isGuarding = false;
         target.guardBrokenUntil = now + GAUNTLET_GUARD_BREAK_MS;
-        state.io.emit('guardBroken', { id: targetId, until: target.guardBrokenUntil, ms: GAUNTLET_GUARD_BREAK_MS });
+        state.io.emit('guardBroken', { id: targetId, until: target.guardBrokenUntil, ms: GAUNTLET_GUARD_BREAK_MS, wasGuarding });
     }
-}
-
-// Server-side check of secondary skill cooldowns.
-function trySpendSkill(p, kind, now) {
-    const cooldownMs = SKILL_COOLDOWN_MS[kind] || 0;
-    const last = (p.skillUsedAt && p.skillUsedAt[kind]) || 0;
-    if (now - last < cooldownMs - SKILL_COOLDOWN_SLACK_MS) return false;
-    p.skillUsedAt = Object.assign({}, p.skillUsedAt, { [kind]: now });
-    return true;
 }
 
 function registerSocketHandlers(io) {
@@ -159,7 +146,8 @@ function registerSocketHandlers(io) {
             const nextWeapon = sanitizeWeapon(weapon);
             p.weapon = nextWeapon;
             p.stats = normalizeStats(createBaseStatsForWeapon(nextWeapon));
-            p.hp = getMaxHpFromStats(p.stats);
+            // Full health only when picking a loadout; switching mid-game is no free heal.
+            p.hp = p.isSelectingLoadout ? getMaxHpFromStats(p.stats) : Math.min(p.hp, getMaxHpFromStats(p.stats));
             clearUltimateState(p);
             io.emit('statsUpdate', players);
         });
@@ -204,39 +192,27 @@ function registerSocketHandlers(io) {
         });
 
         socket.on('playerMovement', (movementData) => {
+            if (!movementData || typeof movementData !== 'object') return;
             if (players[socket.id] && !players[socket.id].isStunned) {
                 const p = players[socket.id];
                 const now = Date.now();
                 if (isRootedByUltimate(p, now)) return;
-                const dt = Math.max((now - (p.lastMoveAt || now)) / 1000, 1 / 60);
                 const nextX = Number(movementData.x);
                 const nextY = Number(movementData.y);
                 const nextAngle = Number(movementData.angle);
                 if (!Number.isFinite(nextX) || !Number.isFinite(nextY) || !Number.isFinite(nextAngle)) return;
-
-                const maxDistance = MAX_MOVE_SPEED * dt + MOVE_TOLERANCE;
-                const dx = nextX - p.x;
-                const dy = nextY - p.y;
-                const distance = Math.hypot(dx, dy);
-                if (distance > maxDistance) {
-                    const scale = maxDistance / distance;
-                    p.x += dx * scale;
-                    p.y += dy * scale;
-                } else {
-                    p.x = nextX;
-                    p.y = nextY;
+                // Too far for the time since the last move: cut short and snap the client back.
+                if (applyMovement(p, nextX, nextY, now)) {
+                    socket.emit('playerMoved', { id: socket.id, x: p.x, y: p.y, angle: nextAngle, forced: true });
                 }
-                p.x = Math.max(WORLD_MARGIN, Math.min(GAME_WIDTH - WORLD_MARGIN, p.x));
-                p.y = Math.max(WORLD_MARGIN, Math.min(GAME_HEIGHT - WORLD_MARGIN, p.y));
                 p.angle = nextAngle;
-                p.lastMoveAt = now;
                 socket.broadcast.emit('playerMoved', players[socket.id]);
             }
         });
 
         socket.on('playerAction', (actionData) => {
             if (players[socket.id]) {
-                const action = sanitizeAction(players[socket.id], actionData);
+                const action = enforceActionRules(players[socket.id], sanitizeAction(players[socket.id], actionData));
                 if (action.isAttacking === true && action.attackPhase === 1) resetAttackHits(socket.id);
                 Object.assign(players[socket.id], action);
                 socket.broadcast.emit('playerActionUpdate', { id: socket.id, action });
@@ -274,111 +250,17 @@ function registerSocketHandlers(io) {
             socket.emit('upgradeApplied');
         });
 
-        socket.on('wireGrabHit', (payloadData) => {
-            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : { targetId: payloadData };
-            let attackerId = socket.id;
-            let targetId = payload.targetId;
-            let finalAttacker = players[attackerId];
-            let finalTarget = players[targetId];
-            if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
-            if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'wire') return;
-
-            const now = Date.now();
-            if ((now - (finalAttacker.lastWireAt || 0)) < WIRE_COOLDOWN_MS) return;
-            const wireProgress = Number.isFinite(payload.progress)
-                ? Math.max(0, Math.min(1, payload.progress))
-                : Math.max(0, Math.min(1, finalAttacker.wire && Number.isFinite(finalAttacker.wire.progress) ? finalAttacker.wire.progress : 1));
-            const wireTx = Number.isFinite(payload.tx)
-                ? payload.tx
-                : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.tx) ? finalAttacker.wire.tx : finalAttacker.x);
-            const wireTy = Number.isFinite(payload.ty)
-                ? payload.ty
-                : (finalAttacker.wire && Number.isFinite(finalAttacker.wire.ty) ? finalAttacker.wire.ty : finalAttacker.y);
-            const wireTip = {
-                x: finalAttacker.x + (wireTx - finalAttacker.x) * wireProgress,
-                y: finalAttacker.y + (wireTy - finalAttacker.y) * wireProgress
-            };
-            if (Math.hypot(finalTarget.x - wireTip.x, finalTarget.y - wireTip.y) > 35) return;
-            finalAttacker.lastWireAt = now;
-
-            const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
-            const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
-
-            if (isFacingAttacker && isJustGuarding(finalTarget, now)) {
-                const tempId = attackerId; attackerId = targetId; targetId = tempId;
-                finalAttacker = players[attackerId]; finalTarget = players[targetId];
-                io.emit('chatMessage', { id: 'SYSTEM', message: `저스트 가드 성공! ${finalAttacker.name}에게 반격했습니다.` });
-            }
-
-            if (finalAttacker && finalTarget && !finalTarget.isStunned) {
-                const stunEndsAt = Date.now() + WIRE_STUN_MS;
-                finalTarget.isStunned = true;
-                io.emit('playerStunned', { id: targetId, stunned: true, stunEndsAt, stunMs: WIRE_STUN_MS });
-                let steps = 10;
-                let currentStep = 0;
-                let pullInterval = setInterval(() => {
-                    if (!players[attackerId] || !players[targetId]) { clearInterval(pullInterval); return; }
-                    const destX = finalAttacker.x + Math.cos(finalAttacker.angle) * 50;
-                    const destY = finalAttacker.y + Math.sin(finalAttacker.angle) * 50;
-                    finalTarget.x += (destX - finalTarget.x) * 0.5;
-                    finalTarget.y += (destY - finalTarget.y) * 0.5;
-                    io.emit('playerMoved', finalTarget);
-                    currentStep++;
-                    if (currentStep >= steps) {
-                        clearInterval(pullInterval);
-                        setTimeout(() => {
-                            if (players[targetId]) {
-                                players[targetId].isStunned = false;
-                                io.emit('playerStunned', { id: targetId, stunned: false, stunEndsAt: 0 });
-                            }
-                        }, WIRE_STUN_MS);
-                    }
-                }, 30);
-            }
-        });
-
-        socket.on('ashArrowHit', (payloadData) => {
-            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : { targetId: payloadData };
-            let attackerId = socket.id;
-            let targetId = payload.targetId;
-            const finalAttacker = players[attackerId];
-            const finalTarget = players[targetId];
-            if (!finalAttacker || !finalTarget || finalTarget.upgradeShield || finalTarget.isSelectingLoadout) return;
-            if (sanitizeSkill(payload.kind || finalAttacker.skill) !== 'ash') return;
-            applyAshImpact(attackerId, targetId, payload, false);
-        });
-
+        // The client only says it fired; the server flies the volley and decides the hits.
         socket.on('playerBowShot', (payloadData) => {
             const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
             const attacker = players[socket.id];
-            if (!attacker || sanitizeWeapon(attacker.weapon) !== 'bow' || attacker.hp <= 0 || attacker.isStunned) return;
-            const projectileId = String(payload.projectileId || createProjectileId('bow'));
+            if (!attacker || sanitizeWeapon(attacker.weapon) !== 'bow' || attacker.hp <= 0 || attacker.isStunned || attacker.isSelectingLoadout) return;
+            if (!attacker.isAttacking || attacker.attackPhase !== 2) return;
+            if (hasHitTargetThisAttack(socket.id, 'bow-shot')) return;
             const angle = Number.isFinite(payload.angle) ? payload.angle : (Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle);
-            const startX = Number.isFinite(payload.startX) ? payload.startX : attacker.x;
-            const startY = Number.isFinite(payload.startY) ? payload.startY : attacker.y;
-            const endX = Number.isFinite(payload.endX) ? payload.endX : (startX + Math.cos(angle) * 600);
-            const endY = Number.isFinite(payload.endY) ? payload.endY : (startY + Math.sin(angle) * 600);
-            const maxDistance = Number.isFinite(payload.maxDistance) ? Math.max(1, payload.maxDistance) : Math.max(1, Math.hypot(endX - startX, endY - startY));
-            io.emit('bowProjectile', {
-                projectileId,
-                originId: socket.id,
-                startX,
-                startY,
-                endX,
-                endY,
-                angle,
-                reflected: false,
-                duration: Math.max(180, Math.min(800, Math.round(maxDistance * 0.9))),
-            });
-        });
-
-        socket.on('bowArrowHit', (payloadData) => {
-            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
-            const attacker = players[socket.id];
-            const targetId = payload.targetId;
-            const target = players[targetId];
-            if (!attacker || !target || sanitizeWeapon(attacker.weapon) !== 'bow' || target.upgradeShield || target.isSelectingLoadout) return;
-            applyBowImpact(socket.id, targetId, payload, Boolean(payload.reflected));
+            // The client's shot id lets it match its own drawn arrows to the server's.
+            const shotId = String(payload.shotId || '').replace(/[^a-z0-9]/gi, '').slice(0, 16);
+            fireBowVolley(socket.id, angle, shotId);
         });
 
         socket.on('playerHitTarget', (targetId) => {
@@ -405,7 +287,7 @@ function registerSocketHandlers(io) {
                 const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
                 let damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
                 if (weapon === 'dual' && facingDiff > Math.PI / 2) damage = Math.floor(damage * DUAL_FLANK_DAMAGE_MULT);
-                if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.5);
+                if (isGuardActive(target, now) && isFacingAttacker) damage = Math.floor(damage * 0.5);
                 io.emit('combatEffect', {
                     x: target.x,
                     y: target.y,
@@ -447,35 +329,20 @@ function registerSocketHandlers(io) {
             damageMob(mob.id, socket.id, damage, Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle, impact);
         });
 
-        socket.on('bowArrowHitMob', (payloadData) => {
-            const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
-            const attacker = players[socket.id];
-            const mob = getMob(payload.mobId);
-            if (!attacker || !mob || attacker.hp <= 0 || sanitizeWeapon(attacker.weapon) !== 'bow') return;
-            const endX = Number.isFinite(payload.endX) ? payload.endX : mob.x;
-            const endY = Number.isFinite(payload.endY) ? payload.endY : mob.y;
-            if (Math.hypot(mob.x - endX, mob.y - endY) > mob.radius + 40) return;
-            if (Math.hypot(mob.x - attacker.x, mob.y - attacker.y) > BOW_MAX_DISTANCE + mob.radius + 120) return;
-            const hitKey = `${socket.id}:bowmob:${String(payload.projectileId || '').slice(0, 80)}`;
-            const pierced = state.attackHitTargets.get(hitKey);
-            if (pierced && pierced.size >= BOW_PIERCE) return;
-            if (hasHitTargetForKey(hitKey, `mob:${mob.id}`)) return;
-            const damage = Math.floor(BOW_ARROW_DAMAGE * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
-            damageMob(mob.id, socket.id, damage, Number(payload.angle) || 0, { fromX: attacker.x, fromY: attacker.y, knockback: BOW_MOB_KNOCKBACK });
-        });
-
         socket.on('dualRushSlash', (payloadData) => {
             const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
             const attacker = players[socket.id];
             if (!attacker || sanitizeWeapon(attacker.weapon) !== 'dual' || !attacker.gearRush || !attacker.gearRush.active) return;
             if ((attacker.gearRush.mode || 'rush') !== 'dualRush') return;
-            const startX = Number.isFinite(payload.startX) ? payload.startX : attacker.x;
-            const startY = Number.isFinite(payload.startY) ? payload.startY : attacker.y;
-            const endX = Number.isFinite(payload.endX) ? payload.endX : attacker.x;
-            const endY = Number.isFinite(payload.endY) ? payload.endY : attacker.y;
-            const slashIndex = Number.isInteger(payload.slashIndex) ? Math.max(0, payload.slashIndex) : 0;
-            const comboId = String(payload.comboId || attacker.gearRush.comboId || createProjectileId('dualrush')).slice(0, 64);
-            const slashKey = `${socket.id}:dualRush:${comboId}:${slashIndex}`;
+            // Ten slashes per rush, counted here, and only along the rush's own path.
+            if ((attacker.rushSlashes || 0) >= DUAL_RUSH_SLASH_COUNT) return;
+            const rushPath = [{ x: attacker.gearRush.startX, y: attacker.gearRush.startY }, { x: attacker.gearRush.tx, y: attacker.gearRush.ty }];
+            const onPath = (x, y) => Number.isFinite(x) && Number.isFinite(y) && distToSegment(rushPath[0], rushPath[1], { x, y }) <= RUSH_PATH_SLACK;
+            if (!onPath(payload.startX, payload.startY) || !onPath(payload.endX, payload.endY)) return;
+            const { startX, startY, endX, endY } = payload;
+            const slashIndex = attacker.rushSlashes || 0;
+            attacker.rushSlashes = slashIndex + 1;
+            const slashKey = `${socket.id}:dualRush:${attacker.rushId}:${slashIndex}`;
             const attackRange = Math.max(40, Math.hypot(endX - startX, endY - startY) + 18);
             const profile = getWeaponAttackProfile(attacker.weapon);
             const slashWidth = profile.lineWidth + 10;
@@ -499,7 +366,7 @@ function registerSocketHandlers(io) {
                 let damage = Math.floor(baseDamage * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
                 const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
                 const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
-                if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.5);
+                if (isGuardActive(target) && isFacingAttacker) damage = Math.floor(damage * 0.5);
                 io.emit('combatEffect', {
                     x: target.x,
                     y: target.y,
@@ -528,7 +395,7 @@ function registerSocketHandlers(io) {
             castStaffOrb(socket.id, angle, { range, big: p.comboStep === 3 });
         });
 
-        // Trap, blink mark and heal potion.
+        // Wire, ash arrow, trap, blink mark and heal potion (the rush starts through playerAction).
         socket.on('useSkill', (payloadData) => {
             const p = players[socket.id];
             const payload = (payloadData && typeof payloadData === 'object') ? payloadData : {};
@@ -549,7 +416,9 @@ function registerSocketHandlers(io) {
                 return;
             }
             if (!trySpendSkill(p, kind, now)) return;
-            if (kind === 'trap') placeTrap(socket.id);
+            const angle = Number.isFinite(payload.angle) ? payload.angle : p.angle;
+            if (kind === 'wire' || kind === 'ash') fireSkillShot(kind, socket.id, angle);
+            else if (kind === 'trap') placeTrap(socket.id);
             else if (kind === 'potion') placeHealPotion(socket.id);
         });
 

@@ -12,6 +12,7 @@ const { grantXp, xpToNextLevel } = require('../src/game/progression');
 const { updateHealingCrosses, updateGiantPotions, getHealingCrossList, getGiantPotionList } = require('../src/game/pickups');
 const { recordRun, clearMemoryRecords } = require('../src/records');
 const { resolveKill } = require('../src/game/combat');
+const { tickField } = require('../src/game/field');
 const { BOSS, HEAL_CROSS_MAX, GIANT_POTION_MAX, HEAL_CROSS_SPAWN_DELAY_MS, GIANT_POTION_SPAWN_DELAY_MS } = require('../src/config');
 
 let server;
@@ -35,6 +36,16 @@ async function connect() {
     clients.push(client);
     await once(client, 'currentPlayers');
     return client;
+}
+
+// Swings the bow; the server fires the arrow (aimed right) and flies it in tickField.
+async function shootArrow(client) {
+    Object.assign(state.players[client.id], { lastAttackAt: 0 });
+    client.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep: 1, aAngle: 0 });
+    client.emit('playerAction', { isAttacking: true, attackPhase: 2 });
+    const fired = once(client, 'bowProjectile');
+    client.emit('playerBowShot', { angle: 0 });
+    await fired;
 }
 
 async function readyPlayer(client, weapon = 'sword') {
@@ -133,6 +144,7 @@ test('bosses ignore knockback, and drop a burst of XP and a big heal when killed
     Object.assign(p, { x: 2600, y: 600, angle: 0, hp: 10 });
     const boss = spawnBoss(client.id, { x: 2660, y: 600 });
     const swing = async (comboStep) => {
+        Object.assign(state.players[client.id], { serverCombo: comboStep - 1, lastAttackAt: 0 });
         client.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep, aAngle: 0 });
         client.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep, aAngle: 0 });
     };
@@ -162,14 +174,15 @@ test('bow kills pull their XP to the archer from far away, and arrows push mobs'
     Object.assign(p, { x: 1000, y: 1700, angle: 0 });
     const mob = spawnMob(client.id, { x: 1500, y: 1700, tier: 5 });
 
-    const damaged = once(client, 'mobDamaged');
-    client.emit('bowArrowHitMob', { mobId: mob.id, endX: 1500, endY: 1700, angle: 0, projectileId: 'a1' });
-    await damaged;
+    await shootArrow(client);
+    tickField(Date.now() + 600);
+    assert.ok(mob.hp < mob.maxHp, 'the server-flown arrow hit');
     assert.ok(mob.x > 1505, 'arrow nudged the mob back');
 
     mob.hp = 1;
     const dropped = once(client, 'xpOrbsAdded');
-    client.emit('bowArrowHitMob', { mobId: mob.id, endX: mob.x, endY: mob.y, angle: 0, projectileId: 'a2' });
+    await shootArrow(client);
+    tickField(Date.now() + 600);
     const [[orb]] = await dropped;
     assert.equal(orb.magnetTo, client.id);
     const before = p.totalXp;
@@ -214,10 +227,8 @@ test('one arrow pierces up to three mobs', async () => {
     Object.assign(p, { x: 400, y: 400, angle: 0 });
     const line = [0, 1, 2, 3].map((i) => spawnMob(client.id, { x: 600 + i * 60, y: 400, tier: 5 }));
     const hpBefore = line.map((m) => m.hp);
-    for (const mob of line) {
-        client.emit('bowArrowHitMob', { mobId: mob.id, endX: mob.x, endY: mob.y, angle: 0, projectileId: 'pierce-1' });
-    }
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await shootArrow(client);
+    tickField(Date.now() + 800);
     const hit = line.map((m, i) => m.hp < hpBefore[i]);
     assert.deepEqual(hit, [true, true, true, false]);
     clearAllMobs();

@@ -317,48 +317,7 @@ function drawCharacter(p, color) {
             ctx.restore();
         }
     }
-    if(isAttacking && attackPhase === 2) {
-        ctx.save();
-        ctx.translate(x, y);
-        const ba = aAngle || angle;
-        if (weapon === 'spear') {
-            const tipX = Math.cos(ba) * attackRange;
-            const tipY = Math.sin(ba) * attackRange;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(tipX, tipY);
-            ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.85)":"rgba(255,255,255,0.85)";
-            ctx.lineWidth = profile.lineWidth * getComboFinisher(weapon, comboStep).width;
-            ctx.lineCap = "round";
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
-            ctx.fillStyle = comboStep===3?"rgba(255,200,0,0.95)":"rgba(255,255,255,0.9)";
-            ctx.fill();
-        } else if (isRangedWeapon(weapon)) {
-            // The projectile itself shows the shot.
-        } else {
-            ctx.beginPath();
-            let sA = ba-2.0, eA = ba+0.5; let counter = false;
-            if(comboStep===2) { sA = ba+2.0; eA = ba-0.5; counter = true; } else if(comboStep===3) { sA = ba-2.8; eA = ba+2.8; }
-            ctx.arc(0,0,attackRange,sA,eA,counter);
-            ctx.strokeStyle = comboStep===3?"rgba(255,200,0,0.8)":"rgba(255,255,255,0.8)";
-            ctx.lineWidth = 20;
-            ctx.lineCap = "round";
-            ctx.stroke();
-            if (weapon === 'hammer' && comboStep === 3) {
-                // Finisher slam: a full shockwave around the hammer.
-                ctx.beginPath();
-                ctx.arc(0, 0, attackRange, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(255, 150, 60, 0.18)";
-                ctx.fill();
-                ctx.strokeStyle = "rgba(255, 190, 90, 0.75)";
-                ctx.lineWidth = 4;
-                ctx.stroke();
-            }
-        }
-        ctx.restore();
-    }
+    noteAttackPhase(p, weapon, attackRange);
 }
 
 function drawCombatEffects() {
@@ -368,74 +327,8 @@ function drawCombatEffects() {
         ctx.save();
         ctx.translate(effect.x, effect.y);
         ctx.globalAlpha = alpha;
-        if (effect.weapon === 'hammer') {
-            const burst = 20 + (1 - t) * 34;
-            ctx.strokeStyle = 'rgba(241, 196, 15, 0.95)';
-            ctx.fillStyle = 'rgba(231, 76, 60, 0.55)';
-            ctx.lineWidth = 4;
-            for (let i = 0; i < 6; i++) {
-                const a = (Math.PI * 2 / 6) * i + effect.angle;
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 4);
-                ctx.lineTo(Math.cos(a) * burst, Math.sin(a) * burst);
-                ctx.stroke();
-            }
-            ctx.beginPath();
-            ctx.arc(0, 0, 10 + (1 - t) * 8, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (effect.weapon === 'bow') {
-            const burst = 16 + (1 - t) * 18;
-            ctx.strokeStyle = 'rgba(255, 214, 140, 0.95)';
-            ctx.fillStyle = 'rgba(255, 245, 200, 0.7)';
-            ctx.lineWidth = 2;
-            for (let i = 0; i < 4; i++) {
-                const a = (Math.PI * 2 / 4) * i + effect.angle;
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(a) * 2, Math.sin(a) * 2);
-                ctx.lineTo(Math.cos(a) * burst, Math.sin(a) * burst);
-                ctx.stroke();
-            }
-            ctx.beginPath();
-            ctx.arc(0, 0, 7 + (1 - t) * 4, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (effect.weapon === 'spear') {
-            const burst = 26 + (1 - t) * 22;
-            ctx.strokeStyle = 'rgba(255, 240, 180, 0.95)';
-            ctx.fillStyle = 'rgba(241, 196, 15, 0.55)';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(Math.cos(effect.angle) * burst, Math.sin(effect.angle) * burst);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(Math.cos(effect.angle) * burst, Math.sin(effect.angle) * burst, 6, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (effect.weapon === 'dual') {
-            const slashLen = 42 + (1 - t) * 20;
-            const burstScale = 1 + (1 - t) * 0.35;
-            ctx.lineWidth = 3.4;
-            ctx.lineCap = 'round';
-            const strokes = [
-                { color: 'rgba(255, 255, 255, 0.95)', ang: effect.angle + 0.78, len: 0.82, offX: -4, offY: -2 },
-                { color: 'rgba(241, 196, 15, 0.92)', ang: effect.angle - 0.92, len: 0.72, offX: 3, offY: 1 },
-                { color: 'rgba(255, 255, 255, 0.78)', ang: effect.angle + 1.62, len: 0.58, offX: -1, offY: 4 },
-                { color: 'rgba(241, 196, 15, 0.72)', ang: effect.angle - 1.68, len: 0.52, offX: 5, offY: -3 },
-            ];
-            strokes.forEach((stroke) => {
-                ctx.save();
-                ctx.translate(stroke.offX * burstScale, stroke.offY * burstScale);
-                ctx.rotate(stroke.ang);
-                ctx.strokeStyle = stroke.color;
-                ctx.beginPath();
-                ctx.moveTo(-slashLen * stroke.len, -slashLen * 0.14);
-                ctx.lineTo(slashLen * stroke.len, slashLen * 0.14);
-                ctx.stroke();
-                ctx.restore();
-            });
-            ctx.fillStyle = 'rgba(255, 245, 180, 0.55)';
-            ctx.beginPath();
-            ctx.arc(0, 0, 5 + (1 - t) * 4, 0, Math.PI * 2);
-            ctx.fill();
+        if (WEAPON_FX[effect.weapon]) {
+            drawWeaponHit(effect, t);
         } else if (effect.weapon === 'ult-dual') {
             const slashLen = 52 + (1 - t) * 28;
             const burstScale = 1.15 + (1 - t) * 0.45;
@@ -606,22 +499,7 @@ function drawCombatEffects() {
             ctx.arc(0, 0, 8 + (1 - t) * 6, 0, Math.PI * 2);
             ctx.fill();
         } else {
-            const slashLen = 44 + (1 - t) * 18;
-            const slashWidth = 4 + (1 - t) * 2;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-            ctx.lineWidth = slashWidth;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.rotate(effect.angle + Math.PI / 10);
-            ctx.moveTo(-slashLen * 0.6, -slashLen * 0.22);
-            ctx.lineTo(slashLen * 0.6, slashLen * 0.22);
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(241, 196, 15, 0.75)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(-slashLen * 0.25, slashLen * 0.16);
-            ctx.lineTo(slashLen * 0.72, -slashLen * 0.12);
-            ctx.stroke();
+            drawWeaponHit(effect, t);
         }
         ctx.restore();
     });
@@ -636,15 +514,33 @@ function drawAshProjectiles() {
     });
 }
 
+// Arrows fly at hand height (the bow is held there), with a fading streak behind and a
+// faint shadow on the ground under them.
 function drawBowProjectiles() {
+    const lift = (HERO_HAND_LIFT * HERO_FIGURE_SCALE) / VIEW_Y_SCALE;
     bowProjectiles.forEach((effect) => {
         const p = Math.max(0, Math.min(1, effect.progress || 0));
         const tipX = effect.startX + (effect.endX - effect.startX) * p;
         const tipY = effect.startY + (effect.endY - effect.startY) * p;
-        drawBowArrow(effect.startX, effect.startY, tipX, tipY, effect.angle, p, effect.reflected);
+        const tailBack = Math.min(90, Math.hypot(tipX - effect.startX, tipY - effect.startY));
+        const tailX = tipX - Math.cos(effect.angle) * tailBack;
+        const tailY = tipY - Math.sin(effect.angle) * tailBack;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tailX, tailY); ctx.lineTo(tipX, tipY); ctx.stroke();
+        const streak = ctx.createLinearGradient(tailX, tailY - lift, tipX, tipY - lift);
+        const tint = effect.reflected ? '255, 150, 130' : '255, 230, 170';
+        streak.addColorStop(0, `rgba(${tint}, 0)`);
+        streak.addColorStop(1, `rgba(${tint}, 0.75)`);
+        ctx.strokeStyle = streak;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(tailX, tailY - lift); ctx.lineTo(tipX, tipY - lift); ctx.stroke();
+        ctx.restore();
+        drawBowArrow(effect.startX, effect.startY - lift, tipX, tipY - lift, effect.angle, p, effect.reflected);
     });
 }
-
 function drawDragonProjectiles() {
     dragonProjectiles.forEach((effect) => {
         const p = Math.max(0, Math.min(1, effect.progress || 0));
@@ -1126,11 +1022,13 @@ function draw() {
     drawHealingCrosses();
     drawGiantPotions();
     drawMobs();
+    drawSwingTrails();
     // Standing characters overlap, so draw the ones further back (smaller y) first.
     Object.values(allPlayers).filter(p => p.hp > 0).sort((a, b) => a.y - b.y)
         .forEach(p => drawCharacter(p, (p.id === myId) ? "#e67e22" : "#3498db"));
     drawHealingTexts();
     drawCombatEffects();
+    drawHitParticles();
     drawAshProjectiles();
     drawBowProjectiles();
     drawDragonProjectiles();

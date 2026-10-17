@@ -68,7 +68,7 @@ const STAFF_ORB = {
     patchDamage: 4,
 };
 // Secondary skills: cooldowns are checked on the server too (with a little slack for lag).
-const SKILL_COOLDOWN_MS = { wire: 900, ash: 2000, gear: 3000, trap: 6000, blink: 10000, potion: 14000 };
+const SKILL_COOLDOWN_MS = { wire: 2000, ash: 2000, gear: 3000, trap: 6000, blink: 10000, potion: 14000 };
 const SKILL_COOLDOWN_SLACK_MS = 150;
 const TRAP = { maxPerOwner: 2, lifetimeMs: 30000, armMs: 400, radius: 32, rootMs: 1200, mobStunMs: 1500, damage: 6 };
 const BLINK_MARK_MS = 4000;
@@ -144,6 +144,16 @@ const BOW_XP_MAGNET_RANGE = 900;
 // knockback made archers spread damage over the swarm instead of finishing kills.
 const BOW_PIERCE = 3;
 const BOW_MOB_KNOCKBACK = 10;
+// The dual-blade rush: slashes per rush, and how far a slash may stray from the rush's path.
+const DUAL_RUSH_SLASH_COUNT = 10;
+const RUSH_PATH_SLACK = 60;
+// Server-flown shots: speed (px/s), how far they go and how close counts as a hit.
+// Wire and ash timings match how fast the client draws them.
+const PROJECTILES = {
+    bow: { speed: 1300, range: 1000, hitRadius: 26 },
+    ash: { speed: 3200, range: 900, hitRadius: 28 },
+    wire: { speed: 1600, range: 500, hitRadius: 35 },
+};
 const XP_ORB_SCATTER_RADIUS = { min: 90, max: 260 };
 const XP_ORB_MAX_COUNT_PER_DEATH = 24;
 
@@ -210,6 +220,9 @@ module.exports = {
     BOW_XP_MAGNET_RANGE,
     BOW_MOB_KNOCKBACK,
     BOW_PIERCE,
+    PROJECTILES,
+    DUAL_RUSH_SLASH_COUNT,
+    RUSH_PATH_SLACK,
     XP_ORB_SCATTER_RADIUS,
     XP_ORB_MAX_COUNT_PER_DEATH,
 };

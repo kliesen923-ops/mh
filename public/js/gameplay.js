@@ -19,46 +19,10 @@ function updateAshProjectiles(dt) {
     });
 }
 
+// Arrows are flown by the server; this only animates them until it says they stopped.
 function updateBowProjectiles(dt) {
     bowProjectiles = bowProjectiles.filter((effect) => {
-        const prevProgress = effect.progress || 0;
-        effect.progress = Math.min(1, prevProgress + dt / Math.max(0.001, effect.duration || 0.4));
-        const tipX = effect.startX + (effect.endX - effect.startX) * effect.progress;
-        const tipY = effect.startY + (effect.endY - effect.startY) * effect.progress;
-        const prevTipX = effect.startX + (effect.endX - effect.startX) * prevProgress;
-        const prevTipY = effect.startY + (effect.endY - effect.startY) * prevProgress;
-        if (effect.originId === myId && !effect.hitSent) {
-            const hit = findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect);
-            if (hit && hit.mobId) {
-                // Arrows keep flying through mobs until they have pierced BOW_PIERCE of them.
-                effect.piercedMobs = effect.piercedMobs || new Set();
-                effect.piercedMobs.add(hit.mobId);
-                socket.emit('bowArrowHitMob', {
-                    projectileId: effect.id,
-                    mobId: hit.mobId,
-                    endX: tipX,
-                    endY: tipY,
-                    angle: effect.angle,
-                });
-                if (effect.piercedMobs.size >= BOW_PIERCE) return false;
-                return effect.progress < 1;
-            }
-            if (hit) {
-                effect.hitSent = true;
-                socket.emit('bowArrowHit', {
-                    projectileId: effect.id,
-                    targetId: hit.id,
-                    startX: effect.startX,
-                    startY: effect.startY,
-                    endX: tipX,
-                    endY: tipY,
-                    angle: effect.angle,
-                    maxDistance: Math.max(1, Math.hypot(effect.endX - effect.startX, effect.endY - effect.startY)),
-                    reflected: effect.reflected,
-                });
-                return false;
-            }
-        }
+        effect.progress = Math.min(1, (effect.progress || 0) + dt / Math.max(0.001, effect.duration || 0.4));
         return effect.progress < 1;
     });
 }
@@ -155,27 +119,6 @@ function updateGearRush(dt) {
     }
 }
 
-function findBowHitTarget(prevTipX, prevTipY, tipX, tipY, effect) {
-    const candidates = [];
-    for (const id of Object.keys(allPlayers)) {
-        if (id === myId) continue;
-        const target = allPlayers[id];
-        if (!target || target.hp <= 0 || target.upgradeShield) continue;
-        const distance = distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target);
-        if (distance > 26) continue;
-        const score = Math.hypot(target.x - effect.startX, target.y - effect.startY);
-        candidates.push({ id, score });
-    }
-    mobs.forEach((mob) => {
-        if (effect.piercedMobs && effect.piercedMobs.has(mob.id)) return;
-        const radius = getMobRadius(mob);
-        if (distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, mob) > radius + 8) return;
-        candidates.push({ mobId: mob.id, score: Math.hypot(mob.x - effect.startX, mob.y - effect.startY) });
-    });
-    candidates.sort((a, b) => a.score - b.score);
-    return candidates.length ? candidates[0] : null;
-}
-
 function getMobRadius(mob) {
     if (mob.boss) return BOSS_RADIUS;
     const tier = mobTiers[mob.tier];
@@ -248,21 +191,13 @@ function update(dt) {
 
     if(player.wire.active) {
         const wire = player.wire;
-        const prevProgress = wire.progress || 0;
-        const nextProgress = Math.min(1, (wire.progress || 0) + dt * (wire.kind === 'ash' ? 3.6 : 3.2));
-        wire.progress = nextProgress;
-        const prevTipX = player.x + (wire.tx - player.x) * prevProgress;
-        const prevTipY = player.y + (wire.ty - player.y) * prevProgress;
-        const tipX = player.x + (wire.tx - player.x) * wire.progress;
-        const tipY = player.y + (wire.ty - player.y) * wire.progress;
-        const hitId = findSecondaryHitTarget(tipX, tipY, prevTipX, prevTipY, wire.kind);
-        if (hitId) {
-            if (wire.kind === 'ash') resolveAshHit(hitId);
-            else resolveWireHit(hitId);
-        } else if (wire.progress >= 1) {
-            if (wire.kind === 'ash') resolveAshHit();
-            else resolveWireHit();
-        } else {
+        if (!wire.holdUntil) wire.progress = Math.min(1, (wire.progress || 0) + dt * (wire.kind === 'ash' ? 3.6 : 3.2));
+        // The server decides what the wire or ash arrow hits (see skillShotEnd); this only draws it.
+        if (wire.progress >= 1 && !wire.holdUntil) {
+            endWire();
+        } else if (wire.holdUntil && Date.now() >= wire.holdUntil) {
+            endWire();
+        } else if (!wire.holdUntil) {
             socket.emit('playerAction', { wire: { active: true, kind: wire.kind || 'wire', tx: wire.tx, ty: wire.ty, progress: wire.progress, maxDistance: wire.maxDistance || 500 } });
         }
     }
@@ -272,10 +207,6 @@ function update(dt) {
     if (player.isGuarding) { player.guardActiveTimer += dt; if (player.guardActiveTimer >= GUARD_DURATION_SEC) releaseGuard(); }
     
     updateCombatReadouts();
-    updateCombatEffects(dt);
-    updateAshProjectiles(dt);
-    updateBowProjectiles(dt);
-    updateDragonProjectiles(dt);
 
     if(allPlayers[myId]) {
         Object.assign(allPlayers[myId], {
@@ -304,7 +235,34 @@ function update(dt) {
     }
     if(prev.x !== player.x || prev.y !== player.y || prev.angle !== player.angle) socket.emit('playerMovement', { x: player.x, y: player.y, angle: player.angle });
     if(player.isAttacking) updateAttack(dt);
+}
+
+// Effects and projectiles keep moving whatever the player is doing (stunned, picking an
+// upgrade, chatting); only the player's own actions pause.
+function updateVisuals(dt) {
+    updateCombatEffects(dt);
+    updateAshProjectiles(dt);
+    updateBowProjectiles(dt);
+    updateDragonProjectiles(dt);
     updateHealingTexts(dt);
+}
+
+// Being stunned cuts off whatever the player was doing, cleanly.
+function cancelActionsOnStun() {
+    if (player.isAttacking || player.attackPhase) {
+        player.isAttacking = false;
+        player.attackPhase = 0;
+        player.bowShotFired = false;
+        socket.emit('playerAction', { isAttacking: false, attackPhase: 0 });
+    }
+    if (player.gearRush && player.gearRush.active) {
+        player.gearRush.active = false;
+        socket.emit('playerAction', { gearRush: { active: false } });
+    }
+    if (player.isDodging) player.isDodging = false;
+    if (player.isGuarding) player.isGuarding = false;
+    if (player.wire.active) endWire();
+    player.moveDir = { x: 0, y: 0 };
 }
 
 function updateAttack(dt) {
@@ -454,40 +412,42 @@ function triggerDualRushSlash() {
 function startBowShot() {
     releaseGuardForAction();
     if(player.isDodging || player.hp <= 0 || player.isStunned) return;
+    // Drawn right away; the server flies the same arrows (same ids) and decides the hits.
     const angle = player.aAngle || player.angle;
     const projectileMultiplier = Number.isFinite(player.stats.projectile) ? player.stats.projectile : 1;
-    const giantBonus = getBowProjectileBonus(player);
-    const totalShots = Math.max(1, 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)) + giantBonus);
-    const spreadStep = Math.min(0.24, Math.max(0.05, 0.05 + (totalShots - 1) * 0.035));
-    const centerOffset = (totalShots - 1) / 2;
-    for (let i = 0; i < totalShots; i++) {
-        const offset = (i - centerOffset) * spreadStep;
-        const shotAngle = angle + offset;
-        // Arrows fly to the edge of the visible screen.
-        const edge = getRayCanvasEdge(player.x, player.y, shotAngle);
-        const projectileId = `${myId || 'bow'}:${Date.now()}:${Math.random().toString(16).slice(2, 8)}:${i}`;
+    const shots = 1 + Math.max(0, Math.floor((projectileMultiplier - 0.999) / 0.2)) + getBowProjectileBonus(player);
+    const spread = Math.min(0.24, Math.max(0.05, 0.05 + (shots - 1) * 0.035));
+    const shotId = (Date.now() % 1e9).toString(36) + Math.random().toString(36).slice(2, 6);
+    for (let i = 0; i < shots; i++) {
+        const shotAngle = angle + (i - (shots - 1) / 2) * spread;
+        const end = getShotEnd(player.x, player.y, shotAngle, BOW_RANGE);
         bowProjectiles.push({
-            id: projectileId,
-            originId: myId || '',
+            id: `${myId}:${shotId}:${i}`,
+            originId: myId,
             startX: player.x,
             startY: player.y,
-            endX: edge.x,
-            endY: edge.y,
+            endX: end.x,
+            endY: end.y,
             angle: shotAngle,
-            duration: Math.max(0.18, Math.min(0.8, Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)) * 0.9 / 1000)),
+            duration: Math.max(0.06, Math.hypot(end.x - player.x, end.y - player.y) / BOW_SPEED),
             progress: 0,
             reflected: false,
         });
-        socket.emit('playerBowShot', {
-            projectileId,
-            startX: player.x,
-            startY: player.y,
-            endX: edge.x,
-            endY: edge.y,
-            angle: shotAngle,
-            maxDistance: Math.max(1, Math.hypot(edge.x - player.x, edge.y - player.y)),
-        });
     }
+    socket.emit('playerBowShot', { angle, shotId });
+}
+
+// Where a straight shot stops at the world's edge (matches the server's shotEnd).
+function getShotEnd(x, y, angle, range) {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    let t = range;
+    if (dx > 0) t = Math.min(t, (WORLD_WIDTH - 25 - x) / dx);
+    if (dx < 0) t = Math.min(t, (25 - x) / dx);
+    if (dy > 0) t = Math.min(t, (WORLD_HEIGHT - 25 - y) / dy);
+    if (dy < 0) t = Math.min(t, (25 - y) / dy);
+    t = Math.max(1, t);
+    return { x: x + dx * t, y: y + dy * t };
 }
 // The hammer slam and gauntlet rush root their caster until they end (matches the server).
 function isRootedByUltimate() {
@@ -535,6 +495,8 @@ function startWireGrab() {
     player.wire.ty = ty;
     player.wire.progress = 0;
     player.wire.maxDistance = Math.max(1, Math.hypot(tx - player.x, ty - player.y));
+    player.wire.holdUntil = 0;
+    socket.emit('useSkill', { kind: 'wire', angle: player.angle });
     socket.emit('playerAction', { wire: { active: true, kind: 'wire', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
 }
 function startWire() {
@@ -571,99 +533,41 @@ function startAshArrow() {
     releaseGuardForAction();
     if(player.isAttacking || player.isDodging || player.hp <= 0 || player.isStunned || player.wireCooldown > 0 || (player.gearRush && player.gearRush.active)) return;
     player.wireCooldown = getSkillCooldown('ash');
-    const edge = getRayCanvasEdge(player.x, player.y, player.angle);
-    const tx = edge.x;
-    const ty = edge.y;
+    // Same range as the server's ash arrow.
+    const tx = Math.max(25, Math.min(WORLD_WIDTH - 25, player.x + Math.cos(player.angle) * ASH_RANGE));
+    const ty = Math.max(25, Math.min(WORLD_HEIGHT - 25, player.y + Math.sin(player.angle) * ASH_RANGE));
     player.wire.active = true;
+    player.wire.holdUntil = 0;
     player.wire.kind = 'ash';
     player.wire.tx = tx;
     player.wire.ty = ty;
     player.wire.progress = 0;
     player.wire.maxDistance = Math.max(1, Math.hypot(tx - player.x, ty - player.y));
+    socket.emit('useSkill', { kind: 'ash', angle: player.angle });
     socket.emit('playerAction', { wire: { active: true, kind: 'ash', tx: player.wire.tx, ty: player.wire.ty, progress: 0, maxDistance: player.wire.maxDistance } });
 }
 
-// Where a ray from the origin leaves the visible part of the world.
-function getRayCanvasEdge(originX, originY, angle) {
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    const left = camera.x;
-    const top = camera.y;
-    const right = camera.x + canvas.width;
-    const bottom = camera.y + canvas.height / VIEW_Y_SCALE;
-    const candidates = [];
-    const pushCandidate = (t) => {
-        if (!Number.isFinite(t) || t <= 0) return;
-        const x = originX + dx * t;
-        const y = originY + dy * t;
-        if (x >= left && x <= right && y >= top && y <= bottom) {
-            candidates.push({ t, x, y });
-        }
-    };
-    if (Math.abs(dx) > 1e-6) {
-        pushCandidate((left - originX) / dx);
-        pushCandidate((right - originX) / dx);
-    }
-    if (Math.abs(dy) > 1e-6) {
-        pushCandidate((top - originY) / dy);
-        pushCandidate((bottom - originY) / dy);
-    }
-    if (!candidates.length) {
-        return { x: originX, y: originY };
-    }
-    candidates.sort((a, b) => a.t - b.t);
-    return candidates[candidates.length - 1];
-}
-
-function findSecondaryHitTarget(tipX, tipY, prevTipX, prevTipY, kind) {
-    return Object.keys(allPlayers).find((id) => {
-        if (id === myId) return false;
-        const target = allPlayers[id];
-        if (!target || target.hp <= 0) return false;
-        const hitRadius = kind === 'ash' ? 28 : 35;
-        if (Number.isFinite(prevTipX) && Number.isFinite(prevTipY)) {
-            return distToSegment({ x: prevTipX, y: prevTipY }, { x: tipX, y: tipY }, target) <= hitRadius;
-        }
-        return Math.hypot(target.x - tipX, target.y - tipY) <= hitRadius;
-    });
-}
-
-function resolveWireHit(forcedHitId) {
+function endWire() {
     if (!player.wire.active) return;
+    player.wire.active = false;
+    player.wire.holdUntil = 0;
+    socket.emit('playerAction', { wire: { active: false } });
+}
+
+// The server says where our wire or ash arrow stopped: a wire that caught someone holds
+// on them briefly while it pulls; anything else just ends.
+function onSkillShotEnd(data) {
     const wire = player.wire;
-    const progress = Math.max(0, Math.min(1, wire.progress || 1));
-    const tipX = player.x + (wire.tx - player.x) * progress;
-    const tipY = player.y + (wire.ty - player.y) * progress;
-    const hitId = forcedHitId || findSecondaryHitTarget(tipX, tipY, null, null, 'wire');
-    if (hitId) {
-        socket.emit('wireGrabHit', { targetId: hitId, progress, tx: wire.tx, ty: wire.ty, maxDistance: wire.maxDistance || 500, kind: 'wire' });
-        const target = allPlayers[hitId];
-        wire.tx = target ? target.x : wire.tx;
-        wire.ty = target ? target.y : wire.ty;
-        wire.progress = progress;
-        socket.emit('playerAction', { wire: { active: true, kind: 'wire', tx: wire.tx, ty: wire.ty, progress, maxDistance: wire.maxDistance || 500 } });
-        setTimeout(() => {
-            wire.active = false;
-            socket.emit('playerAction', { wire: { active: false } });
-        }, 300);
+    if (!data || data.ownerId !== myId || !wire.active || data.kind !== wire.kind) return;
+    if (data.kind === 'wire' && data.hitId) {
+        wire.tx = data.x;
+        wire.ty = data.y;
+        wire.progress = 1;
+        wire.holdUntil = Date.now() + 300;
+        socket.emit('playerAction', { wire: { active: true, kind: 'wire', tx: wire.tx, ty: wire.ty, progress: 1, maxDistance: wire.maxDistance || 500 } });
         return;
     }
-    wire.active = false;
-    socket.emit('playerAction', { wire: { active: false } });
-}
-
-function resolveAshHit(forcedHitId) {
-    if (!player.wire.active) return;
-    const wire = player.wire;
-    const progress = Math.max(0, Math.min(1, wire.progress || 1));
-    const tipX = player.x + (wire.tx - player.x) * progress;
-    const tipY = player.y + (wire.ty - player.y) * progress;
-    const hitId = forcedHitId || findSecondaryHitTarget(tipX, tipY, null, null, 'ash');
-    if (hitId) {
-        socket.emit('ashArrowHit', { targetId: hitId, progress, tx: wire.tx, ty: wire.ty, maxDistance: wire.maxDistance || 500, kind: 'ash' });
-    }
-    wire.active = false;
-    socket.emit('playerAction', { wire: { active: false } });
+    endWire();
 }
 function drawGearRush(p) {
     const rush = p.gearRush;

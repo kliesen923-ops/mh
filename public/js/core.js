@@ -36,8 +36,6 @@ const COMBO_FINISHER = {
 // Attack-speed picks shorten the ultimate cooldown (matches the server).
 const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
 const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
-// Arrows pass through this many mobs (matches the server).
-const BOW_PIERCE = 3;
 const ULTIMATE_NAMES = {
     sword: '검기 난무',
     hammer: '대지 분쇄',
@@ -60,6 +58,10 @@ const SKILL_PRESETS = {
 const STAFF_ORB_DAMAGE = 16;
 const STAFF_ORB_FINISHER_DAMAGE = 26;
 const BLINK_MARK_SEC = 4;
+// How far the ash arrow and arrows fly, and arrow speed (match the server's PROJECTILES).
+const ASH_RANGE = 900;
+const BOW_RANGE = 1000;
+const BOW_SPEED = 1300;
 const ULTIMATE_PRESETS = {
     sword: { cooldown: 11.0, duration: 1.2 },
     hammer: { cooldown: 13.0, duration: 0.7 },
