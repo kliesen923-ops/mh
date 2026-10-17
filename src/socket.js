@@ -11,6 +11,7 @@ const {
     WORLD_MARGIN,
     MOB_TIERS,
     BOW_MAX_DISTANCE,
+    MOB_HIT_IMPACT,
 } = require('./config');
 const { sanitizeWeapon, sanitizeSkill, sanitizeName } = require('./utils/sanitize');
 const { getAngleDiff, distToSegment, createProjectileId, randomWorldPoint } = require('./utils/geometry');
@@ -351,6 +352,7 @@ function registerSocketHandlers(io) {
                     y: target.y,
                     angle: Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle,
                     weapon: attacker.weapon || 'sword',
+                    damage,
                 });
                 target.hp -= damage;
                 if (target.hp <= 0) resolveKill(socket.id, targetId);
@@ -374,7 +376,15 @@ function registerSocketHandlers(io) {
             if (hasHitTargetThisAttack(socket.id, `mob:${mob.id}`)) return;
             const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
             const damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
-            damageMob(mob.id, socket.id, damage, Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle);
+            const hitImpact = MOB_HIT_IMPACT[sanitizeWeapon(attacker.weapon)];
+            const isFinisher = attacker.comboStep === 3;
+            const impact = hitImpact ? {
+                fromX: attacker.x,
+                fromY: attacker.y,
+                knockback: isFinisher ? hitImpact.finisherKnockback : hitImpact.knockback,
+                stunMs: isFinisher ? hitImpact.finisherStunMs : 0,
+            } : null;
+            damageMob(mob.id, socket.id, damage, Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle, impact);
         });
 
         socket.on('bowArrowHitMob', (payloadData) => {
@@ -433,6 +443,7 @@ function registerSocketHandlers(io) {
                     y: target.y,
                     angle: attackAngle,
                     weapon: 'dual',
+                    damage,
                 });
                 target.hp -= damage;
                 hitAny = true;

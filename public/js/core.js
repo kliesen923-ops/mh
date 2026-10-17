@@ -9,17 +9,29 @@ const WORLD_HEIGHT = 1920;
 const camera = { x: 0, y: 0 };
 const WEAPON_PRESETS = {
     sword: { label: '한손검', stats: { dmg: 1.0, range: 1.0, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
-    hammer: { label: '망치', stats: { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, projectile: 1.0, hp: 115 } },
-    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, projectile: 1.0, hp: 95 } },
+    hammer: { label: '망치', stats: { dmg: 1.8, range: 1.0, speed: 0.68, move: 0.9, dodge: 1.0, projectile: 1.0, hp: 120 } },
+    spear: { label: '창', stats: { dmg: 1.24, range: 1.34, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 } },
     dual: { label: '쌍검', stats: { dmg: 0.82, range: 0.82, speed: 1.45, move: 1.02, dodge: 1.0, projectile: 1.0, hp: 92 } },
     bow: { label: '활', stats: { dmg: 1.2, range: 1.0, speed: 0.84, move: 0.98, dodge: 1.0, projectile: 1.0, hp: 90 } },
 };
 const ATTACK_PROFILES = {
     sword: { reach: 85, arc: Math.PI * 0.65, lineWidth: 20 },
-    hammer: { reach: 78, arc: Math.PI * 0.42, lineWidth: 22 },
-    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 24 },
+    hammer: { reach: 96, arc: Math.PI * 0.5, lineWidth: 22 },
+    spear: { reach: 126, arc: Math.PI * 0.14, lineWidth: 40 },
     dual: { reach: 72, arc: Math.PI * 0.72, lineWidth: 18 },
     bow: { reach: 560, arc: Math.PI * 0.08, lineWidth: 8 },
+};
+// The third hit of a combo reaches further (and, for the spear, wider). Matches the server.
+const COMBO_FINISHER = {
+    hammer: { reach: 1.25, width: 1 },
+    spear: { reach: 1.35, width: 1.4 },
+};
+const ULTIMATE_NAMES = {
+    sword: '검기 난무',
+    hammer: '대지 분쇄',
+    spear: '반사 결계',
+    bow: '용의 화살',
+    dual: '광폭화',
 };
 const SKILL_PRESETS = {
     wire: { label: '땡겨', cooldown: 2.0 },
@@ -60,6 +72,10 @@ let mobTiers = [];
 let mobDeathEffects = [];
 let xpOrbs = [];
 let collectingOrbs = [];
+let damageTexts = [];
+let ultimateBanners = [];
+const seenUltimateStarts = {};
+const screenShake = { until: 0, strength: 0 };
 const keys = {};
 function getMaxHpFromStats(stats) {
     return Math.max(1, Math.floor(Number.isFinite(stats && stats.hp) ? stats.hp : 100));
@@ -91,6 +107,9 @@ function createDefaultUltimate() {
         endsAt: 0,
         cooldownEndsAt: 0,
         radius: 0,
+        angle: 0,
+        x: 0,
+        y: 0,
         extra: 0,
     };
 }

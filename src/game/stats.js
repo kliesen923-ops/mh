@@ -1,14 +1,14 @@
-const { ATTACK_PROFILES } = require('../config');
+const { ATTACK_PROFILES, COMBO_FINISHER } = require('../config');
 const { sanitizeWeapon } = require('../utils/sanitize');
 const { getAngleDiff, distToSegment } = require('../utils/geometry');
 
 function createBaseStatsForWeapon(weapon) {
     const nextWeapon = sanitizeWeapon(weapon);
     if (nextWeapon === 'hammer') {
-        return { dmg: 1.8, range: 0.72, speed: 0.58, move: 0.88, dodge: 1.0, projectile: 1.0, hp: 115 };
+        return { dmg: 1.8, range: 1.0, speed: 0.68, move: 0.9, dodge: 1.0, projectile: 1.0, hp: 120 };
     }
     if (nextWeapon === 'spear') {
-        return { dmg: 1.24, range: 1.34, speed: 0.9, move: 0.96, dodge: 1.0, projectile: 1.0, hp: 95 };
+        return { dmg: 1.24, range: 1.34, speed: 1.0, move: 1.0, dodge: 1.0, projectile: 1.0, hp: 100 };
     }
     if (nextWeapon === 'dual') {
         return { dmg: 0.82, range: 0.82, speed: 1.45, move: 1.02, dodge: 1.0, projectile: 1.0, hp: 92 };
@@ -23,20 +23,25 @@ function getWeaponAttackProfile(weapon) {
     return ATTACK_PROFILES[sanitizeWeapon(weapon)] || ATTACK_PROFILES.sword;
 }
 
+function getComboFinisher(weapon, comboStep) {
+    return (comboStep === 3 && COMBO_FINISHER[sanitizeWeapon(weapon)]) || { reach: 1, width: 1 };
+}
+
 function isTargetInWeaponAttack(attacker, target) {
     if (!attacker || !target) return false;
     const profile = getWeaponAttackProfile(attacker.weapon);
     if (sanitizeWeapon(attacker.weapon) === 'bow') return false;
+    const finisher = getComboFinisher(attacker.weapon, attacker.comboStep);
     const attackAngle = Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle;
     const dx = target.x - attacker.x;
     const dy = target.y - attacker.y;
     const distance = Math.hypot(dx, dy);
-    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
+    const attackRange = profile.reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker) * finisher.reach;
     if (distance > attackRange) return false;
     if (sanitizeWeapon(attacker.weapon) === 'spear') {
         const endX = attacker.x + Math.cos(attackAngle) * attackRange;
         const endY = attacker.y + Math.sin(attackAngle) * attackRange;
-        return distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) <= profile.lineWidth;
+        return distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) <= profile.lineWidth * finisher.width;
     }
     if (attacker.comboStep === 3) return true;
     const targetAngle = Math.atan2(dy, dx);
@@ -89,6 +94,7 @@ function createDefaultUltimate() {
         endsAt: 0,
         cooldownEndsAt: 0,
         radius: 0,
+        angle: 0,
         extra: 0,
     };
 }
@@ -121,6 +127,7 @@ module.exports = {
     normalizeStats,
     getWeaponAttackProfile,
     isTargetInWeaponAttack,
+    getComboFinisher,
     getMaxHpFromStats,
     getAttackMultiplier,
     getAttackRangeMultiplier,

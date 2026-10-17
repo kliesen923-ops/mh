@@ -134,6 +134,8 @@ test('hammer ultimate damages targets in front and goes on cooldown', async () =
     await updated;
     assert.equal(target.hp, 100 - Math.floor(28 * 1.8));
     assert.ok(attacker.ultimate.cooldownEndsAt > Date.now());
+    assert.equal(attacker.ultimate.angle, 0, 'clients get the cast direction to draw the cone');
+    assert.ok(attacker.ultimate.radius >= 160);
 
     // Second use during cooldown is ignored.
     const hpAfterFirst = target.hp;
@@ -375,5 +377,76 @@ test('the victim gets a record of the life that just ended', async () => {
     assert.equal(killer.lifePlayerKills, 1);
     assert.deepEqual([victim.lifeStartedAt, victim.lifeMobKills], [0, 0], 'life stats reset for the next run');
     clearXpOrbs();
+    clearAllMobs();
+});
+
+test('hammer hits knock mobs back, and the finisher stuns them', async () => {
+    clearAllMobs();
+    const client = await connect();
+    const p = await readyPlayer(client);
+    const weaponSet = once(client, 'statsUpdate');
+    client.emit('setWeapon', 'hammer');
+    await weaponSet;
+    Object.assign(p, { x: 1000, y: 600, angle: 0, hp: 9999 });
+
+    const mob = spawnMob(client.id, { x: 1060, y: 600, tier: 5 });
+    const swing = async (comboStep) => {
+        client.emit('playerAction', { isAttacking: true, attackPhase: 1, comboStep, aAngle: 0 });
+        client.emit('playerAction', { isAttacking: true, attackPhase: 2, comboStep, aAngle: 0 });
+        const damaged = once(client, 'mobDamaged');
+        client.emit('mobHit', mob.id);
+        return (await damaged)[0];
+    };
+
+    const first = await swing(1);
+    assert.ok(first.damage > 0, 'damage number sent to clients');
+    assert.equal(Math.round(mob.x), 1090, 'normal hit pushes the mob 30px');
+    assert.equal(mob.stunUntil || 0, 0);
+
+    mob.x = 1060;
+    await swing(3);
+    assert.equal(Math.round(mob.x), 1120, 'finisher pushes the mob 60px');
+    assert.ok(mob.stunUntil > Date.now(), 'finisher stuns');
+
+    const x = mob.x;
+    tickMobs(Date.now(), { spawn: false });
+    assert.equal(mob.x, x, 'stunned mobs do not move');
+    clearAllMobs();
+});
+
+test('the spear ultimate keeps mobs outside its barrier', async () => {
+    clearAllMobs();
+    const client = await connect();
+    const p = await readyPlayer(client);
+    const weaponSet = once(client, 'statsUpdate');
+    client.emit('setWeapon', 'spear');
+    await weaponSet;
+    Object.assign(p, { x: 2000, y: 1000, angle: 0, hp: 9999 });
+    const mob = spawnMob(client.id, { x: 2040, y: 1000, tier: 5 });
+
+    const updated = once(client, 'statsUpdate');
+    client.emit('useUltimate');
+    await updated;
+    for (let i = 0; i < 5; i++) tickMobs(Date.now(), { spawn: false });
+    const distance = Math.hypot(mob.x - p.x, mob.y - p.y);
+    assert.ok(distance >= 180 + mob.radius - 1, `mob held at ${distance.toFixed(0)}px`);
+    clearAllMobs();
+});
+
+test('hammer ultimate stuns the mobs it hits', async () => {
+    clearAllMobs();
+    const client = await connect();
+    const p = await readyPlayer(client);
+    const weaponSet = once(client, 'statsUpdate');
+    client.emit('setWeapon', 'hammer');
+    await weaponSet;
+    Object.assign(p, { x: 3000, y: 1000, angle: 0, aAngle: 0, hp: 9999 });
+    const mob = spawnMob(client.id, { x: 3080, y: 1000, tier: 5 });
+
+    const updated = once(client, 'statsUpdate');
+    client.emit('useUltimate');
+    await updated;
+    assert.ok(mob.stunUntil > Date.now());
+    assert.ok(mob.x > 3150, 'pushed away from the slam');
     clearAllMobs();
 });

@@ -161,6 +161,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         y: finalTarget.y,
         angle,
         weapon: 'bow',
+        damage,
     });
     finalTarget.hp -= damage;
     if (finalTarget.hp <= 0) resolveKill(attackerId, targetId);

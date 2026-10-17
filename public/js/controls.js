@@ -38,4 +38,4 @@ window.addEventListener('mouseleave', () => { if (aimMode === 'mouse') aimMode =
 const bind = (id, fn, end) => { const el = document.getElementById(id); if(!el) return; el.addEventListener('pointerdown', e => { e.preventDefault(); if(gameState === 'PLAYING' && !isChatting && !isUpgrading) fn(e); }); if(end) { el.addEventListener('pointerup', end); el.addEventListener('pointerleave', end); el.addEventListener('pointercancel', end); } };
 bind('btn-attack', () => { attackHoldSources.add('button'); beginAttack(); }, () => { attackHoldSources.delete('button'); });
 bind('btn-dodge', startDodge); bind('btn-guard', startGuard, releaseGuard); bind('btn-wire', startWire); bind('btn-ultimate', useUltimate);
-let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateMobVisuals(dt); updateCooldownUI(); draw(); }
+let lastTime = 0; function loop(t) { if(!lastTime) lastTime = t; let dt = (t - lastTime)/1000; if(dt > 0.1) dt = 0.1; lastTime = t; update(dt); updateMobVisuals(dt); updateFloatingFx(dt); updateCooldownUI(); draw(); }

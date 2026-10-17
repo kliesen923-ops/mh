@@ -101,6 +101,16 @@ function getEffectiveAttackRange(weapon, stats, sourcePlayer) {
     return profile.reach * statRange * (normalizeWeapon(weapon) === 'bow' ? 1 : giantScale) * ultimateRangeMult;
 }
 
+function getComboFinisher(weapon, comboStep) {
+    return (comboStep === 3 && COMBO_FINISHER[normalizeWeapon(weapon)]) || { reach: 1, width: 1 };
+}
+
+// Reach of the swing in progress, including the combo finisher bonus.
+function getStrikeRange(weapon, stats, sourcePlayer) {
+    const finisher = getComboFinisher(weapon, sourcePlayer && sourcePlayer.comboStep);
+    return getEffectiveAttackRange(weapon, stats, sourcePlayer) * finisher.reach;
+}
+
 function getVisualAttackRange(weapon, stats, sourcePlayer) {
     const profile = getWeaponAttackProfile(weapon);
     const statRange = Number.isFinite(stats && stats.range) ? stats.range : 1.0;

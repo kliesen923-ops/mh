@@ -55,7 +55,7 @@ function applySwordUltimate(playerId) {
                 if (hasHitTargetForKey(key, targetId)) continue;
                 const damage = Math.floor((8 + (i % 3)) * (current.stats && Number.isFinite(current.stats.dmg) ? current.stats.dmg : 1) * getAttackMultiplier(current));
                 target.hp -= damage;
-                state.io.emit('combatEffect', { x: target.x, y: target.y, angle: slashAngle, weapon: 'ult-sword' });
+                state.io.emit('combatEffect', { x: target.x, y: target.y, angle: slashAngle, weapon: 'ult-sword', damage, ultimate: true });
                 if (target.hp <= 0) resolveKill(playerId, targetId);
             }
             const mobDamage = Math.floor((8 + (i % 3)) * (current.stats && Number.isFinite(current.stats.dmg) ? current.stats.dmg : 1) * getAttackMultiplier(current));
@@ -76,20 +76,24 @@ function applyHammerUltimate(playerId) {
     if (!attacker) return;
     const now = Date.now();
     const config = getUltimateConfig(attacker.weapon);
+    const profile = getWeaponAttackProfile(attacker.weapon);
+    const coneRange = Math.max(118, profile.reach * 1.7);
+    const coneArc = Math.PI * 0.7;
+    const attackAngle = attacker.aAngle || attacker.angle;
+    // Position, direction and size go to clients so they can draw the exact hit area.
     attacker.ultimate = {
         active: true,
         type: 'hammer',
         startAt: now,
         endsAt: now + config.durationMs,
         cooldownEndsAt: now + config.cooldownMs,
-        radius: 0,
-        extra: 0,
+        radius: coneRange,
+        angle: attackAngle,
+        x: attacker.x,
+        y: attacker.y,
+        extra: coneArc,
     };
     broadcastUltimateState(playerId);
-    const profile = getWeaponAttackProfile(attacker.weapon);
-    const coneRange = Math.max(118, profile.reach * 1.7);
-    const coneArc = Math.PI * 0.7;
-    const attackAngle = attacker.aAngle || attacker.angle;
     state.io.emit('combatEffect', { x: attacker.x, y: attacker.y, angle: attackAngle, weapon: 'ult-hammer' });
     for (const [targetId, target] of Object.entries(players)) {
         if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
@@ -101,7 +105,7 @@ function applyHammerUltimate(playerId) {
         target.hp -= damage;
         const stunMs = 350;
         target.isStunned = true;
-        state.io.emit('combatEffect', { x: target.x, y: target.y, angle: attackAngle, weapon: 'ult-hammer' });
+        state.io.emit('combatEffect', { x: target.x, y: target.y, angle: attackAngle, weapon: 'ult-hammer', damage, ultimate: true });
         state.io.emit('playerStunned', { id: targetId, stunned: true, stunEndsAt: now + stunMs, stunMs });
         setTimeout(() => {
             if (players[targetId]) {
@@ -116,7 +120,7 @@ function applyHammerUltimate(playerId) {
         const dx = mob.x - attacker.x;
         const dy = mob.y - attacker.y;
         return Math.hypot(dx, dy) <= coneRange + mob.radius && getAngleDiff(attackAngle, Math.atan2(dy, dx)) <= coneArc;
-    }, hammerMobDamage, attackAngle);
+    }, hammerMobDamage, attackAngle, null, { fromX: attacker.x, fromY: attacker.y, knockback: 120, stunMs: 1000 });
     state.io.emit('statsUpdate', players);
     setTimeout(() => {
         if (players[playerId] && players[playerId].ultimate && players[playerId].ultimate.type === 'hammer') {
@@ -149,7 +153,7 @@ function applySpearUltimate(playerId) {
         if (Math.hypot(dx, dy) > attacker.ultimate.radius) continue;
         const damage = Math.floor(18 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
         target.hp -= damage;
-        state.io.emit('combatEffect', { x: target.x, y: target.y, angle: Math.atan2(dy, dx), weapon: 'spear-ult' });
+        state.io.emit('combatEffect', { x: target.x, y: target.y, angle: Math.atan2(dy, dx), weapon: 'spear-ult', damage, ultimate: true });
         if (target.hp <= 0) resolveKill(playerId, targetId);
     }
     const spearMobDamage = Math.floor(18 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
@@ -174,7 +178,10 @@ function applyBowUltimate(playerId) {
         startAt: now,
         endsAt: now + config.durationMs,
         cooldownEndsAt: now + config.cooldownMs,
-        radius: 0,
+        radius: 54,
+        angle: attacker.aAngle || attacker.angle,
+        x: attacker.x,
+        y: attacker.y,
         extra: 0,
     };
     broadcastUltimateState(playerId);
@@ -202,7 +209,7 @@ function applyBowUltimate(playerId) {
         if (hasHitTargetForKey(hitKey, targetId)) continue;
         const damage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
         target.hp -= damage;
-        state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon' });
+        state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon', damage, ultimate: true });
         if (target.hp <= 0) resolveKill(playerId, targetId);
     }
     const dragonMobDamage = Math.floor(26 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker));
