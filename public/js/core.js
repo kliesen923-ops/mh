@@ -92,7 +92,6 @@ let bowProjectiles = [];
 let dragonProjectiles = [];
 let staffOrbs = [];
 let staffBlasts = [];
-let potionFlights = [];
 let fieldFx = [];
 let fieldState = { traps: [], zones: [], marks: [] };
 let healingCrosses = [];

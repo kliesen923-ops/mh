@@ -133,20 +133,17 @@ function updateOrbs(now) {
 
 // ── Zones (staff burn patches, heal potions) ────────────────────────────────────
 
-function throwHealPotion(ownerId, angle) {
+function placeHealPotion(ownerId) {
     const owner = players[ownerId];
     if (!owner) return null;
-    const x = clampX(owner.x + Math.cos(angle) * HEAL_POTION.throwDistance);
-    const y = clampY(owner.y + Math.sin(angle) * HEAL_POTION.throwDistance);
-    const now = Date.now();
-    const startAt = now + HEAL_POTION.flightMs;
-    state.io.emit('potionThrown', { originId: ownerId, startX: owner.x, startY: owner.y, x, y, flightMs: HEAL_POTION.flightMs });
+    const startAt = Date.now();
+    state.io.emit('potionPlaced', { originId: ownerId, x: owner.x, y: owner.y });
     const zone = {
         id: createProjectileId('heal'),
         kind: 'heal',
         ownerId,
-        x,
-        y,
+        x: owner.x,
+        y: owner.y,
         radius: HEAL_POTION.radius,
         startAt,
         endsAt: startAt + HEAL_POTION.durationMs,
@@ -308,7 +305,7 @@ function clearField() {
 
 module.exports = {
     castStaffOrb,
-    throwHealPotion,
+    placeHealPotion,
     placeTrap,
     getBlinkMark,
     placeBlinkMark,

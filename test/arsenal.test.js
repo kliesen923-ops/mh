@@ -200,16 +200,18 @@ test('a blink mark sends its owner back on the second press', async () => {
     assert.equal(getFieldState().marks.length, 0, 'on cooldown after the jump');
 });
 
-test('a thrown heal potion heals everyone standing in it', async () => {
+test('a heal potion is set down at your feet and heals everyone standing in it', async () => {
     const { attackerClient, attacker, target } = await readyPair('sword', 'potion');
     Object.assign(attacker, { hp: 50 });
-    Object.assign(target, { x: 500, y: 300, hp: 50 });
-    attackerClient.emit('useSkill', { kind: 'potion', angle: 0 });
+    Object.assign(target, { hp: 50 });
+    attackerClient.emit('useSkill', { kind: 'potion' });
     await wait(40);
     const zone = getFieldState().zones.find((z) => z.kind === 'heal');
     assert.ok(zone);
-    assert.equal(zone.x, 500);
+    assert.deepEqual([zone.x, zone.y], [300, 300]);
+    // Steps out of it before the ticks.
+    target.x = 600;
     tickField(zone.startAt + 1100);
-    assert.equal(target.hp, 59, 'three heal ticks for anyone inside');
-    assert.equal(attacker.hp, 50, 'the thrower is outside the zone');
+    assert.equal(attacker.hp, 59, 'three heal ticks while standing in it');
+    assert.equal(target.hp, 50, 'nothing outside the zone');
 });

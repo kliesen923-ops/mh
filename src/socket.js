@@ -43,7 +43,7 @@ const {
 const { sanitizeAction } = require('./game/action');
 const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayerHits } = require('./game/hits');
 const { resolveKill, applyBowImpact, applyAshImpact, isJustGuarding, stunPlayer, forcePlayerPosition } = require('./game/combat');
-const { castStaffOrb, throwHealPotion, placeTrap, getBlinkMark, placeBlinkMark, clearBlinkMark, getFieldState, clearFieldForOwner } = require('./game/field');
+const { castStaffOrb, placeHealPotion, placeTrap, getBlinkMark, placeBlinkMark, clearBlinkMark, getFieldState, clearFieldForOwner } = require('./game/field');
 const { ULTIMATE_HANDLERS, isRootedByUltimate } = require('./game/ultimates');
 const { getHealingCrossList, getGiantPotionList } = require('./game/pickups');
 const { createProgression } = require('./game/progression');
@@ -550,7 +550,7 @@ function registerSocketHandlers(io) {
             }
             if (!trySpendSkill(p, kind, now)) return;
             if (kind === 'trap') placeTrap(socket.id);
-            else if (kind === 'potion') throwHealPotion(socket.id, Number.isFinite(payload.angle) ? payload.angle : p.angle);
+            else if (kind === 'potion') placeHealPotion(socket.id);
         });
 
         socket.on('chatMessage', (msg) => {

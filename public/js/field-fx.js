@@ -1,5 +1,5 @@
-// Ground objects (traps, burning patches, heal zones, blink marks), staff orbs, thrown
-// potions and their one-off flashes. Everything here is drawn in world space, from timestamps.
+// Ground objects (traps, burning patches, heal zones, blink marks), staff orbs and their
+// one-off flashes. Everything here is drawn in world space, from timestamps.
 const STAFF_ORB_COLOR = '255, 122, 217';
 
 function fieldTime(serverTime) {
@@ -136,7 +136,7 @@ function drawStaffOrb(x, y, big, now) {
     ctx.restore();
 }
 
-// Above the characters: flying orbs and potions, bursts and flashes.
+// Above the characters: flying orbs, bursts and flashes.
 function drawFieldEffects() {
     const now = Date.now();
     staffOrbs = staffOrbs.filter((orb) => now - orb.bornAt < orb.durationMs + 400);
@@ -169,38 +169,6 @@ function drawFieldEffects() {
         ctx.restore();
     });
 
-    potionFlights = potionFlights.filter((flight) => now - flight.bornAt < flight.flightMs + 250);
-    potionFlights.forEach((flight) => {
-        const t = Math.min(1, (now - flight.bornAt) / Math.max(1, flight.flightMs));
-        if (t >= 1) {
-            // Splash where it lands.
-            const p = (now - flight.bornAt - flight.flightMs) / 250;
-            ctx.save();
-            ctx.globalAlpha = 1 - p;
-            ctx.strokeStyle = 'rgba(140, 255, 190, 0.95)';
-            ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.arc(flight.x, flight.y, 20 + p * 50, 0, Math.PI * 2); ctx.stroke();
-            ctx.restore();
-            return;
-        }
-        const x = flight.startX + (flight.x - flight.startX) * t;
-        const y = flight.startY + (flight.y - flight.startY) * t;
-        // Arcs up through the air (screen-up is -y in world units after the squash).
-        const lift = Math.sin(t * Math.PI) * 70 / VIEW_Y_SCALE;
-        drawUpright(x, y - lift, () => {
-            ctx.save();
-            ctx.translate(x, y - lift);
-            ctx.rotate(t * 8);
-            ctx.fillStyle = '#2ecc71';
-            ctx.beginPath(); ctx.arc(0, 2, 8, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#d7f5e3';
-            ctx.fillRect(-3, -10, 6, 6);
-            ctx.fillStyle = '#8e5a2b';
-            ctx.fillRect(-3.5, -12, 7, 3);
-            ctx.restore();
-        });
-    });
-
     fieldFx = fieldFx.filter((fx) => now - fx.bornAt < fx.life);
     fieldFx.forEach((fx) => {
         const p = (now - fx.bornAt) / fx.life;
@@ -213,6 +181,11 @@ function drawFieldEffects() {
             ctx.lineWidth = 5;
             ctx.beginPath(); ctx.arc(0, 0, 26 - p * 10, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
             ctx.beginPath(); ctx.arc(0, 0, 26 - p * 10, Math.PI * 0.1, Math.PI * 0.9); ctx.stroke();
+        } else if (fx.kind === 'heal') {
+            // The potion bursts open where it is set down.
+            ctx.strokeStyle = 'rgba(140, 255, 190, 0.95)';
+            ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.arc(0, 0, 20 + p * 70, 0, Math.PI * 2); ctx.stroke();
         } else {
             ctx.strokeStyle = 'rgba(180, 165, 255, 0.95)';
             ctx.lineWidth = 4;

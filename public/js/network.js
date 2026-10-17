@@ -398,8 +398,8 @@ socket.on('fieldState', (data) => {
     fieldState.clockOffset = Number.isFinite(data && data.serverNow) ? Date.now() - data.serverNow : 0;
     updateSkillButtonLabel();
 });
-socket.on('potionThrown', (data) => {
-    if (data) potionFlights.push(Object.assign({}, data, { bornAt: Date.now() }));
+socket.on('potionPlaced', (data) => {
+    if (data) fieldFx.push({ kind: 'heal', x: data.x, y: data.y, bornAt: Date.now(), life: 450 });
 });
 socket.on('trapSprung', (data) => {
     if (data) fieldFx.push({ kind: 'trap', x: data.x, y: data.y, bornAt: Date.now(), life: 500 });
