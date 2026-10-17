@@ -541,36 +541,125 @@ function drawBowProjectiles() {
         drawBowArrow(effect.startX, effect.startY - lift, tipX, tipY - lift, effect.angle, p, effect.reflected);
     });
 }
+// The bow ultimate: an eastern dragon that flies low over the ground, its body winding
+// behind the head, with a shadow under it.
+const DRAGON_SEGMENTS = 20;
+const DRAGON_SPACING = 20;
+// Size of the head relative to its drawing units.
+const DRAGON_HEAD_SCALE = 1.7;
 function drawDragonProjectiles() {
+    const lift = (HERO_HAND_LIFT * HERO_FIGURE_SCALE * 1.4) / VIEW_Y_SCALE;
     dragonProjectiles.forEach((effect) => {
         const p = Math.max(0, Math.min(1, effect.progress || 0));
-        const x = effect.startX + (effect.endX - effect.startX) * p;
-        const y = effect.startY + (effect.endY - effect.startY) * p;
-        const len = 140 + (1 - p) * 90;
+        const distance = Math.hypot(effect.endX - effect.startX, effect.endY - effect.startY);
+        const travelled = distance * p;
+        const dirX = Math.cos(effect.angle);
+        const dirY = Math.sin(effect.angle);
+        const normX = -dirY;
+        const normY = dirX;
+        const wave = (performance.now() / 1000) * 9 + (effect.seed || 0);
+        const palette = effect.reflected
+            ? { body: '220, 70, 70', belly: '255, 210, 170', glow: '255, 120, 120', mane: '255, 230, 200' }
+            : { body: '40, 150, 255', belly: '200, 245, 255', glow: '90, 220, 255', mane: '235, 255, 255' };
+        // Fades in from the bow and out at the edge of its flight.
+        const fade = Math.min(1, p * 8) * Math.min(1, (1 - p) * 6 + 0.25);
+        // Points along the body, head first; the body only exists behind where it has flown.
+        const points = [];
+        for (let i = 0; i < DRAGON_SEGMENTS; i++) {
+            const along = travelled - i * DRAGON_SPACING;
+            if (along < 0) break;
+            const sway = Math.sin(wave - i * 0.5) * 22 * Math.min(1, i / 3);
+            points.push({
+                x: effect.startX + dirX * along + normX * sway,
+                y: effect.startY + dirY * along + normY * sway,
+                w: (i === 0 ? 22 : 24 * (1 - i / DRAGON_SEGMENTS) + 5),
+            });
+        }
+        if (points.length < 2) return;
         ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(effect.angle);
-        ctx.globalAlpha = 0.95 - p * 0.25;
-        ctx.shadowColor = effect.reflected ? 'rgba(255, 120, 120, 0.95)' : 'rgba(70, 220, 255, 0.98)';
-        ctx.shadowBlur = 30;
-        ctx.fillStyle = effect.reflected ? 'rgba(255, 90, 90, 0.95)' : 'rgba(35, 170, 255, 0.96)';
-        ctx.strokeStyle = effect.reflected ? 'rgba(255, 230, 220, 0.98)' : 'rgba(210, 255, 255, 0.98)';
-        ctx.lineWidth = 5;
+        ctx.globalAlpha = fade;
+        // Shadow on the ground.
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 30;
         ctx.beginPath();
-        ctx.moveTo(-len * 0.98, 0);
-        ctx.quadraticCurveTo(-len * 0.68, -36, -len * 0.18, -16);
-        ctx.quadraticCurveTo(len * 0.1, -42, len * 0.5, -14);
-        ctx.quadraticCurveTo(len * 0.8, -26, len, 0);
-        ctx.quadraticCurveTo(len * 0.8, 26, len * 0.5, 14);
-        ctx.quadraticCurveTo(len * 0.1, 42, -len * 0.18, 16);
-        ctx.quadraticCurveTo(-len * 0.68, 36, -len * 0.98, 0);
+        points.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+        ctx.stroke();
+        ctx.translate(0, -lift);
+        // Glow, then the body as tapering segments from tail to head.
+        ctx.shadowColor = `rgba(${palette.glow}, 0.95)`;
+        ctx.shadowBlur = 24;
+        for (let i = points.length - 1; i > 0; i--) {
+            const a = points[i];
+            const b = points[i - 1];
+            ctx.strokeStyle = `rgba(${palette.body}, 0.95)`;
+            ctx.lineWidth = a.w * 2;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        // Pale belly stripe and scale marks.
+        ctx.strokeStyle = `rgba(${palette.belly}, 0.75)`;
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        points.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+        ctx.stroke();
+        for (let i = 2; i < points.length - 1; i += 2) {
+            const pt = points[i];
+            const next = points[i - 1];
+            const segAngle = Math.atan2(next.y - pt.y, next.x - pt.x);
+            ctx.save();
+            ctx.translate(pt.x, pt.y);
+            ctx.rotate(segAngle);
+            // Dorsal fin.
+            ctx.fillStyle = `rgba(${palette.mane}, 0.85)`;
+            ctx.beginPath();
+            ctx.moveTo(-8, -pt.w + 2);
+            ctx.lineTo(3, -pt.w - 13);
+            ctx.lineTo(8, -pt.w + 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+        // Head: snout, open jaw, horns, eye and whiskers.
+        const head = points[0];
+        const neck = points[1];
+        const headAngle = Math.atan2(head.y - neck.y, head.x - neck.x);
+        ctx.save();
+        ctx.translate(head.x, head.y);
+        ctx.rotate(headAngle);
+        ctx.scale(DRAGON_HEAD_SCALE, DRAGON_HEAD_SCALE);
+        ctx.shadowColor = `rgba(${palette.glow}, 1)`;
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = `rgba(${palette.body}, 1)`;
+        ctx.beginPath();
+        ctx.moveTo(-12, -14);
+        ctx.quadraticCurveTo(14, -16, 30, -5);
+        ctx.lineTo(16, -1);
+        ctx.lineTo(28, 6);
+        ctx.quadraticCurveTo(10, 14, -12, 12);
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(-len * 0.42, 0, 18, 0, Math.PI * 2);
-        ctx.fillStyle = effect.reflected ? 'rgba(255, 180, 180, 0.98)' : 'rgba(210, 255, 255, 0.98)';
-        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(${palette.belly}, 0.9)`;
+        ctx.beginPath(); ctx.moveTo(16, -1); ctx.lineTo(28, 6); ctx.lineTo(10, 7); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = `rgba(${palette.mane}, 0.95)`;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-6, -12); ctx.quadraticCurveTo(-16, -26, -28, -24); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -13); ctx.quadraticCurveTo(-8, -30, -20, -32); ctx.stroke();
+        ctx.lineWidth = 1.6;
+        const whisker = Math.sin(wave) * 6;
+        ctx.beginPath(); ctx.moveTo(24, -4); ctx.quadraticCurveTo(10, -18 + whisker, -14, -20 + whisker); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(22, 6); ctx.quadraticCurveTo(8, 18 - whisker, -14, 20 - whisker); ctx.stroke();
+        ctx.fillStyle = '#fff6c8';
+        ctx.beginPath(); ctx.ellipse(8, -7, 4, 2.6, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#10223a';
+        ctx.beginPath(); ctx.arc(9, -7, 1.6, 0, Math.PI * 2); ctx.fill();
+        // Breath glow at the mouth.
+        ctx.fillStyle = `rgba(${palette.mane}, 0.7)`;
+        ctx.beginPath(); ctx.arc(32, 1, 5 + Math.sin(wave * 2) * 2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
         ctx.restore();
     });
 }

@@ -9,10 +9,11 @@ const {
     getBowShotCount,
     clearUltimateState,
 } = require('./stats');
-const { DRAGON_SPREAD, SCYTHE_PULL_DISTANCE, GAME_WIDTH, GAME_HEIGHT, WORLD_MARGIN } = require('../config');
+const { DRAGON_SPREAD, DRAGON, SCYTHE_PULL_DISTANCE, GAME_WIDTH, GAME_HEIGHT, WORLD_MARGIN } = require('../config');
 const { hasHitTargetForKey } = require('./hits');
 const { resolveKill, forcePlayerPosition, damagePlayerFrom, stunPlayer } = require('./combat');
 const { hitMobs } = require('./mobs');
+const { markStatsDirty } = require('./sync');
 
 const { players } = state;
 
@@ -77,10 +78,11 @@ function applySwordUltimate(playerId) {
 
 const HAMMER_ULT_HALF_ARC = Math.PI / 6;
 
-// The hammer slam and the gauntlet rush plant the caster until they end.
+// The hammer slam, the gauntlet rush and the bow's dragons plant the caster until the cast ends.
+const ROOTING_ULTIMATES = new Set(['hammer', 'gauntlet', 'bow']);
 function isRootedByUltimate(player, now = Date.now()) {
     const ult = player && player.ultimate;
-    return Boolean(ult && ult.active && (ult.type === 'hammer' || ult.type === 'gauntlet') && now < (ult.endsAt || 0));
+    return Boolean(ult && ult.active && ROOTING_ULTIMATES.has(ult.type) && now < (ult.endsAt || 0));
 }
 
 function applyHammerUltimate(playerId) {
@@ -209,32 +211,43 @@ function applyBowUltimate(playerId) {
     const damageScale = (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1) * getAttackMultiplier(attacker);
     angles.forEach((angle, shot) => {
         const edge = getRayWorldEdge(attacker.x, attacker.y, angle);
-        const endX = edge.x;
-        const endY = edge.y;
-        const attackRange = Math.max(1, Math.hypot(endX - attacker.x, endY - attacker.y));
+        const start = { x: attacker.x, y: attacker.y };
+        const distance = Math.max(1, Math.hypot(edge.x - start.x, edge.y - start.y));
+        const flightMs = Math.round((distance / DRAGON.speed) * 1000);
         state.io.emit('dragonProjectile', {
             projectileId: createProjectileId('dragon'),
             originId: playerId,
-            startX: attacker.x,
-            startY: attacker.y,
-            endX,
-            endY,
+            startX: start.x,
+            startY: start.y,
+            endX: edge.x,
+            endY: edge.y,
             angle,
-            duration: Math.max(1000, Math.min(1800, Math.round(attackRange * 1.15))),
+            duration: flightMs,
             reflected: false,
         });
-        // Each dragon can hit a target once; overlapping dragons can both hit it.
+        // The dragon's body (from its head back one body length) hits what it passes over,
+        // each target once.
         const hitKey = `${playerId}:ult-bow:${now}:${shot}`;
-        for (const [targetId, target] of Object.entries(players)) {
-            if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
-            if (distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, target) > halfWidth) continue;
-            if (hasHitTargetForKey(hitKey, targetId)) continue;
-            const damage = Math.floor(26 * damageScale);
-            target.hp -= damage;
-            state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon', damage, ultimate: true });
-            if (target.hp <= 0) resolveKill(playerId, targetId);
-        }
-        hitMobs(playerId, (mob) => distToSegment({ x: attacker.x, y: attacker.y }, { x: endX, y: endY }, mob) <= halfWidth + mob.radius, Math.floor(26 * damageScale), angle, hitKey);
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        const damage = Math.floor(26 * damageScale);
+        const flight = setInterval(() => {
+            const travelled = Math.min(distance, ((Date.now() - now) / 1000) * DRAGON.speed);
+            const head = { x: start.x + dirX * travelled, y: start.y + dirY * travelled };
+            const tailAt = Math.max(0, travelled - DRAGON.bodyLength);
+            const tail = { x: start.x + dirX * tailAt, y: start.y + dirY * tailAt };
+            for (const [targetId, target] of Object.entries(players)) {
+                if (targetId === playerId || !target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) continue;
+                if (distToSegment(tail, head, target) > halfWidth) continue;
+                if (hasHitTargetForKey(hitKey, targetId)) continue;
+                target.hp -= damage;
+                state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'dragon', damage, ultimate: true });
+                if (target.hp <= 0) resolveKill(playerId, targetId);
+                markStatsDirty();
+            }
+            hitMobs(playerId, (mob) => distToSegment(tail, head, mob) <= halfWidth + mob.radius, damage, angle, hitKey);
+            if (travelled >= distance) clearInterval(flight);
+        }, DRAGON.tickMs);
     });
     state.io.emit('statsUpdate', players);
     setTimeout(() => {

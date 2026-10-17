@@ -220,3 +220,25 @@ test('a heal potion is set down at your feet and heals only its owner', async ()
     tickField(zone.startAt + 1600);
     assert.equal(attacker.hp, 59, 'nothing once the owner steps out');
 });
+
+test('bow ultimate dragons all fly at one speed, hit as they pass, and root the archer', async () => {
+    const { attackerClient, attacker, target } = await readyPair('bow');
+    // Two extra dragons from projectile upgrades.
+    attacker.stats.projectile = 1.4;
+    Object.assign(target, { x: 700, y: 300 });
+    const dragons = [];
+    attackerClient.on('dragonProjectile', (d) => dragons.push(d));
+    attackerClient.emit('useUltimate', { angle: 0 });
+    await wait(150);
+    assert.equal(dragons.length, 3);
+    for (const d of dragons) {
+        const speed = Math.hypot(d.endX - d.startX, d.endY - d.startY) / (d.duration / 1000);
+        assert.ok(Math.abs(speed - 800) < 2, `dragon speed ${speed}`);
+    }
+    assert.equal(target.hp, 100, 'the dragons have not reached the target 400px away yet');
+    attackerClient.emit('playerMovement', { x: 330, y: 300, angle: 0 });
+    await wait(50);
+    assert.equal(attacker.x, 300, 'rooted while casting');
+    await wait(400);
+    assert.ok(target.hp < 100, 'hit once the dragon passes');
+});

@@ -79,6 +79,8 @@ const ULTIMATE_COOLDOWN_CUT_PER_SPEED = 0.08;
 const ULTIMATE_MAX_COOLDOWN_CUT = 0.4;
 // Angle between the bow ultimate's dragons when projectile upgrades add more.
 const DRAGON_SPREAD = 0.16;
+// Bow ultimate dragons: all fly at one speed; their body (head back this far) hits what it passes.
+const DRAGON = { speed: 800, bodyLength: 380, tickMs: 50 };
 // Several pickups can be on the 3840x1920 map at once; a new one spawns every delay
 // while the map has fewer than the max.
 const HEAL_CROSS_MAX = 5;
@@ -190,6 +192,7 @@ module.exports = {
     ULTIMATE_COOLDOWN_CUT_PER_SPEED,
     ULTIMATE_MAX_COOLDOWN_CUT,
     DRAGON_SPREAD,
+    DRAGON,
     HEAL_CROSS_MAX,
     HEAL_CROSS_SPAWN_DELAY_MS,
     HEAL_CROSS_LIFETIME_MS,

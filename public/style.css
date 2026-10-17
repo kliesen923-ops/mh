@@ -25,22 +25,51 @@
         .death-top-entry b { color: #f1c40f; }
         .hidden { display: none !important; }
         #upgrade-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 20px; width: min(960px, 95%); justify-items: center; }
-        .card { position: relative; width: 100%; max-width: 180px; height: 220px; background: linear-gradient(135deg, #2c3e50, #000); border: 3px solid #f1c40f; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; padding: 15px; text-align: center; box-sizing: border-box; }
-        .upgrade-level-badge { position: absolute; top: 10px; right: 10px; min-width: 36px; padding: 2px 7px; border-radius: 999px; background: rgba(241, 196, 15, 0.95); color: #111; font-size: 11px; font-weight: 800; line-height: 1.2; box-sizing: border-box; }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 0 15px #f1c40f; }
-        .card h4 { color: #f1c40f; margin: 0 0 10px 0; font-size: 16px; }
-        .card p { font-size: 12px; line-height: 1.4; color: #ddd; margin: 0; }
+        /* Level-up cards: dark glass tinted with each card's --accent colour, a glowing top
+           edge, and a light sweep on hover. */
+        .card {
+            --accent: 241,196,15;
+            position: relative;
+            width: 100%;
+            max-width: 180px;
+            height: 220px;
+            overflow: hidden;
+            background:
+                radial-gradient(120% 70% at 50% 0%, rgba(var(--accent),0.28), transparent 60%),
+                linear-gradient(180deg, rgba(28,30,44,0.96), rgba(10,11,18,0.98));
+            border: 1px solid rgba(var(--accent),0.55);
+            border-radius: 16px;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+            padding: 15px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .card::before { content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 3px; border-radius: 0 0 4px 4px; background: rgb(var(--accent)); box-shadow: 0 0 14px rgba(var(--accent),0.9); }
+        .card::after { content: ""; position: absolute; top: -60%; left: -60%; width: 40%; height: 220%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent); transform: rotate(20deg); transition: left 0.5s; pointer-events: none; }
+        .card:hover::after { left: 130%; }
+        .upgrade-level-badge { position: absolute; top: 10px; right: 10px; min-width: 36px; padding: 2px 7px; border-radius: 999px; background: rgba(var(--accent), 0.18); border: 1px solid rgba(var(--accent), 0.7); color: rgb(var(--accent)); font-size: 11px; font-weight: 800; line-height: 1.2; box-sizing: border-box; }
+        .card:hover { transform: translateY(-6px); border-color: rgba(var(--accent),1); box-shadow: 0 14px 28px rgba(0,0,0,0.55), 0 0 22px rgba(var(--accent),0.45); }
+        .card:active { transform: translateY(-2px) scale(0.98); }
+        .card h4 { color: #fff; margin: 0 0 8px 0; font-size: 16px; letter-spacing: 0.3px; }
+        .card p { font-size: 12px; line-height: 1.45; color: #c9ccd8; margin: 0; }
+        .card p b { color: rgb(var(--accent)); }
         .card .icon {
-            width: 54px;
-            height: 54px;
-            margin-bottom: 10px;
+            width: 64px;
+            height: 64px;
+            margin-bottom: 12px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: radial-gradient(circle at 30% 30%, rgba(241,196,15,0.35), rgba(241,196,15,0.08) 55%, rgba(0,0,0,0.15) 100%);
-            border: 1px solid rgba(241,196,15,0.55);
-            box-shadow: inset 0 0 12px rgba(241,196,15,0.18), 0 0 12px rgba(241,196,15,0.15);
+            background: radial-gradient(circle at 35% 30%, rgba(var(--accent),0.35), rgba(var(--accent),0.08) 55%, rgba(0,0,0,0.4) 100%);
+            border: 1px solid rgba(var(--accent),0.6);
+            box-shadow: inset 0 0 12px rgba(var(--accent),0.25), 0 0 16px rgba(var(--accent),0.25);
         }
         .card .icon svg {
             width: 30px;
@@ -51,6 +80,7 @@
             stroke-linecap: round;
             stroke-linejoin: round;
         }
+        #upgrade-cards .card .icon svg.art { width: 78%; height: 78%; stroke: none; fill: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
         #upgrade-timer { font-size: 24px; color: #e74c3c; font-weight: bold; margin-top: 20px; text-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
         #nickname-input { width: min(260px, calc(100vw - 40px)); margin: 14px 0; padding: 12px 14px; border: 1px solid #555; border-radius: 8px; background: rgba(255,255,255,0.12); color: white; outline: none; font-size: 16px; text-align: center; box-sizing: border-box; }
         #nickname-input:focus { border-color: #f1c40f; box-shadow: 0 0 0 2px rgba(241,196,15,0.2); }

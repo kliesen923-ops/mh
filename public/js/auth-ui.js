@@ -22,7 +22,25 @@ function getSkillLabel(skill) {
 function getSkillCooldown(skill) {
     return SKILL_PRESETS[normalizeSkill(skill)]?.cooldown || SKILL_PRESETS.wire.cooldown;
 }
+// The attack and skill buttons show the art of the chosen weapon and skill.
+let shownControlArt = '';
+function updateControlIcons() {
+    const weapon = normalizeWeapon(player.weapon || selectedWeapon);
+    const skill = normalizeSkill(player.skill || selectedSkill);
+    if (shownControlArt === `${weapon}:${skill}`) return;
+    shownControlArt = `${weapon}:${skill}`;
+    const copyArt = (cardSelector, buttonId) => {
+        const source = document.querySelector(`${cardSelector} svg.art`);
+        const target = document.querySelector(`#${buttonId} .btn-icon`);
+        if (!source || !target) return;
+        target.setAttribute('viewBox', source.getAttribute('viewBox'));
+        target.innerHTML = source.innerHTML;
+    };
+    copyArt(`.weapon-card[data-weapon="${weapon}"]`, 'btn-attack');
+    copyArt(`.weapon-card[data-skill="${skill}"]`, 'btn-wire');
+}
 function updateSkillButtonLabel() {
+    updateControlIcons();
     const label = document.getElementById('btn-wire-label');
     if (!label) return;
     const skill = normalizeSkill(player.skill || selectedSkill);
