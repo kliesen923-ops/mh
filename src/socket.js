@@ -4,7 +4,10 @@ const {
     MOVE_TOLERANCE,
     WIRE_COOLDOWN_MS,
     WIRE_STUN_MS,
-    JUST_GUARD_WINDOW_MS,
+    PARRY_STAGGER_MS,
+    HAMMER_FINISHER_PLAYER_STUN_MS,
+    DUAL_FLANK_DAMAGE_MULT,
+    BOW_ARROW_DAMAGE,
     MAX_CHAT_LENGTH,
     GAME_WIDTH,
     GAME_HEIGHT,
@@ -34,7 +37,7 @@ const {
 } = require('./game/stats');
 const { sanitizeAction } = require('./game/action');
 const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayerHits } = require('./game/hits');
-const { resolveKill, applyBowImpact, applyAshImpact } = require('./game/combat');
+const { resolveKill, applyBowImpact, applyAshImpact, isJustGuarding, stunPlayer } = require('./game/combat');
 const { ULTIMATE_HANDLERS, isRootedByUltimate } = require('./game/ultimates');
 const { getHealingCrossList, getGiantPotionList } = require('./game/pickups');
 const { createProgression } = require('./game/progression');
@@ -267,7 +270,7 @@ function registerSocketHandlers(io) {
             const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
             const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
 
-            if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS) {
+            if (isFacingAttacker && isJustGuarding(finalTarget, now)) {
                 const tempId = attackerId; attackerId = targetId; targetId = tempId;
                 finalAttacker = players[attackerId]; finalTarget = players[targetId];
                 io.emit('chatMessage', { id: 'SYSTEM', message: `저스트 가드 성공! ${finalAttacker.name}에게 반격했습니다.` });
@@ -355,10 +358,19 @@ function registerSocketHandlers(io) {
                 if (!canHit) return;
                 if (hasHitTargetThisAttack(socket.id, targetId)) return;
 
+                const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
+                const facingDiff = getAngleDiff(target.angle, angleToAttacker);
+                const isFacingAttacker = facingDiff < (Math.PI / 3);
+                // Just guard: the hit is blocked and the attacker is staggered.
+                if (isFacingAttacker && isJustGuarding(target, now)) {
+                    io.emit('combatEffect', { x: target.x, y: target.y, angle: angleToAttacker, weapon: 'parry' });
+                    stunPlayer(socket.id, PARRY_STAGGER_MS);
+                    return;
+                }
+                const weapon = sanitizeWeapon(attacker.weapon);
                 const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
                 let damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
-                const angleToAttacker = Math.atan2(attacker.y - target.y, attacker.x - target.x);
-                const isFacingAttacker = getAngleDiff(target.angle, angleToAttacker) < (Math.PI / 3);
+                if (weapon === 'dual' && facingDiff > Math.PI / 2) damage = Math.floor(damage * DUAL_FLANK_DAMAGE_MULT);
                 if (target.isGuarding && isFacingAttacker) damage = Math.floor(damage * 0.5);
                 io.emit('combatEffect', {
                     x: target.x,
@@ -369,6 +381,7 @@ function registerSocketHandlers(io) {
                 });
                 target.hp -= damage;
                 if (target.hp <= 0) resolveKill(socket.id, targetId);
+                else if (weapon === 'hammer' && attacker.comboStep === 3) stunPlayer(targetId, HAMMER_FINISHER_PLAYER_STUN_MS);
                 io.emit('statsUpdate', players);
             }
         });
@@ -413,7 +426,7 @@ function registerSocketHandlers(io) {
             const pierced = state.attackHitTargets.get(hitKey);
             if (pierced && pierced.size >= BOW_PIERCE) return;
             if (hasHitTargetForKey(hitKey, `mob:${mob.id}`)) return;
-            const damage = Math.floor(11 * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
+            const damage = Math.floor(BOW_ARROW_DAMAGE * (attacker.stats && Number.isFinite(attacker.stats.dmg) ? attacker.stats.dmg : 1));
             damageMob(mob.id, socket.id, damage, Number(payload.angle) || 0, { fromX: attacker.x, fromY: attacker.y, knockback: BOW_MOB_KNOCKBACK });
         });
 

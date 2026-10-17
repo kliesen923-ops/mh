@@ -1,5 +1,6 @@
 const state = require('./state');
-const { JUST_GUARD_WINDOW_MS } = require('../config');
+const { JUST_GUARD_WINDOW_MS, SWORD_JUST_GUARD_WINDOW_MS, BOW_ARROW_DAMAGE } = require('../config');
+const { sanitizeWeapon } = require('../utils/sanitize');
 const { getAngleDiff, createProjectileId, randomWorldPoint } = require('../utils/geometry');
 const { updateAccountScore } = require('../db');
 const { recordRun } = require('../records');
@@ -16,6 +17,29 @@ const { resetProgression } = require('./progression');
 const { scatterXp } = require('./xpOrbs');
 
 const { players } = state;
+
+// True while the target is inside the just-guard window of a guard it just raised.
+function isJustGuarding(target, now = Date.now()) {
+    if (!target || !target.isGuarding) return false;
+    const windowMs = sanitizeWeapon(target.weapon) === 'sword' ? SWORD_JUST_GUARD_WINDOW_MS : JUST_GUARD_WINDOW_MS;
+    return (now - (target.guardStartTime || 0)) < windowMs;
+}
+
+// Stuns a player for ms unless they are already stunned.
+function stunPlayer(id, ms) {
+    const p = players[id];
+    if (!p || p.isStunned || p.hp <= 0) return;
+    const stunEndsAt = Date.now() + ms;
+    p.isStunned = true;
+    p.isAttacking = false;
+    state.io.emit('playerStunned', { id, stunned: true, stunEndsAt, stunMs: ms });
+    setTimeout(() => {
+        if (players[id] && players[id].isStunned) {
+            players[id].isStunned = false;
+            state.io.emit('playerStunned', { id, stunned: false, stunEndsAt: 0 });
+        }
+    }, ms);
+}
 
 // attackerId is null when the victim was killed by their own mobs.
 function resolveKill(attackerId, targetId) {
@@ -102,7 +126,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
     const angle = Number.isFinite(payload.angle) ? payload.angle : Math.atan2(endY - startY, endX - startX);
     const angleToAttacker = Math.atan2(finalAttacker.y - finalTarget.y, finalAttacker.x - finalTarget.x);
     const isFacingAttacker = getAngleDiff(finalTarget.angle, angleToAttacker) < (Math.PI / 3);
-    let damage = Math.floor(11 * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
+    let damage = Math.floor(BOW_ARROW_DAMAGE * (finalAttacker.stats && Number.isFinite(finalAttacker.stats.dmg) ? finalAttacker.stats.dmg : 1));
     if (shouldReflectFromSpearUltimate(finalTarget, startX, startY) && !reflected) {
         const reflectedId = createProjectileId('bowr');
         const reflectedPayload = {
@@ -129,7 +153,7 @@ function applyBowImpact(attackerId, targetId, payload, reflected) {
         setTimeout(() => applyBowImpact(targetId, attackerId, reflectedPayload, true), Math.max(180, Math.min(800, Math.round(reflectedPayload.maxDistance * 0.9))));
         return;
     }
-    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS && !reflected) {
+    if (isFacingAttacker && isJustGuarding(finalTarget, now) && !reflected) {
         const reflectedId = createProjectileId('bowr');
         const reflectedPayload = {
             projectileId: reflectedId,
@@ -242,7 +266,7 @@ function applyAshImpact(attackerId, targetId, payload, reflected) {
         return;
     }
 
-    if (finalTarget.isGuarding && isFacingAttacker && (now - (finalTarget.guardStartTime || 0)) < JUST_GUARD_WINDOW_MS) {
+    if (isFacingAttacker && isJustGuarding(finalTarget, now)) {
         const reflectDistance = Math.max(1, Math.hypot(finalAttacker.x - finalTarget.x, finalAttacker.y - finalTarget.y));
         const reflectedPayload = {
             targetId: attackerId,
@@ -295,6 +319,8 @@ function shouldReflectFromSpearUltimate(finalTarget, projectileStartX, projectil
 }
 
 module.exports = {
+    isJustGuarding,
+    stunPlayer,
     resolveKill,
     applyBowImpact,
     applyAshImpact,
