@@ -113,17 +113,19 @@ function endGiantForm(id, p, now) {
     p.stunEndsAt = stunEndsAt;
     state.io.emit('playerStunned', { id, stunned: true, stunEndsAt, stunMs: GIANT_POTION_RECOVERY_STUN_MS });
     state.io.emit('statsUpdate', players);
-    setTimeout(() => {
-        const current = players[id];
-        if (!current || !current.giantRecoveryArmed) return;
-        if (Date.now() < (current.giantRecoveryEndsAt || 0)) return;
-        current.isStunned = false;
-        current.stunEndsAt = 0;
-        current.giantRecoveryArmed = false;
-        current.giantRecoveryEndsAt = 0;
-        state.io.emit('playerStunned', { id, stunned: false, stunEndsAt: 0, stunMs: 0 });
-        state.io.emit('statsUpdate', players);
-    }, GIANT_POTION_RECOVERY_STUN_MS);
+}
+
+// Ends the post-giant stun once its time is up. This runs from the pickup loop rather than
+// a setTimeout: Node timers can fire a few ms before Date.now() reaches the end time when
+// the event loop is busy, and a timer that saw "not yet" never checked again, leaving the
+// player stunned for good.
+function endGiantRecovery(id, p) {
+    p.isStunned = false;
+    p.stunEndsAt = 0;
+    p.giantRecoveryArmed = false;
+    p.giantRecoveryEndsAt = 0;
+    state.io.emit('playerStunned', { id, stunned: false, stunEndsAt: 0, stunMs: 0 });
+    state.io.emit('statsUpdate', players);
 }
 
 function updateGiantPotions(now = Date.now()) {
@@ -146,7 +148,9 @@ function updateGiantPotions(now = Date.now()) {
     }
     if (changed) emitGiantPotionUpdate();
     for (const [id, p] of Object.entries(players)) {
-        if (p && p.giantActive && !p.giantRecoveryArmed && now >= (p.giantEndsAt || 0)) endGiantForm(id, p, now);
+        if (!p) continue;
+        if (p.giantActive && !p.giantRecoveryArmed && now >= (p.giantEndsAt || 0)) endGiantForm(id, p, now);
+        else if (p.giantRecoveryArmed && now >= (p.giantRecoveryEndsAt || 0)) endGiantRecovery(id, p);
     }
 }
 
