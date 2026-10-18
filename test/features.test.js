@@ -234,3 +234,25 @@ test('one arrow pierces up to three mobs', async () => {
     clearAllMobs();
     clearXpOrbs();
 });
+
+test('the post-giant stun always wears off on time', async () => {
+    const client = await connect();
+    const p = await readyPlayer(client);
+    const t = Date.now();
+    Object.assign(p, { giantActive: true, giantScale: 1.9, giantAttackMult: 2, giantEndsAt: t, giantRecoveryArmed: false, isStunned: false });
+
+    updateGiantPotions(t);
+    assert.equal(p.giantActive, false);
+    assert.equal(p.isStunned, true, 'stunned when the giant form ends');
+
+    updateGiantPotions(t + 999);
+    assert.equal(p.isStunned, true, 'still stunned before the second is up');
+
+    const freed = new Promise((resolve) => {
+        client.on('playerStunned', (data) => { if (data.id === client.id && !data.stunned) resolve(); });
+    });
+    updateGiantPotions(t + 1000);
+    await freed;
+    assert.equal(p.isStunned, false);
+    assert.equal(p.giantRecoveryArmed, false);
+});
