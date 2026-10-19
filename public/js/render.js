@@ -136,6 +136,14 @@ function drawCharacter(p, color) {
         } else {
             sRot = 0.02;
         }
+    } else if (weapon === 'scythe') {
+        // Carried with the blade raised behind; swings sweep wider than a sword's.
+        if (isAttacking) {
+            if (attackPhase === 1) sRot = comboStep === 2 ? 1.9 : -1.9;
+            else if (attackPhase === 2) sRot = comboStep === 2 ? -1.5 : 1.5;
+            else if (attackPhase === 3) sRot = comboStep === 2 ? -0.7 : 0.7;
+        } else if (isGuarding) sRot = 0.3;
+        else sRot = 1.25;
     } else if(isAttacking) {
         if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5);
     } else if(isGuarding) sRot = 0.2;
@@ -282,19 +290,37 @@ function drawCombatEffects() {
             ctx.beginPath();
             ctx.arc(0, 0, ring + 14, 0, Math.PI * 2);
             ctx.stroke();
+        } else if (effect.weapon === 'ult-scythe' && effect.damage) {
+            // Where the harvest cut someone.
+            ctx.strokeStyle = `rgba(210, 170, 255, ${t})`;
+            ctx.lineWidth = 8 * t + 2;
+            ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(0, 0, 34, effect.angle - 1.2, effect.angle + 0.6); ctx.stroke();
         } else if (effect.weapon === 'ult-scythe') {
-            // A full reaping circle.
-            const ring = 60 + (1 - t) * 90;
-            ctx.strokeStyle = `rgba(181, 140, 255, ${0.3 + t * 0.6})`;
-            ctx.lineWidth = 12 * t + 3;
-            ctx.beginPath();
-            ctx.arc(0, 0, ring, effect.angle, effect.angle + Math.PI * 1.7);
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(0, 0, ring - 10, effect.angle + 0.3, effect.angle + Math.PI * 1.5);
-            ctx.stroke();
+            // The harvest: one huge crescent swept across the arc ahead.
+            const half = Math.PI * 0.6;
+            const sweep = Math.min(1, (1 - t) * 3);
+            const from = effect.angle - half;
+            const to = from + half * 2 * sweep;
+            for (const [radius, width, color] of [[200, 34 * t + 6, '150, 90, 255'], [175, 14 * t + 3, '235, 220, 255'], [215, 4, '255, 255, 255']]) {
+                ctx.strokeStyle = `rgba(${color}, ${0.25 + t * 0.7})`;
+                ctx.lineWidth = width;
+                ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.arc(0, 0, radius, from, to); ctx.stroke();
+            }
+        } else if (effect.weapon === 'execute') {
+            // A vertical death-cut and a fading skull over the executed player.
+            const rise = (1 - t) * 30;
+            ctx.strokeStyle = `rgba(200, 150, 255, ${t})`;
+            ctx.lineWidth = 6 * t + 2;
+            ctx.beginPath(); ctx.moveTo(-26, -60); ctx.lineTo(26, 30); ctx.stroke();
+            ctx.save();
+            ctx.translate(0, -70 - rise);
+            ctx.fillStyle = `rgba(240, 230, 255, ${t})`;
+            ctx.beginPath(); ctx.arc(0, 0, 13, Math.PI, 0); ctx.lineTo(9, 10); ctx.lineTo(-9, 10); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = `rgba(40, 10, 70, ${t})`;
+            ctx.beginPath(); ctx.arc(-5, -1, 3.4, 0, Math.PI * 2); ctx.arc(5, -1, 3.4, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
         } else if (effect.weapon === 'ult-gauntlet') {
             // Impact star in front of the fist.
             const burst = 20 + (1 - t) * 26;

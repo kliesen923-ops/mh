@@ -61,7 +61,7 @@ function pushDamageText(x, y, amount, options = {}) {
         value,
         text: String(value),
         color: options.color || (options.ultimate ? '#ffb347' : '#ffffff'),
-        size: options.ultimate ? 22 : 15,
+        size: options.ultimate || options.crit ? 22 : 15,
         drift: (Math.random() - 0.5) * 24,
         life: 0.8,
         maxLife: 0.8,
@@ -171,7 +171,7 @@ socket.on('skillChanged', (data) => {
 });
 socket.on('combatEffect', pushCombatEffect);
 // Effects with their own drawing; any other weapon name falls back to a basic slash.
-const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash', 'parry', 'ult-scythe', 'ult-gauntlet', 'meteor']);
+const SPECIAL_EFFECTS = new Set(['ult-sword', 'ult-hammer', 'spear-ult', 'dragon', 'ult-dual', 'ash', 'parry', 'ult-scythe', 'ult-gauntlet', 'meteor', 'execute']);
 // Drawn their own way too, but their damage numbers look like normal hits.
 const PLAIN_EFFECTS = new Set(['staff', 'burn', 'trap']);
 function pushCombatEffect(effect) {
@@ -179,7 +179,7 @@ function pushCombatEffect(effect) {
     const special = SPECIAL_EFFECTS.has(effect.weapon);
     const plain = PLAIN_EFFECTS.has(effect.weapon);
     const weaponKey = special || plain ? effect.weapon : normalizeWeapon(effect.weapon);
-    const life = special ? (effect.weapon === 'meteor' ? 0.7 : 0.45) : (HIT_LIFE[weaponKey] || 0.22);
+    const life = special ? (effect.weapon === 'meteor' || effect.weapon === 'execute' ? 0.8 : 0.45) : (HIT_LIFE[weaponKey] || 0.22);
     if (special && effect.damage) spawnUltimateHitFx({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: Number(effect.angle) || 0, weapon: effect.weapon });
     if (effect.weapon === 'meteor' && !effect.damage) spawnUltimateHitFx({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: 0, weapon: 'meteor' });
     if (effect.damage && !special && !plain) spawnHitParticles({ x: Number(effect.x) || 0, y: Number(effect.y) || 0, angle: Number(effect.angle) || 0, weapon: weaponKey });
@@ -195,8 +195,14 @@ function pushCombatEffect(effect) {
         damageTexts.push({ x: Number(effect.x) || 0, y: (Number(effect.y) || 0) - 20, value: 0, text: '반격!', color: '#ffd84a', size: 20, drift: 0, life: 0.9, maxLife: 0.9 });
         if (isOnScreen(effect.x, effect.y)) playSound('hit');
     }
+    if (effect.weapon === 'execute') {
+        damageTexts.push({ x: Number(effect.x) || 0, y: (Number(effect.y) || 0) - 30, value: 0, text: '처형!', color: '#c89bff', size: 26, drift: 0, life: 1.1, maxLife: 1.1 });
+        if (isOnScreen(effect.x, effect.y)) playSound('hit');
+        return;
+    }
     if (effect.damage) {
-        pushDamageText(effect.x, effect.y, effect.damage, { ultimate: effect.ultimate || special });
+        // A scythe hit with the tip of the blade is a critical hit.
+        pushDamageText(effect.x, effect.y, effect.damage, effect.crit ? { color: '#d2a8ff', crit: true } : { ultimate: effect.ultimate || special });
         if (isOnScreen(effect.x, effect.y)) playSound('hit');
     }
 }

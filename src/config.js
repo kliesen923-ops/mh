@@ -51,6 +51,13 @@ const MOB_HIT_IMPACT = {
 };
 // The scythe's third hit drags players to this distance in front of the attacker.
 const SCYTHE_PULL_DISTANCE = 48;
+// The scythe cuts with its blade, not its shaft: a target in the outer part of the reach
+// takes extra damage, one hugging the reaper takes less. Hits on players heal the reaper.
+const SCYTHE_SWEET_SPOT = { innerRatio: 0.55, outerMult: 1.4, innerMult: 0.6 };
+const SCYTHE_LIFESTEAL = 0.25;
+// Harvest (the scythe ultimate): a rooted wind-up, then one huge sweep ahead that
+// executes anyone it leaves at or below a quarter of their health.
+const SCYTHE_HARVEST = { windupMs: 450, radius: 230, halfArc: Math.PI * 0.6, damage: 30, executeRatio: 0.25, lifesteal: 0.5 };
 // The gauntlet's third hit stops the target from guarding for this long.
 const GAUNTLET_GUARD_BREAK_MS = 1000;
 // Staff orbs fly slowly and burst on the first body they touch or at the end of their path,
@@ -183,6 +190,9 @@ module.exports = {
     COMBO_FINISHER,
     MOB_HIT_IMPACT,
     SCYTHE_PULL_DISTANCE,
+    SCYTHE_SWEET_SPOT,
+    SCYTHE_LIFESTEAL,
+    SCYTHE_HARVEST,
     GAUNTLET_GUARD_BREAK_MS,
     STAFF_ORB,
     SKILL_COOLDOWN_MS,

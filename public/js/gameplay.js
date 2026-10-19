@@ -449,11 +449,11 @@ function getShotEnd(x, y, angle, range) {
     t = Math.max(1, t);
     return { x: x + dx * t, y: y + dy * t };
 }
-// The hammer slam, gauntlet rush and bow dragons root their caster until the cast ends
-// (matches the server).
+// The hammer slam, gauntlet rush, bow dragons and scythe harvest root their caster until
+// the cast ends (matches the server).
 function isRootedByUltimate() {
     const ult = getUltimateState(player);
-    return Boolean(ult && ult.active && ['hammer', 'gauntlet', 'bow'].includes(ult.type) && Date.now() < (ult.endsAt || 0));
+    return Boolean(ult && ult.active && ['hammer', 'gauntlet', 'bow', 'scythe'].includes(ult.type) && Date.now() < (ult.endsAt || 0));
 }
 function startGearRush() {
     releaseGuardForAction();

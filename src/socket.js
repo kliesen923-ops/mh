@@ -4,6 +4,8 @@ const {
     HAMMER_FINISHER_PLAYER_STUN_MS,
     DUAL_FLANK_DAMAGE_MULT,
     SCYTHE_PULL_DISTANCE,
+    SCYTHE_SWEET_SPOT,
+    SCYTHE_LIFESTEAL,
     GAUNTLET_GUARD_BREAK_MS,
     MAX_CHAT_LENGTH,
     GAME_WIDTH,
@@ -35,7 +37,7 @@ const {
 const { sanitizeAction, enforceActionRules, trySpendSkill } = require('./game/action');
 const { applyMovement } = require('./game/movement');
 const { resetAttackHits, hasHitTargetThisAttack, hasHitTargetForKey, clearPlayerHits } = require('./game/hits');
-const { resolveKill, isJustGuarding, stunPlayer, forcePlayerPosition } = require('./game/combat');
+const { resolveKill, isJustGuarding, stunPlayer, forcePlayerPosition, healPlayer } = require('./game/combat');
 const { isGuardActive } = require('./game/defense');
 const { fireBowVolley, fireSkillShot } = require('./game/projectiles');
 const { castStaffOrb, placeHealPotion, placeTrap, getBlinkMark, placeBlinkMark, clearBlinkMark, getFieldState, clearFieldForOwner } = require('./game/field');
@@ -64,6 +66,14 @@ function applyFinisherToPlayer(attacker, weapon, targetId, target, now) {
         target.guardBrokenUntil = now + GAUNTLET_GUARD_BREAK_MS;
         state.io.emit('guardBroken', { id: targetId, until: target.guardBrokenUntil, ms: GAUNTLET_GUARD_BREAK_MS, wasGuarding });
     }
+}
+
+// The scythe hits hardest with the tip of its blade: outer part of the reach is a
+// critical hit, a target hugging the reaper only meets the shaft.
+function getScytheSweetSpot(attacker, target) {
+    const reach = getWeaponAttackProfile('scythe').reach * (attacker.stats && Number.isFinite(attacker.stats.range) ? attacker.stats.range : 1) * getAttackRangeMultiplier(attacker);
+    const outer = Math.hypot(target.x - attacker.x, target.y - attacker.y) >= reach * SCYTHE_SWEET_SPOT.innerRatio;
+    return { crit: outer, mult: outer ? SCYTHE_SWEET_SPOT.outerMult : SCYTHE_SWEET_SPOT.innerMult };
 }
 
 function registerSocketHandlers(io) {
@@ -288,6 +298,8 @@ function registerSocketHandlers(io) {
                 const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
                 let damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
                 if (weapon === 'dual' && facingDiff > Math.PI / 2) damage = Math.floor(damage * DUAL_FLANK_DAMAGE_MULT);
+                const sweetSpot = weapon === 'scythe' ? getScytheSweetSpot(attacker, target) : null;
+                if (sweetSpot) damage = Math.floor(damage * sweetSpot.mult);
                 if (isGuardActive(target, now) && isFacingAttacker) damage = Math.floor(damage * 0.5);
                 io.emit('combatEffect', {
                     x: target.x,
@@ -295,8 +307,10 @@ function registerSocketHandlers(io) {
                     angle: Number.isFinite(attacker.aAngle) ? attacker.aAngle : attacker.angle,
                     weapon: attacker.weapon || 'sword',
                     damage,
+                    crit: Boolean(sweetSpot && sweetSpot.crit),
                 });
                 target.hp -= damage;
+                if (weapon === 'scythe') healPlayer(socket.id, damage * SCYTHE_LIFESTEAL);
                 if (target.hp <= 0) resolveKill(socket.id, targetId);
                 else if (attacker.comboStep === 3) applyFinisherToPlayer(attacker, weapon, targetId, target, now);
                 io.emit('statsUpdate', players);
@@ -318,7 +332,8 @@ function registerSocketHandlers(io) {
             if (!isTargetInWeaponAttack(attacker, nearestPoint)) return;
             if (hasHitTargetThisAttack(socket.id, `mob:${mob.id}`)) return;
             const baseDamage = attacker.comboStep === 3 ? 35 : (attacker.comboStep === 2 ? 20 : 10);
-            const damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
+            let damage = Math.floor(baseDamage * attacker.stats.dmg * getAttackMultiplier(attacker));
+            if (sanitizeWeapon(attacker.weapon) === 'scythe') damage = Math.floor(damage * getScytheSweetSpot(attacker, mob).mult);
             const hitImpact = MOB_HIT_IMPACT[sanitizeWeapon(attacker.weapon)];
             const isFinisher = attacker.comboStep === 3;
             const impact = hitImpact ? {

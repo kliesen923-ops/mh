@@ -172,25 +172,36 @@ function drawDualUltimateArea(source, elapsed, remain) {
     drawUltimateTimer(range + 8, remain, ULTIMATE_COLORS.dual);
 }
 
+// Harvest: the crescent ahead darkens and fills from the reaper outward during the
+// wind-up (when it reaches the edge, the sweep lands), then fades.
+const SCYTHE_HARVEST_WINDUP_MS = 450;
 function drawScytheUltimateArea(ult, elapsed, remain) {
-    const r = ult.radius || 170;
-    ctx.fillStyle = `rgba(120, 80, 200, ${0.12 + 0.05 * Math.sin(elapsed / 70)})`;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    // Spiral arms pulling inward.
-    ctx.strokeStyle = 'rgba(200, 170, 255, 0.75)';
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 4; i++) {
-        const base = -elapsed / 160 + (i * Math.PI) / 2;
-        ctx.beginPath();
-        for (let k = 0; k <= 12; k++) {
-            const f = k / 12;
-            const a = base + f * 1.6;
-            const rr = r * (1 - f * 0.8);
-            if (k === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-        }
-        ctx.stroke();
+    const r = ult.radius || 230;
+    const half = ult.extra || Math.PI * 0.6;
+    const angle = ult.angle || 0;
+    const charge = Math.min(1, elapsed / SCYTHE_HARVEST_WINDUP_MS);
+    const swept = elapsed >= SCYTHE_HARVEST_WINDUP_MS;
+    ctx.save();
+    ctx.rotate(angle);
+    // Whole reach, faint.
+    ctx.fillStyle = swept ? `rgba(90, 40, 160, ${0.25 * remain})` : 'rgba(60, 20, 110, 0.22)';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -half, half); ctx.closePath(); ctx.fill();
+    if (!swept) {
+        // The charge creeping outward.
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * charge + 1);
+        g.addColorStop(0, 'rgba(40, 0, 70, 0.1)');
+        g.addColorStop(1, 'rgba(170, 110, 255, 0.45)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r * charge, -half, half); ctx.closePath(); ctx.fill();
     }
-    drawUltimateTimer(r + 8, remain, ULTIMATE_COLORS.scythe);
+    ctx.strokeStyle = `rgba(200, 160, 255, ${swept ? 0.6 * remain : 0.9})`;
+    ctx.lineWidth = 3;
+    ctx.setLineDash(swept ? [] : [12, 8]);
+    ctx.lineDashOffset = -elapsed / 30;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -half, half); ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    drawUltimateTimer(42, remain, ULTIMATE_COLORS.scythe);
 }
 
 function drawGauntletUltimateArea(ult, elapsed, remain) {
@@ -291,19 +302,23 @@ function drawUltimateFlourish(type, ult, source, elapsed, remain) {
             ctx.fill();
         }
     } else if (type === 'scythe') {
-        // Pale souls spiralling into the reaper.
-        const r = ult.radius || 170;
-        for (let i = 0; i < 9; i++) {
-            const phase = ((elapsed / 700) + i / 9) % 1;
-            const a = i * 0.7 + phase * 5;
-            const rr = r * (1 - phase);
-            const x = Math.cos(a) * rr;
-            const y = Math.sin(a) * rr;
-            const g = ctx.createRadialGradient(x, y, 0, x, y, 12);
-            g.addColorStop(0, `rgba(225, 205, 255, ${0.9 * (1 - phase)})`);
-            g.addColorStop(1, 'rgba(150, 90, 255, 0)');
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+        // Souls drawn into the blade while it winds up.
+        const r = ult.radius || 230;
+        if (elapsed < SCYTHE_HARVEST_WINDUP_MS) {
+            const angle = ult.angle || 0;
+            const half = ult.extra || Math.PI * 0.6;
+            for (let i = 0; i < 9; i++) {
+                const phase = ((elapsed / 450) + i / 9) % 1;
+                const a = angle - half + ((i * 0.37) % 1) * half * 2;
+                const rr = r * (1 - phase);
+                const x = Math.cos(a) * rr;
+                const y = Math.sin(a) * rr;
+                const g = ctx.createRadialGradient(x, y, 0, x, y, 12);
+                g.addColorStop(0, `rgba(225, 205, 255, ${0.9 * phase})`);
+                g.addColorStop(1, 'rgba(150, 90, 255, 0)');
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+            }
         }
     } else if (type === 'gauntlet') {
         // Fist afterimages streaking down the cone.
@@ -366,7 +381,7 @@ function drawUltimateAreas() {
         const remain = Math.max(0, Math.min(1, (ult.endsAt - now) / Math.max(1, ult.endsAt - ult.startAt)));
         const type = normalizeWeapon(ult.type);
         // Hammer, bow, gauntlet and staff fire from where they were cast; the others follow the caster.
-        const fixed = type === 'hammer' || type === 'bow' || type === 'gauntlet' || type === 'staff';
+        const fixed = type === 'hammer' || type === 'bow' || type === 'gauntlet' || type === 'staff' || type === 'scythe';
         // Their direction, size and origin come from the server, so wait for its copy
         // instead of drawing the local guess (which pointed right until it arrived).
         if (fixed && ult.predicted) return;

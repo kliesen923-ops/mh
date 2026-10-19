@@ -243,35 +243,74 @@ function drawBowModel(s) {
 }
 
 function drawScytheModel(s) {
+    // A reaper's war-scythe: a long ebony snath with a violet wrap, and a huge crescent
+    // blade swept back from the head, so it never reads as a sword.
     const finisher = s.comboStep === 3;
-    const shaftEnd = Math.max(50, s.localReach - 6);
-    ctx.fillStyle = woodFill(0, 20, 0, 26);
-    heroRoundRect(ctx, 12, 20, shaftEnd - 12, 6, 3); ctx.fill();
-    // Two hand grips sticking out of the snath.
-    ctx.fillStyle = '#2f1d12';
-    heroRoundRect(ctx, 24, 18, 7, 10, 2); ctx.fill();
-    heroRoundRect(ctx, shaftEnd * 0.6, 26, 4, 7, 1.5); ctx.fill();
-    // Iron collar and a long hooked blade.
-    ctx.fillStyle = steelFill(0, 17, 0, 29, false);
-    heroRoundRect(ctx, shaftEnd - 6, 17.5, 8, 11, 2); ctx.fill();
-    glowIf(finisher, 'rgba(160, 110, 255, 0.85)');
-    const blade = ctx.createLinearGradient(shaftEnd, -20, shaftEnd - 40, 10);
+    const now = performance.now();
+    const shaftEnd = Math.max(56, s.localReach - 4);
+    const y = 23;
+    // Snath, very slightly bowed.
+    const ebony = ctx.createLinearGradient(0, y - 4, 0, y + 4);
+    ebony.addColorStop(0, '#5a4a66'); ebony.addColorStop(0.5, '#2a2030'); ebony.addColorStop(1, '#120c16');
+    ctx.strokeStyle = ebony;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(4, y + 1); ctx.quadraticCurveTo(shaftEnd * 0.5, y + 4, shaftEnd, y); ctx.stroke();
+    // Butt spike.
+    ctx.fillStyle = steelFill(0, y - 3, 0, y + 3, false);
+    ctx.beginPath(); ctx.moveTo(4, y - 3); ctx.lineTo(-8, y + 1); ctx.lineTo(4, y + 4); ctx.closePath(); ctx.fill();
+    // Violet cloth wraps and the second grip peg.
+    ctx.strokeStyle = '#7d4bd6';
+    ctx.lineWidth = 1.6;
+    for (const x of [20, 25, 30, shaftEnd * 0.62, shaftEnd * 0.62 + 5]) {
+        ctx.beginPath(); ctx.moveTo(x - 2, y - 3.5); ctx.lineTo(x + 2, y + 4); ctx.stroke();
+    }
+    ctx.fillStyle = '#2a2030';
+    heroRoundRect(ctx, shaftEnd * 0.45, y + 2, 4, 9, 1.5); ctx.fill();
+    // Head: an iron socket with a little skull-like boss.
+    ctx.fillStyle = steelFill(0, y - 7, 0, y + 7, false);
+    heroRoundRect(ctx, shaftEnd - 9, y - 6.5, 12, 13, 3); ctx.fill();
+    ctx.fillStyle = '#e8e2d4';
+    ctx.beginPath(); ctx.arc(shaftEnd - 3, y, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a1420';
+    ctx.beginPath(); ctx.arc(shaftEnd - 4.4, y - 0.8, 0.9, 0, Math.PI * 2); ctx.arc(shaftEnd - 1.6, y - 0.8, 0.9, 0, Math.PI * 2); ctx.fill();
+    // The crescent blade: spine bulging out past the head, edge curving back to a hooked tip.
+    const tipX = shaftEnd - 62;
+    const tipY = y - 50;
+    glowIf(finisher, 'rgba(160, 110, 255, 0.9)');
+    const blade = ctx.createLinearGradient(shaftEnd, y, tipX, tipY);
     if (finisher) {
-        blade.addColorStop(0, '#fff6c8'); blade.addColorStop(1, '#c68a10');
+        blade.addColorStop(0, '#fff6c8'); blade.addColorStop(0.6, '#e0a82a'); blade.addColorStop(1, '#8a5a06');
     } else {
-        blade.addColorStop(0, '#f2eefe'); blade.addColorStop(0.5, '#b9b2d6'); blade.addColorStop(1, '#5c4f86');
+        blade.addColorStop(0, '#3c3448'); blade.addColorStop(0.45, '#8f86a8'); blade.addColorStop(1, '#e9e4f7');
     }
     ctx.fillStyle = blade;
     ctx.beginPath();
-    ctx.moveTo(shaftEnd + 2, 19);
-    ctx.quadraticCurveTo(shaftEnd + 8, -16, shaftEnd - 44, -18);
-    ctx.quadraticCurveTo(shaftEnd - 12, -6, shaftEnd - 4, 21);
+    ctx.moveTo(shaftEnd + 1, y - 6);
+    ctx.bezierCurveTo(shaftEnd + 22, y - 30, shaftEnd - 18, tipY - 10, tipX, tipY);
+    ctx.bezierCurveTo(shaftEnd - 30, tipY + 4, shaftEnd - 6, y - 22, shaftEnd - 8, y - 5);
     ctx.closePath();
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    // Bright cutting edge on the inner curve, and a darker spine ridge.
+    ctx.strokeStyle = finisher ? 'rgba(255, 250, 220, 0.95)' : 'rgba(205, 180, 255, 0.95)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.bezierCurveTo(shaftEnd - 30, tipY + 4, shaftEnd - 6, y - 22, shaftEnd - 8, y - 5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(20, 14, 26, 0.6)';
     ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(shaftEnd + 2, 17); ctx.quadraticCurveTo(shaftEnd + 7, -14, shaftEnd - 42, -17.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(shaftEnd + 1, y - 6); ctx.bezierCurveTo(shaftEnd + 18, y - 28, shaftEnd - 18, tipY - 7, tipX + 6, tipY + 1); ctx.stroke();
+    // Soul wisps drifting off the blade.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+        const t = (now / 900 + i / 4) % 1;
+        const along = 0.25 + i * 0.18;
+        const wx = shaftEnd + (tipX - shaftEnd) * along - t * 10;
+        const wy = y - 8 + (tipY - y + 8) * along - t * 14 + Math.sin(now / 200 + i) * 2;
+        ctx.fillStyle = `rgba(170, 120, 255, ${0.45 * (1 - t)})`;
+        ctx.beginPath(); ctx.arc(wx, wy, 2.4 * (1 - t) + 1, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
 }
 
 function drawGauntletModel(s) {

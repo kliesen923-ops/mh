@@ -529,6 +529,11 @@ function spawnUltimateHitFx(effect) {
     } else if (weapon === 'ult-scythe') {
         emitParticles('mist', x, y, { count: 4, speedMin: 10, speedMax: 50, life: 0.7, size: 16, color: '70, 20, 120' });
         emitParticles('ember', x, y, { count: 8, jitter: 40, size: 3, life: 0.7, color: '200, 160, 255' });
+    } else if (weapon === 'execute') {
+        emitParticles('mist', x, y, { count: 6, speedMin: 20, speedMax: 70, life: 1.0, size: 22, color: '60, 10, 100' });
+        emitParticles('glow', x, y, { color: '190, 140, 255', size: 90, life: 0.4 });
+        emitParticles('ember', x, y, { count: 14, jitter: 30, size: 3, life: 1.0, color: '230, 210, 255' });
+        if (near) shakeScreen(6, 220);
     } else if (weapon === 'ult-gauntlet') {
         emitParticles('spark', x, y, { angle, spread: 1.4, count: 8, speedMin: 200, speedMax: 400, life: 0.25, size: 2.4, color: '255, 200, 120' });
         if (near) shakeScreen(3, 120);
