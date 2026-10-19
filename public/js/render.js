@@ -56,13 +56,7 @@ function drawCharacter(p, color) {
         if (wire.kind === 'ash') {
             drawAshArrow(x, y, tipX, tipY, handAngle, wireProgress);
         } else {
-            ctx.beginPath();
-            ctx.setLineDash([5, 5]);
-            ctx.moveTo(x, y);
-            ctx.lineTo(tipX, tipY);
-            ctx.strokeStyle = "#f1c40f";
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            drawGrappleCable(x, y, tipX, tipY, wireProgress);
             drawWireHand(tipX, tipY, handAngle, wireProgress);
         }
         ctx.restore();
@@ -672,42 +666,7 @@ function drawHealingTexts() {
 }
 
 function drawAshArrow(originX, originY, tipX, tipY, angle, progress) {
-    const crystalScale = 0.92;
-    ctx.save();
-    ctx.translate(tipX, tipY);
-    ctx.rotate(angle);
-    ctx.scale(crystalScale, crystalScale);
-    ctx.shadowColor = 'rgba(90, 180, 255, 0.75)';
-    ctx.shadowBlur = 18;
-    ctx.strokeStyle = 'rgba(160, 230, 255, 0.95)';
-    ctx.fillStyle = 'rgba(80, 160, 255, 0.92)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-11, -4);
-    ctx.lineTo(-18, 0);
-    ctx.lineTo(-11, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(35, 120, 255, 0.9)';
-    ctx.beginPath();
-    ctx.moveTo(-2, 0);
-    ctx.lineTo(-16, -2.4);
-    ctx.lineTo(-34, 0);
-    ctx.lineTo(-16, 2.4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(195, 245, 255, 0.95)';
-    ctx.beginPath();
-    ctx.moveTo(-6, 0);
-    ctx.lineTo(-10, -1.4);
-    ctx.lineTo(-14, 0);
-    ctx.lineTo(-10, 1.4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    drawAshBolt(originX, originY, tipX, tipY, angle, progress);
 }
 
 function drawBowArrow(originX, originY, tipX, tipY, angle, progress, reflected) {
@@ -747,45 +706,7 @@ function drawBowArrow(originX, originY, tipX, tipY, angle, progress, reflected) 
 }
 
 function drawWireHand(tipX, tipY, angle, progress) {
-    const palmScale = 0.9 + Math.min(0.25, Math.max(0, progress) * 0.18);
-    ctx.save();
-    ctx.translate(tipX, tipY);
-    ctx.rotate(angle);
-    ctx.scale(palmScale, palmScale);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.shadowColor = 'rgba(255, 214, 140, 0.35)';
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = 'rgba(255, 225, 195, 0.95)';
-    ctx.strokeStyle = 'rgba(110, 70, 35, 0.75)';
-    ctx.lineWidth = 1.4;
-    if (typeof ctx.roundRect === 'function') {
-        ctx.beginPath();
-        ctx.roundRect(-8, -7, 16, 14, 5);
-        ctx.fill();
-        ctx.stroke();
-    } else {
-        ctx.beginPath();
-        ctx.rect(-8, -7, 16, 14);
-        ctx.fill();
-        ctx.stroke();
-    }
-    const fingerYs = [-6, -2.5, 1.5, 5];
-    fingerYs.forEach((fy, idx) => {
-        ctx.beginPath();
-        ctx.moveTo(6, fy);
-        ctx.lineTo(16 + idx * 0.3, fy * 0.72);
-        ctx.stroke();
-    });
-    ctx.beginPath();
-    ctx.moveTo(-3, 4);
-    ctx.lineTo(4, 10);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(-1, -1, 2.3, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 240, 220, 0.95)';
-    ctx.fill();
-    ctx.restore();
+    drawGrappleClaw(tipX, tipY, angle, progress);
 }
 // How much of the world fits on screen; the tilted ground shows more of it vertically.
 function getViewWorldHeight() {

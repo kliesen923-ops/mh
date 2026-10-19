@@ -587,28 +587,13 @@ function drawGearRush(p) {
     const scale = Math.max(1, Number.isFinite(p.giantScale) ? p.giantScale : 1);
     const handSpread = 14 * scale;
     const handLift = 6 * scale;
-    const leftStartX = startX + Math.cos(angle + Math.PI / 2) * handSpread;
-    const leftStartY = startY + Math.sin(angle + Math.PI / 2) * handSpread - handLift;
-    const rightStartX = startX + Math.cos(angle - Math.PI / 2) * handSpread;
-    const rightStartY = startY + Math.sin(angle - Math.PI / 2) * handSpread - handLift;
+    // The cables run from the rusher's hips to an anchor bolt lodged at the target.
+    const leftHipX = tipX + Math.cos(angle + Math.PI / 2) * handSpread;
+    const leftHipY = tipY + Math.sin(angle + Math.PI / 2) * handSpread - handLift;
+    const rightHipX = tipX + Math.cos(angle - Math.PI / 2) * handSpread;
+    const rightHipY = tipY + Math.sin(angle - Math.PI / 2) * handSpread - handLift;
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 240, 140, 0.95)';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.shadowColor = 'rgba(255, 220, 120, 0.45)';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.moveTo(leftStartX, leftStartY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(rightStartX, rightStartY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255, 245, 190, 0.95)';
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 4.5, 0, Math.PI * 2);
-    ctx.fill();
+    drawRushCables(leftHipX, leftHipY, rightHipX, rightHipY, tx, ty, angle, progress, scale);
     if (rush.mode === 'dualRush' && Date.now() < Number(rush.pauseUntil || 0)) {
         ctx.save();
         ctx.fillStyle = 'rgba(255, 240, 120, 0.98)';

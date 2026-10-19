@@ -13,24 +13,7 @@ function drawTrap(trap, now) {
     ctx.translate(trap.x, trap.y);
     // Enemies' traps are faint: easy to miss if you are not looking.
     ctx.globalAlpha = mine ? 0.95 : 0.35;
-    ctx.strokeStyle = armed ? '#c8ccd4' : 'rgba(200, 204, 212, 0.5)';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = 'rgba(40, 44, 52, 0.75)';
-    ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill();
-    // Teeth around the jaw.
-    ctx.fillStyle = armed ? '#e6e9ef' : '#8a8f99';
-    for (let i = 0; i < 10; i++) {
-        const a = (Math.PI * 2 * i) / 10;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a) * 17, Math.sin(a) * 17);
-        ctx.lineTo(Math.cos(a + 0.16) * 9, Math.sin(a + 0.16) * 9);
-        ctx.lineTo(Math.cos(a + 0.32) * 17, Math.sin(a + 0.32) * 17);
-        ctx.closePath();
-        ctx.fill();
-    }
-    ctx.fillStyle = mine ? '#e67e22' : '#e74c3c';
-    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    drawBearTrap(mine, armed, now);
     ctx.restore();
 }
 
@@ -65,6 +48,9 @@ function drawZone(zone, now) {
             ctx.fillRect(cx - 1.5, cy - 5, 3, 10);
         }
         drawUltimateTimer(zone.radius + 6, remain, '#7dffb0');
+        ctx.restore();
+        drawUpright(zone.x, zone.y, () => drawHealFlask(zone.x, zone.y, now, remain));
+        return;
     } else {
         ctx.fillStyle = `rgba(255, 90, 60, ${0.18 + 0.08 * Math.sin(now / 70)})`;
         ctx.beginPath(); ctx.arc(0, 0, zone.radius * pulse, 0, Math.PI * 2); ctx.fill();
@@ -84,20 +70,14 @@ function drawBlinkMark(mark, now) {
     ctx.save();
     ctx.translate(mark.x, mark.y);
     ctx.globalAlpha = mine ? 0.95 : 0.45;
-    ctx.rotate(now / 400);
-    ctx.strokeStyle = '#9b8cff';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = 'rgba(200, 190, 255, 0.9)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 4; i++) {
-        const a = (Math.PI / 2) * i;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
-        ctx.lineTo(Math.cos(a) * 30, Math.sin(a) * 30);
-        ctx.stroke();
-    }
+    drawBlinkRune(now);
     ctx.restore();
+    drawUpright(mark.x, mark.y, () => {
+        ctx.save();
+        ctx.globalAlpha = mine ? 1 : 0.5;
+        drawBlinkCrystal(mark.x, mark.y, now);
+        ctx.restore();
+    });
     if (mine) {
         const remain = Math.max(0, (fieldTime(mark.expiresAt) - now) / 1000);
         drawUpright(mark.x, mark.y, () => {
@@ -107,8 +87,8 @@ function drawBlinkMark(mark, now) {
             ctx.lineWidth = 4;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.fillStyle = '#d8d2ff';
-            ctx.strokeText(`${remain.toFixed(1)}초`, mark.x, mark.y - 38);
-            ctx.fillText(`${remain.toFixed(1)}초`, mark.x, mark.y - 38);
+            ctx.strokeText(`${remain.toFixed(1)}초`, mark.x, mark.y - 58);
+            ctx.fillText(`${remain.toFixed(1)}초`, mark.x, mark.y - 58);
             ctx.restore();
         });
     }
