@@ -136,6 +136,14 @@ function drawCharacter(p, color) {
         } else {
             sRot = 0.02;
         }
+    } else if (weapon === 'scythe') {
+        // Carried with the blade raised behind; swings sweep wider than a sword's.
+        if (isAttacking) {
+            if (attackPhase === 1) sRot = comboStep === 2 ? 1.9 : -1.9;
+            else if (attackPhase === 2) sRot = comboStep === 2 ? -1.5 : 1.5;
+            else if (attackPhase === 3) sRot = comboStep === 2 ? -0.7 : 0.7;
+        } else if (isGuarding) sRot = 0.3;
+        else sRot = 1.25;
     } else if(isAttacking) {
         if(attackPhase === 1) sRot = (comboStep===2?1.5:-1.5); else if(attackPhase === 2) sRot = (comboStep===2?-1.2:1.2); else if(attackPhase === 3) sRot = (comboStep===2?-0.5:0.5);
     } else if(isGuarding) sRot = 0.2;
