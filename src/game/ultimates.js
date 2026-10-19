@@ -7,11 +7,12 @@ const {
     getUltimateRangeMultiplier,
     getUltimateCooldownMs,
     getBowShotCount,
+    getMaxHpFromStats,
     clearUltimateState,
 } = require('./stats');
-const { DRAGON_SPREAD, DRAGON, SCYTHE_PULL_DISTANCE, GAME_WIDTH, GAME_HEIGHT, WORLD_MARGIN } = require('../config');
+const { DRAGON_SPREAD, DRAGON, SCYTHE_HARVEST, GAME_WIDTH, GAME_HEIGHT, WORLD_MARGIN } = require('../config');
 const { hasHitTargetForKey } = require('./hits');
-const { resolveKill, forcePlayerPosition, damagePlayerFrom, stunPlayer } = require('./combat');
+const { resolveKill, damagePlayerFrom, healPlayer, stunPlayer } = require('./combat');
 const { hitMobs } = require('./mobs');
 const { markStatsDirty } = require('./sync');
 
@@ -79,7 +80,7 @@ function applySwordUltimate(playerId) {
 const HAMMER_ULT_HALF_ARC = Math.PI / 6;
 
 // The hammer slam, the gauntlet rush and the bow's dragons plant the caster until the cast ends.
-const ROOTING_ULTIMATES = new Set(['hammer', 'gauntlet', 'bow']);
+const ROOTING_ULTIMATES = new Set(['hammer', 'gauntlet', 'bow', 'scythe']);
 function isRootedByUltimate(player, now = Date.now()) {
     const ult = player && player.ultimate;
     return Boolean(ult && ult.active && ROOTING_ULTIMATES.has(ult.type) && now < (ult.endsAt || 0));
@@ -300,13 +301,18 @@ function endUltimateLater(playerId, type, durationMs) {
     }, durationMs);
 }
 
-// Reaper's dance: drags everyone nearby in, then spins three times.
+// Harvest: the reaper roots, winds up for a moment, then sweeps one huge crescent ahead.
+// Anyone it leaves at a quarter of their health or less is executed, and the reaper
+// heals for half the damage dealt.
 function applyScytheUltimate(playerId) {
     const attacker = players[playerId];
     if (!attacker) return;
     const now = Date.now();
     const config = getUltimateConfig(attacker.weapon);
-    const radius = Math.round(170 * getUltimateRangeMultiplier(attacker));
+    const radius = Math.round(SCYTHE_HARVEST.radius * getUltimateRangeMultiplier(attacker));
+    const angle = attacker.angle;
+    const originX = attacker.x;
+    const originY = attacker.y;
     attacker.ultimate = {
         active: true,
         type: 'scythe',
@@ -314,35 +320,38 @@ function applyScytheUltimate(playerId) {
         endsAt: now + config.durationMs,
         cooldownEndsAt: now + getUltimateCooldownMs(attacker),
         radius,
-        extra: 0,
+        angle,
+        x: originX,
+        y: originY,
+        extra: SCYTHE_HARVEST.halfArc,
     };
     broadcastUltimateState(playerId);
-    for (const [targetId, target] of Object.entries(players)) {
-        if (targetId === playerId || !canBeHit(target)) continue;
-        const distance = Math.hypot(target.x - attacker.x, target.y - attacker.y);
-        if (distance > radius || distance <= SCYTHE_PULL_DISTANCE) continue;
-        const angle = Math.atan2(target.y - attacker.y, target.x - attacker.x);
-        forcePlayerPosition(targetId, attacker.x + Math.cos(angle) * SCYTHE_PULL_DISTANCE, attacker.y + Math.sin(angle) * SCYTHE_PULL_DISTANCE);
-    }
-    const spins = 3;
-    for (let i = 0; i < spins; i++) {
-        setTimeout(() => {
-            const current = players[playerId];
-            if (!current || !current.ultimate || current.ultimate.type !== 'scythe') return;
-            const key = `${playerId}:ult-scythe:${now}:${i}`;
-            const damage = 14 * damageScaleOf(current);
-            state.io.emit('combatEffect', { x: current.x, y: current.y, angle: current.angle + i * 2.1, weapon: 'ult-scythe' });
-            for (const [targetId, target] of Object.entries(players)) {
-                if (targetId === playerId || !canBeHit(target)) continue;
-                if (Math.hypot(target.x - current.x, target.y - current.y) > radius) continue;
-                if (hasHitTargetForKey(key, targetId)) continue;
-                damagePlayerFrom(playerId, targetId, damage, current.x, current.y, 'ult-scythe');
+    setTimeout(() => {
+        const current = players[playerId];
+        if (!current || !current.ultimate || current.ultimate.type !== 'scythe' || current.hp <= 0) return;
+        const key = `${playerId}:ult-scythe:${now}`;
+        const damage = SCYTHE_HARVEST.damage * damageScaleOf(current);
+        state.io.emit('combatEffect', { x: originX, y: originY, angle, weapon: 'ult-scythe' });
+        const inSweep = (t) => {
+            const dx = t.x - originX;
+            const dy = t.y - originY;
+            return Math.hypot(dx, dy) <= radius + (t.radius || 0) && getAngleDiff(angle, Math.atan2(dy, dx)) <= SCYTHE_HARVEST.halfArc;
+        };
+        let dealt = 0;
+        for (const [targetId, target] of Object.entries(players)) {
+            if (targetId === playerId || !canBeHit(target) || !inSweep(target)) continue;
+            if (hasHitTargetForKey(key, targetId)) continue;
+            dealt += damagePlayerFrom(playerId, targetId, damage, originX, originY, 'ult-scythe');
+            if (target.hp > 0 && target.hp <= getMaxHpFromStats(target.stats) * SCYTHE_HARVEST.executeRatio) {
+                state.io.emit('combatEffect', { x: target.x, y: target.y, angle, weapon: 'execute', damage: target.hp });
+                target.hp = 0;
+                resolveKill(playerId, targetId);
             }
-            hitMobs(playerId, (mob) => Math.hypot(mob.x - current.x, mob.y - current.y) <= radius + mob.radius, Math.floor(damage), current.angle, key,
-                i === 0 ? { fromX: current.x, fromY: current.y, knockback: -radius } : null);
-            state.io.emit('statsUpdate', players);
-        }, i * 300);
-    }
+        }
+        hitMobs(playerId, inSweep, Math.floor(damage * 1.5), angle, key, { fromX: originX, fromY: originY, knockback: 40 });
+        if (dealt > 0) healPlayer(playerId, dealt * SCYTHE_HARVEST.lifesteal);
+        state.io.emit('statsUpdate', players);
+    }, SCYTHE_HARVEST.windupMs);
     endUltimateLater(playerId, 'scythe', config.durationMs);
 }
 

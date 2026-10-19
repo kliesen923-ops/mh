@@ -38,16 +38,28 @@ function forcePlayerPosition(id, x, y) {
 }
 
 // Hit from an area or projectile: guarding while facing the source halves it.
+// Returns the damage dealt (0 if the target could not be hit).
 function damagePlayerFrom(attackerId, targetId, amount, fromX, fromY, effectWeapon) {
     const target = players[targetId];
-    if (!target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) return false;
+    if (!target || target.hp <= 0 || target.upgradeShield || target.isSelectingLoadout) return 0;
     const angleToSource = Math.atan2(fromY - target.y, fromX - target.x);
     let damage = Math.max(1, Math.floor(amount));
     if (isGuardActive(target) && getAngleDiff(target.angle, angleToSource) < Math.PI / 3) damage = Math.max(1, Math.floor(damage * 0.5));
     target.hp -= damage;
     state.io.emit('combatEffect', { x: target.x, y: target.y, angle: angleToSource + Math.PI, weapon: effectWeapon, damage });
     if (target.hp <= 0) resolveKill(attackerId, targetId);
-    return true;
+    return damage;
+}
+
+// Heals a living player up to their max HP and shows the number. Returns the amount healed.
+function healPlayer(id, amount) {
+    const p = players[id];
+    if (!p || p.hp <= 0) return 0;
+    const healed = Math.min(Math.floor(amount), Math.max(0, getMaxHpFromStats(p.stats) - p.hp));
+    if (healed <= 0) return 0;
+    p.hp += healed;
+    state.io.emit('healFloatingText', { playerId: id, amount: healed, x: p.x, y: p.y });
+    return healed;
 }
 
 // Stuns a player for ms unless they are already stunned.
@@ -145,6 +157,7 @@ module.exports = {
     isJustGuarding,
     forcePlayerPosition,
     damagePlayerFrom,
+    healPlayer,
     stunPlayer,
     resolveKill,
     shouldReflectFromSpearUltimate,

@@ -88,6 +88,21 @@ test('the scythe finisher drags the target in front of the reaper', async () => 
     assert.ok(Math.abs(target.x - 348) < 1, `pulled to ${target.x}`);
 });
 
+test('the scythe hits hardest with the tip of its blade and heals the reaper', async () => {
+    const { attackerClient, targetClient, attacker, target } = await readyPair('scythe');
+    attacker.hp = 50;
+    // Out at the blade: 10 * 1.3 dmg, x1.4 for the sweet spot.
+    Object.assign(target, { x: 380, y: 300 });
+    await swing(attackerClient, 1, targetClient.id);
+    assert.equal(target.hp, 100 - 18);
+    assert.equal(attacker.hp, 50 + 4, 'a quarter of the damage comes back as health');
+    // Hugging the reaper: only the shaft connects.
+    Object.assign(target, { x: 340, y: 300, hp: 100 });
+    attackerClient.emit('playerAction', { isAttacking: false, attackPhase: 0 });
+    await swing(attackerClient, 1, targetClient.id);
+    assert.equal(target.hp, 100 - 7);
+});
+
 test('the gauntlet finisher breaks a guard and blocks raising it again', async () => {
     const { attackerClient, targetClient, target } = await readyPair('gauntlet');
     Object.assign(target, { isGuarding: true, guardStartTime: Date.now() - 500 });
@@ -122,12 +137,29 @@ test('a staff orb bursts on the first body it reaches and leaves a burning patch
 });
 
 test('scythe, gauntlet and staff ultimates', async () => {
+    // Harvest: one sweep ahead after a rooted wind-up; 30 * 1.3 damage.
     const scythe = await readyPair('scythe');
-    Object.assign(scythe.target, { x: 440, y: 300 });
+    // Away from players left over by earlier tests: a kill would heal the reaper too.
+    Object.assign(scythe.attacker, { x: 1500, y: 1500 });
+    Object.assign(scythe.target, { x: 1680, y: 1500 });
     scythe.attackerClient.emit('useUltimate', { angle: 0 });
-    await wait(700);
-    assert.ok(scythe.target.x < 360, `pulled in to ${scythe.target.x}`);
-    assert.equal(scythe.target.hp, 100 - 18 * 3);
+    await wait(150);
+    assert.equal(scythe.target.hp, 100, 'nothing lands during the wind-up');
+    scythe.attacker.hp = 50;
+    scythe.attackerClient.emit('playerMovement', { x: 1520, y: 1500, angle: 0 });
+    await wait(450);
+    assert.equal(scythe.attacker.x, 1500, 'rooted while reaping');
+    assert.equal(scythe.target.hp, 100 - 39);
+    assert.equal(scythe.attacker.hp, 50 + 19, 'heals half the damage dealt');
+
+    // Left at a quarter of their health or less, they are executed.
+    const reaped = await readyPair('scythe');
+    Object.assign(reaped.target, { x: 420, y: 300, hp: 60 });
+    const deaths = reaped.target.deaths || 0;
+    reaped.attackerClient.emit('useUltimate', { angle: 0 });
+    await wait(600);
+    // 60 - 39 = 21 would have survived a plain hit.
+    assert.equal(reaped.target.deaths, deaths + 1, 'executed');
 
     const gauntlet = await readyPair('gauntlet');
     gauntlet.attackerClient.emit('useUltimate', { angle: 0 });

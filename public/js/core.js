@@ -42,7 +42,7 @@ const ULTIMATE_NAMES = {
     spear: '반사 결계',
     bow: '용의 화살',
     dual: '광폭화',
-    scythe: '사신의 원무',
+    scythe: '사신의 수확',
     gauntlet: '연타 러시',
     staff: '운석 낙하',
 };
